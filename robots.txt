@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /public-assets/images/
+Disallow: /admin/
+Disallow: /moderator/
+Disallow: /settings/
+Disallow: /notifications
+Disallow: /login
+Disallow: /register
+Disallow: /auth/
+Disallow: /search
+Disallow: /post/
+Disallow: /flag/
+Disallow: /answer/
+
+Sitemap: https://420.forum/sitemap.xml
+Sitemap: https://420.forum/sitemap_index.xml
