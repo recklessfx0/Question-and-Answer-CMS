@@ -55,7 +55,7 @@ database/schema.sql
 ### 3. Environment Configuration
 
 ```bash
-APP_NAME="420Forum Q&A"
+APP_NAME="Q&A Platform"
 APP_URL="https://your-domain.example"
 APP_ENV=production
 APP_SECURE_COOKIES=true
