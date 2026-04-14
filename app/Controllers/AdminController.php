@@ -1,0 +1,213 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use App\Services\AdminService;
+use Core\Controller;
+use Core\Csrf;
+use Core\Request;
+use Core\Response;
+use Core\Session;
+use Core\View;
+
+final class AdminController extends Controller
+{
+    public function __construct(View $view, Session $session, Csrf $csrf, private readonly AdminService $admin)
+    {
+        parent::__construct($view, $session, $csrf);
+    }
+
+    public function dashboard(): Response
+    {
+        return $this->adminView('admin/dashboard', 'Admin Panel', 'Administration dashboard.');
+    }
+
+    public function settingsPage(): Response
+    {
+        return $this->adminView('admin/settings', 'Admin Settings', 'Manage site, SEO, and security settings.');
+    }
+
+    public function categoriesPage(): Response
+    {
+        return $this->adminView('admin/categories', 'Admin Categories', 'Manage categories and subcategories.');
+    }
+
+    public function levelsPage(): Response
+    {
+        return $this->adminView('admin/levels', 'Admin Gamification Levels', 'Manage gamification levels.');
+    }
+
+    public function reactionsPage(): Response
+    {
+        return $this->adminView('admin/reactions', 'Admin Reactions', 'Manage reaction types and gamification rewards.');
+    }
+
+    public function usersPage(): Response
+    {
+        return $this->adminView('admin/users', 'Admin Users', 'Manage users and roles.');
+    }
+
+    public function tagsPage(): Response
+    {
+        return $this->adminView('admin/tags', 'Admin Tags', 'Manage tag SEO and topical descriptions.');
+    }
+
+    public function reportsPage(): Response
+    {
+        return $this->adminView('admin/reports', 'Admin Reports', 'Review user reports.');
+    }
+
+    private function adminView(string $template, string $title, string $description): Response
+    {
+        return $this->view($template, array_merge([
+            'title' => $title,
+            'metaDescription' => $description,
+        ], $this->admin->dashboard()));
+    }
+
+    /** @param array<string, string> $params */
+    public function setRole(Request $request, array $params): Response
+    {
+        $updated = $this->admin->setRole((int) ($params['id'] ?? 0), $request->string('role', 30));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'User role updated.' : 'At least one administrator must remain.');
+        return Response::redirect('/admin/users');
+    }
+
+    public function settings(Request $request): Response
+    {
+        $this->admin->saveSettings([
+            'site_title' => $request->string('site_title', 100),
+            'site_description' => $request->string('site_description', 200),
+            'recaptcha_enabled' => (string) $request->int('recaptcha_enabled', 0, 0, 1),
+            'recaptcha_site_key' => $request->string('recaptcha_site_key', 255),
+            'recaptcha_secret_key' => $request->string('recaptcha_secret_key', 255),
+            'google_auth_enabled' => (string) $request->int('google_auth_enabled', 0, 0, 1),
+            'google_client_id' => $request->string('google_client_id', 255),
+            'google_client_secret' => $request->string('google_client_secret', 255),
+        ]);
+        return Response::redirect('/admin/settings');
+    }
+
+    public function createCategory(Request $request): Response
+    {
+        $created = $this->admin->createCategory($request->int('parent_id', 0, 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
+        $this->flash($created ? 'success' : 'error', $created ? 'Category created.' : 'Category could not be created.');
+        return Response::redirect('/admin/categories');
+    }
+
+    /** @param array<string, string> $params */
+    public function updateCategory(Request $request, array $params): Response
+    {
+        $updated = $this->admin->updateCategory((int) ($params['id'] ?? 0), $request->int('parent_id', 0, 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Category updated.' : 'Category could not be updated.');
+        return Response::redirect('/admin/categories');
+    }
+
+    /** @param array<string, string> $params */
+    public function updateTag(Request $request, array $params): Response
+    {
+        $this->admin->updateTag((int) ($params['id'] ?? 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
+        return Response::redirect('/admin/tags');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteCategory(Request $request, array $params): Response
+    {
+        $deleted = $this->admin->deleteCategory((int) ($params['id'] ?? 0));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Category deleted.' : 'Category could not be deleted.');
+        return Response::redirect('/admin/categories');
+    }
+
+    public function createLevel(Request $request): Response
+    {
+        $icon = is_array($request->files['icon'] ?? null) ? $request->files['icon'] : null;
+        $created = $this->admin->createLevel(
+            $request->int('level_number', 1, 1, 100),
+            $request->string('title', 80),
+            $request->int('min_reputation', 0, 0),
+            $request->string('description', 240),
+            $request->int('is_active', 0, 0, 1) === 1,
+            $icon
+        );
+        $this->flash($created ? 'success' : 'error', $created ? 'Level created.' : 'Level could not be created.');
+
+        return Response::redirect('/admin/levels');
+    }
+
+    /** @param array<string, string> $params */
+    public function updateLevel(Request $request, array $params): Response
+    {
+        $icon = is_array($request->files['icon'] ?? null) ? $request->files['icon'] : null;
+        $updated = $this->admin->updateLevel(
+            (int) ($params['id'] ?? 0),
+            $request->int('level_number', 1, 1, 100),
+            $request->string('title', 80),
+            $request->int('min_reputation', 0, 0),
+            $request->string('description', 240),
+            $request->int('is_active', 0, 0, 1) === 1,
+            $icon
+        );
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Level updated.' : 'Level could not be updated.');
+
+        return Response::redirect('/admin/levels');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteLevel(Request $request, array $params): Response
+    {
+        $deleted = $this->admin->deleteLevel((int) ($params['id'] ?? 0));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Level deleted.' : 'Level could not be deleted.');
+        return Response::redirect('/admin/levels');
+    }
+
+    public function createReaction(Request $request): Response
+    {
+        $icon = is_array($request->files['icon'] ?? null) ? $request->files['icon'] : null;
+        $created = $this->admin->createReaction($request->string('name', 60), $request->int('reputation_delta', 1, -10, 25), $request->int('sort_order', 0, 0, 10000), $request->int('is_active', 0, 0, 1) === 1, $icon);
+        $this->flash($created ? 'success' : 'error', $created ? 'Reaction created.' : 'Reaction could not be created.');
+
+        return Response::redirect('/admin/reactions');
+    }
+
+    /** @param array<string, string> $params */
+    public function updateReaction(Request $request, array $params): Response
+    {
+        $icon = is_array($request->files['icon'] ?? null) ? $request->files['icon'] : null;
+        $updated = $this->admin->updateReaction((int) ($params['id'] ?? 0), $request->string('name', 60), $request->int('reputation_delta', 1, -10, 25), $request->int('sort_order', 0, 0, 10000), $request->int('is_active', 0, 0, 1) === 1, $icon);
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Reaction updated.' : 'Reaction could not be updated.');
+
+        return Response::redirect('/admin/reactions');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteReaction(Request $request, array $params): Response
+    {
+        $deleted = $this->admin->deleteReaction((int) ($params['id'] ?? 0));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Reaction deleted.' : 'Reaction could not be deleted.');
+
+        return Response::redirect('/admin/reactions');
+    }
+
+    /** @param array<string, string> $params */
+    public function resolveReport(Request $request, array $params): Response
+    {
+        $this->admin->resolveReport((int) ($params['id'] ?? 0), $request->string('status', 20), (int) $this->session->get('user_id'));
+        return Response::redirect('/admin/reports');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteReportedContent(Request $request, array $params): Response
+    {
+        $this->admin->deleteReportedContent($params['type'] ?? '', (int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        return Response::redirect('/admin/reports');
+    }
+
+    /** @param array<string, string> $params */
+    public function closeQuestion(Request $request, array $params): Response
+    {
+        $this->admin->closeQuestion((int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        return Response::redirect('/admin/reports');
+    }
+}
