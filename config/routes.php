@@ -1,0 +1,112 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Controllers\AdminController;
+use App\Controllers\AuthController;
+use App\Controllers\HomeController;
+use App\Controllers\ModeratorController;
+use App\Controllers\NotificationController;
+use App\Controllers\QuestionController;
+use App\Controllers\SeoController;
+use App\Controllers\UserController;
+use App\Middleware\AuthMiddleware;
+use App\Middleware\AdminMiddleware;
+use App\Middleware\CsrfMiddleware;
+use App\Middleware\ModeratorMiddleware;
+use App\Middleware\RateLimitMiddleware;
+use Core\Router;
+
+return static function (Router $router): void {
+    $router->get('/', [HomeController::class, 'index']);
+    $router->get('/activity', [HomeController::class, 'index']);
+    $router->get('/questions', [HomeController::class, 'index']);
+    $router->get('/questions/page/{page}', [HomeController::class, 'index']);
+    $router->get('/unanswered', [HomeController::class, 'unanswered']);
+    $router->get('/unanswered/page/{page}', [HomeController::class, 'unanswered']);
+    $router->get('/tags', [HomeController::class, 'tags']);
+    $router->get('/users', [HomeController::class, 'users']);
+    $router->get('/search', [HomeController::class, 'search']);
+    $router->get('/tag/{slug}', [HomeController::class, 'tag']);
+    $router->get('/tag/{slug}/page/{page}', [HomeController::class, 'tag']);
+    $router->get('/category/{slug}', [HomeController::class, 'category']);
+    $router->get('/category/{slug}/page/{page}', [HomeController::class, 'category']);
+
+    $router->get('/register', [AuthController::class, 'registerForm']);
+    $router->post('/register', [AuthController::class, 'register'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
+    $router->get('/login', [AuthController::class, 'loginForm']);
+    $router->post('/login', [AuthController::class, 'login'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/logout', [AuthController::class, 'logout'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->get('/auth/google', [AuthController::class, 'googleRedirect']);
+    $router->get('/auth/google/callback', [AuthController::class, 'googleCallback']);
+    $router->get('/forgot-password', [AuthController::class, 'forgotPasswordForm']);
+    $router->post('/forgot-password', [AuthController::class, 'forgotPassword'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
+    $router->get('/reset-password/{token}', [AuthController::class, 'resetPasswordForm']);
+    $router->post('/reset-password/{token}', [AuthController::class, 'resetPassword'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
+    $router->get('/email/verify/{token}', [AuthController::class, 'verifyEmail']);
+
+    $router->get('/ask', [QuestionController::class, 'askForm'], [AuthMiddleware::class]);
+    $router->get('/ask/suggest', [QuestionController::class, 'suggest'], [AuthMiddleware::class]);
+    $router->post('/ask', [QuestionController::class, 'store'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->get('/question/{slug}', [QuestionController::class, 'show']);
+    $router->post('/question/{slug}/answer', [QuestionController::class, 'answer'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/question/{slug}/comment', [QuestionController::class, 'commentQuestion'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/answer/{id}/comment', [QuestionController::class, 'commentAnswer'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/post/{type}/{id}/vote', [QuestionController::class, 'vote'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/post/{type}/{id}/react', [QuestionController::class, 'react'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/answer/{id}/accept', [QuestionController::class, 'accept'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->post('/flag/{type}/{id}', [QuestionController::class, 'flag'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+
+    $router->get('/user/{username}', [UserController::class, 'profile']);
+    $router->get('/settings/profile', [UserController::class, 'editProfile'], [AuthMiddleware::class]);
+    $router->post('/settings/profile', [UserController::class, 'updateProfile'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->get('/notifications', [NotificationController::class, 'index'], [AuthMiddleware::class]);
+    $router->post('/notifications/read', [NotificationController::class, 'markRead'], [CsrfMiddleware::class, AuthMiddleware::class]);
+
+    $router->get('/moderator', [ModeratorController::class, 'dashboard'], [ModeratorMiddleware::class]);
+    $router->get('/moderator/{type}/{id}/edit', [ModeratorController::class, 'editForm'], [ModeratorMiddleware::class]);
+    $router->post('/moderator/{type}/{id}/edit', [ModeratorController::class, 'update'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/{type}/{id}/delete', [ModeratorController::class, 'delete'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/question/{id}/close', [ModeratorController::class, 'closeQuestion'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/answer/{id}/verify', [ModeratorController::class, 'verifyAnswer'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/answer/{id}/unverify', [ModeratorController::class, 'unverifyAnswer'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/flags/{id}/resolve', [ModeratorController::class, 'resolveFlag'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+
+    $router->get('/admin', [AdminController::class, 'dashboard'], [AdminMiddleware::class]);
+    $router->get('/admin/settings', [AdminController::class, 'settingsPage'], [AdminMiddleware::class]);
+    $router->get('/admin/categories', [AdminController::class, 'categoriesPage'], [AdminMiddleware::class]);
+    $router->get('/admin/levels', [AdminController::class, 'levelsPage'], [AdminMiddleware::class]);
+    $router->get('/admin/reactions', [AdminController::class, 'reactionsPage'], [AdminMiddleware::class]);
+    $router->get('/admin/users', [AdminController::class, 'usersPage'], [AdminMiddleware::class]);
+    $router->get('/admin/tags', [AdminController::class, 'tagsPage'], [AdminMiddleware::class]);
+    $router->get('/admin/reports', [AdminController::class, 'reportsPage'], [AdminMiddleware::class]);
+    $router->post('/admin/users/{id}/role', [AdminController::class, 'setRole'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/settings', [AdminController::class, 'settings'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/categories', [AdminController::class, 'createCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/categories/{id}/update', [AdminController::class, 'updateCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/categories/{id}/delete', [AdminController::class, 'deleteCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/tags/{id}/update', [AdminController::class, 'updateTag'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/levels', [AdminController::class, 'createLevel'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/levels/{id}/update', [AdminController::class, 'updateLevel'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/levels/{id}/delete', [AdminController::class, 'deleteLevel'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reactions', [AdminController::class, 'createReaction'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reactions/{id}/update', [AdminController::class, 'updateReaction'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reactions/{id}/delete', [AdminController::class, 'deleteReaction'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reports/{id}/resolve', [AdminController::class, 'resolveReport'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reports/{type}/{id}/delete', [AdminController::class, 'deleteReportedContent'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/reports/question/{id}/close', [AdminController::class, 'closeQuestion'], [CsrfMiddleware::class, AdminMiddleware::class]);
+
+    $router->get('/sitemap.xml', [SeoController::class, 'sitemap']);
+    $router->get('/sitemap_index.xml', [SeoController::class, 'sitemapIndex']);
+    $router->get('/page-sitemap.xml', [SeoController::class, 'pageSitemap']);
+    $router->get('/post-sitemap.xml', [SeoController::class, 'postSitemap']);
+    $router->get('/category-sitemap.xml', [SeoController::class, 'categorySitemap']);
+    $router->get('/post_tag-sitemap.xml', [SeoController::class, 'postTagSitemap']);
+    $router->get('/author-sitemap.xml', [SeoController::class, 'authorSitemap']);
+    $router->get('/sitemap-pages.xml', [SeoController::class, 'sitemapPages']);
+    $router->get('/sitemap-questions.xml', [SeoController::class, 'sitemapQuestions']);
+    $router->get('/sitemap-taxonomy.xml', [SeoController::class, 'sitemapTaxonomy']);
+    $router->get('/sitemap-users.xml', [SeoController::class, 'sitemapUsers']);
+    $router->get('/robots.txt', [SeoController::class, 'robots']);
+    $router->get('/llms.txt', [SeoController::class, 'llms']);
+};
