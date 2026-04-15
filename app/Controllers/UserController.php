@@ -128,7 +128,7 @@ final class UserController extends Controller
         }
         $fresh = $this->users->findSessionStateById($userId);
         if ($fresh !== null) {
-            if (isset($fresh['auth_fingerprint'])) {
+            if (array_key_exists('auth_fingerprint', $fresh)) {
                 $this->session->set('_auth_fingerprint', (string) $fresh['auth_fingerprint']);
                 unset($fresh['auth_fingerprint']);
             }
