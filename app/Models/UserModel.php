@@ -308,11 +308,20 @@ final readonly class UserModel
         $this->db->execute('UPDATE users SET reputation = GREATEST(0, reputation + :delta), updated_at = NOW() WHERE id = :id', [':delta' => $delta, ':id' => $id]);
     }
 
-    public function recordReputationEvent(int $userId, int $points, string $reason, string $sourceType, int $sourceId): void
+    public function recordReputationEvent(int $userId, int $points, string $reason, string $sourceType, int $sourceId): bool
     {
-        $this->db->execute(
-            'INSERT INTO reputation_events (user_id, points, reason, source_type, source_id, created_at) VALUES (:user, :points, :reason, :source_type, :source_id, NOW())',
+        return $this->db->query(
+            'INSERT IGNORE INTO reputation_events (user_id, points, reason, source_type, source_id, created_at) VALUES (:user, :points, :reason, :source_type, :source_id, NOW())',
             [':user' => $userId, ':points' => $points, ':reason' => $reason, ':source_type' => $sourceType, ':source_id' => $sourceId]
+        )->rowCount() > 0;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function findReputationEvent(int $userId, string $sourceType, int $sourceId, string $reason): ?array
+    {
+        return $this->db->fetch(
+            'SELECT id FROM reputation_events WHERE user_id = :user AND source_type = :source_type AND source_id = :source_id AND reason = :reason LIMIT 1',
+            [':user' => $userId, ':source_type' => $sourceType, ':source_id' => $sourceId, ':reason' => $reason]
         );
     }
 

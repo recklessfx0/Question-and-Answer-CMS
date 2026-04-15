@@ -119,8 +119,7 @@ final class ReactionModel
                 continue;
             }
 
-            $params = [':post_type' => $postType, ':user' => $userId];
-            $in = $this->inParams($ids, 'reaction_target', $params);
+            $params = [':post_type' => $postType, ':user' => $userId];            $in = $this->inParams($ids, 'reaction_target', $params);
             $rows = $this->db->fetchAll(
                 "SELECT pr.post_type, pr.post_id, pr.reaction_type_id, COUNT(*) AS total,
                         MAX(CASE WHEN pr.user_id = :user THEN 1 ELSE 0 END) AS reacted

@@ -205,7 +205,8 @@ final readonly class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function search(string $query, int $limit = 20, int $offset = 0): array
     {
-        $pattern = '%' . $query . '%';
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+        $pattern = '%' . $escaped . '%';
         return $this->db->fetchAll(
             'SELECT q.*, u.username, c.name AS category_name, c.slug AS category_slug
              FROM questions q
@@ -219,7 +220,8 @@ final readonly class QuestionModel
 
     public function countSearch(string $query): int
     {
-        $pattern = '%' . $query . '%';
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+        $pattern = '%' . $escaped . '%';
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
@@ -501,7 +503,7 @@ final readonly class QuestionModel
                 continue;
             }
 
-            $this->db->execute('INSERT INTO tags (name, slug, created_at) VALUES (:name, :slug, NOW()) ON DUPLICATE KEY UPDATE name = VALUES(name)', [':name' => $name, ':slug' => $slug]);
+            $this->db->execute('INSERT INTO tags (name, slug, created_at) VALUES (:name, :slug, NOW()) ON DUPLICATE KEY UPDATE id = id', [':name' => $name, ':slug' => $slug]);
             $tagRow = $this->db->fetch('SELECT id FROM tags WHERE slug = :slug LIMIT 1', [':slug' => $slug]);
             if ($tagRow !== null) {
                 $this->db->execute('INSERT IGNORE INTO question_tags (question_id, tag_id) VALUES (:question, :tag)', [':question' => $questionId, ':tag' => (int) $tagRow['id']]);
@@ -551,6 +553,9 @@ final readonly class QuestionModel
 
     public function comment(string $type, int $postId, int $userId, string $body, ?int $parentId = null): int
     {
+        if (!in_array($type, ['answer', 'question'], true)) {
+            throw new \InvalidArgumentException("Invalid comment type: {$type}");
+        }
         $column = $type === 'answer' ? 'answer_id' : 'question_id';
         $this->db->execute("INSERT INTO comments ({$column}, parent_id, user_id, body, votes, created_at) VALUES (:post, :parent, :user, :body, 0, NOW())", [':post' => $postId, ':parent' => $parentId, ':user' => $userId, ':body' => $body]);
         return $this->db->lastInsertId();
