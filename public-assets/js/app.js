@@ -56,12 +56,23 @@
                     results.innerHTML = '';
                     return;
                 }
-                results.innerHTML = '<strong>Possible duplicates</strong>' + items.map((item) => {
+                // Rebuild DOM safely — no innerHTML for API-sourced content
+                results.innerHTML = '';
+                const header = document.createElement('strong');
+                header.textContent = 'Possible duplicates';
+                results.appendChild(header);
+                items.forEach((item) => {
                     const title = String(item.title || '');
                     const slug = String(item.slug || '');
                     const answers = Number(item.answer_count || 0);
-                    return '<a href="/question/' + encodeURIComponent(slug) + '">' + title.replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[char])) + '<span>' + answers + ' answers</span></a>';
-                }).join('');
+                    const a = document.createElement('a');
+                    a.href = '/question/' + encodeURIComponent(slug);
+                    a.textContent = title;
+                    const span = document.createElement('span');
+                    span.textContent = answers + ' answers';
+                    a.appendChild(span);
+                    results.appendChild(a);
+                });
                 results.hidden = false;
             }, 280);
         });
@@ -240,8 +251,25 @@
         event.preventDefault();
         ensureReportModal();
         lastReportFocus = document.activeElement;
-        reportForm.action = button.dataset.reportAction || '';
-        reportForm.querySelector('[data-report-csrf]').innerHTML = button.dataset.reportCsrf || '';
+        // Validate action is an internal path before assigning (defence-in-depth)
+        const reportAction = button.dataset.reportAction || '';
+        reportForm.action = /^\/[a-zA-Z0-9\-_/]+$/.test(reportAction) ? reportAction : '';
+        // Inject CSRF token via DOM API instead of innerHTML
+        const csrfContainer = reportForm.querySelector('[data-report-csrf]');
+        if (csrfContainer) {
+            // The server embeds the full <input> HTML in the data attribute; parse it safely
+            const match = (button.dataset.reportCsrf || '').match(/value="([^"]*)"/);
+            if (match) {
+                let csrfInput = csrfContainer.querySelector('input[name="_csrf"]');
+                if (!csrfInput) {
+                    csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = '_csrf';
+                    csrfContainer.appendChild(csrfInput);
+                }
+                csrfInput.value = match[1];
+            }
+        }
         reportReason.value = '';
         reportModal.hidden = false;
         reportReason.focus();
