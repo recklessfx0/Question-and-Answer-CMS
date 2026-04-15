@@ -14,16 +14,24 @@ final readonly class RateLimitMiddleware
 
     public function handle(Request $request, callable $next): Response
     {
-        $bucket = $request->method . ':' . $request->path;
+        $bucket = $request->method . ':' . $this->normaliseBucket($request->path);
         $identifier = $request->clientIp();
         [$limit, $window] = $this->limitsForPath($request->path);
 
-        if ($this->limiter->tooManyAttempts($bucket, $identifier, $limit, $window)) {
-            return new Response('Too many attempts. Try again later.', 429, ['Content-Type' => 'text/plain; charset=utf-8']);
+        // hitAndCheck() records the attempt and checks the limit atomically under a file lock,
+        // preventing the TOCTOU race where two concurrent requests both pass the check.
+        if ($this->limiter->hitAndCheck($bucket, $identifier, $limit, $window)) {
+            return new Response('Too many attempts. Try again later.', 429, ['Content-Type' => 'text/plain; charset=utf-8', 'Retry-After' => (string) $window]);
         }
 
-        $this->limiter->hit($bucket, $identifier, $window);
         return $next($request);
+    }
+
+    private function normaliseBucket(string $path): string
+    {
+        // Collapse dynamic path segments (UUIDs, slugs, numeric IDs) so that
+        // /question/foo/answer and /question/bar/answer share the same bucket.
+        return (string) preg_replace('/[a-z0-9]{8,}(-[a-z0-9]+)*|[0-9]+/i', '*', $path);
     }
 
     /** @return array{0: int, 1: int} */
