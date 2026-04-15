@@ -63,7 +63,9 @@ final readonly class AuthService
     {
         $user = $this->users->findByEmail($email);
         if ($user === null) {
-            password_verify($password, '$argon2id$v=19$m=65536,t=4,p=1$N2FYcWJDQ1BtMHR1TWJGRw$Eu9opMtyQKLwdSMA1cx8ejLDu0TRaLAmcUaVKA1TZHE');
+            // Perform a dummy verification to equalise timing regardless of whether the email exists.
+            // The hash is a valid Argon2id hash of a random string so the verify path is identical.
+            password_verify($password, '$argon2id$v=19$m=65536,t=4,p=1$c29tZXNhbHRzb21lc2FsdA$z6Ek4JnI2j6kxLQ5pUMjhXbJKoVkmvVqV3y/I2nXsKw');
             return false;
         }
 
@@ -141,7 +143,7 @@ final readonly class AuthService
     {
         $this->session->regenerate();
         $this->session->set('user_id', (int) $user['id']);
-        if (isset($user['auth_fingerprint'])) {
+        if (array_key_exists('auth_fingerprint', $user)) {
             $this->session->set('_auth_fingerprint', (string) $user['auth_fingerprint']);
             unset($user['auth_fingerprint']);
         }

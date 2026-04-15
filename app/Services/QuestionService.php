@@ -40,10 +40,11 @@ final readonly class QuestionService
         }
 
         $meta = excerpt($body, 155);
-        [$id, $slug] = $this->createQuestionWithUniqueSlug((int) $this->session->get('user_id'), $categoryId, $title, $body, $meta);
+        $userId = (int) $this->session->get('user_id');
+        [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);
         $this->queue->push('NotifyModerators', ['question_id' => $id]);
-        $this->gamification->award((int) $this->session->get('user_id'), 3, 'question_created', 'question', $id);
+        $this->gamification->award($userId, 3, 'question_created', 'question', $id);
 
         return ['ok' => true, 'slug' => $slug, 'errors' => []];
     }
@@ -177,9 +178,17 @@ final readonly class QuestionService
         }
 
         $attachments = [];
+        $totalBytes = 0;
+        $maxTotalBytes = 20_000_000; // 20 MB combined cap across all uploads in one post
+
         foreach ($this->uploadList($media) as $file) {
             if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
                 continue;
+            }
+
+            $totalBytes += (int) ($file['size'] ?? 0);
+            if ($totalBytes > $maxTotalBytes) {
+                break;
             }
 
             try {

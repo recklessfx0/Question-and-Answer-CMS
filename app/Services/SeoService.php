@@ -448,7 +448,7 @@ final readonly class SeoService
             '@type' => 'Person',
             'name' => (string) $profile['username'],
             'url' => $profileUrl,
-            'description' => trim((string) ($profile['bio'] ?? '')) !== '' ? excerpt((string) $profile['bio'], 240) : 'Community contributor on 420Forum Q&A.',
+            'description' => trim((string) ($profile['bio'] ?? '')) !== '' ? excerpt((string) $profile['bio'], 240) : 'Community contributor.',
             'interactionStatistic' => [
                 [
                     '@type' => 'InteractionCounter',

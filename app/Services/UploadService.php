@@ -169,6 +169,10 @@ final readonly class UploadService
         }
 
         if ($avifOk && is_file($avifTarget)) {
+            // Remove the webp if avif was successfully written to save disk space
+            if ($webpOk && is_file($webpTarget)) {
+                @unlink($webpTarget);
+            }
             return $avif;
         }
         if ($webpOk && is_file($webpTarget)) {

@@ -28,8 +28,13 @@ final readonly class GamificationService
         }
 
         $this->users->transaction(function () use ($userId, $points, $reason, $sourceType, $sourceId): void {
+            // INSERT IGNORE returns 0 rows affected when the unique key already exists,
+            // preventing double-awards in concurrent requests without a separate SELECT.
+            $inserted = $this->users->recordReputationEvent($userId, $points, $reason, $sourceType, $sourceId);
+            if (!$inserted) {
+                return;
+            }
             $this->users->adjustReputation($userId, $points);
-            $this->users->recordReputationEvent($userId, $points, $reason, $sourceType, $sourceId);
             $this->syncBadges($userId);
         });
     }

@@ -95,7 +95,7 @@ final readonly class GoogleAuthService
         $this->users->updateLastLogin((int) $user['id']);
         $this->session->regenerate();
         $this->session->set('user_id', (int) $user['id']);
-        if (isset($user['auth_fingerprint'])) {
+        if (array_key_exists('auth_fingerprint', $user)) {
             $this->session->set('_auth_fingerprint', (string) $user['auth_fingerprint']);
             unset($user['auth_fingerprint']);
         }
