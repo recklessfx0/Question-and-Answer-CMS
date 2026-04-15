@@ -1,4 +1,4 @@
-# 🚀 Q&A Platform  
+# 🚀 Question and Answer Platform
 **High-performance, secure, SEO-optimized PHP Q&A system (No framework, No Composer)**
 
 Q&A Platform is a **lightweight, production-ready question & answer system** built with **pure PHP 8.2+**, designed for **maximum performance, strong security, and SEO dominance**.
