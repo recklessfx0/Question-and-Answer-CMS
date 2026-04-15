@@ -9,7 +9,10 @@ function h(mixed $value): string
 
 function url(string $path = ''): string
 {
-    $base = rtrim((string) (require BASE_PATH . '/config/app.php')['url'], '/');
+    static $base = null;
+    if ($base === null) {
+        $base = rtrim((string) (require BASE_PATH . '/config/app.php')['url'], '/');
+    }
     return $base . '/' . ltrim($path, '/');
 }
 
