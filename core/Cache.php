@@ -41,8 +41,9 @@ final readonly class Cache
 
     public function remember(string $key, int $seconds, callable $callback): mixed
     {
-        $cached = $this->get($key, null);
-        if ($cached !== null) {
+        $sentinel = "\x00__MISS__\x00";
+        $cached = $this->get($key, $sentinel);
+        if ($cached !== $sentinel) {
             return $cached;
         }
 

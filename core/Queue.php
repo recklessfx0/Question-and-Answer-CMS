@@ -115,7 +115,8 @@ final class Queue
         $threshold = time() - 900;
 
         foreach ($files as $file) {
-            if (@filemtime($file) === false || (int) filemtime($file) > $threshold) {
+            $mtime = @filemtime($file);
+            if ($mtime === false || $mtime > $threshold) {
                 continue;
             }
 

@@ -13,11 +13,52 @@ final readonly class RateLimiter
         }
     }
 
+    /**
+     * Atomically record a hit and return true if the limit is exceeded AFTER this hit.
+     * Uses an exclusive file lock so concurrent requests cannot both slip through
+     * the check+increment window (TOCTOU race).
+     */
+    public function hitAndCheck(string $bucket, string $identifier, int $limit, int $seconds): bool
+    {
+        $file = $this->file($bucket, $identifier);
+        $fh = fopen($file, 'c+');
+        if ($fh === false) {
+            // If we can't open the file, fail open (don't block the request)
+            return false;
+        }
+
+        flock($fh, LOCK_EX);
+
+        try {
+            $size = filesize($file);
+            $raw = $size > 0 ? fread($fh, (int) $size) : '';
+            $hits = is_string($raw) && $raw !== '' ? json_decode($raw, true) : [];
+            $threshold = time() - $seconds;
+            $hits = array_values(array_filter(is_array($hits) ? $hits : [], static fn (mixed $hit): bool => is_int($hit) && $hit >= $threshold));
+            $hits[] = time();
+
+            ftruncate($fh, 0);
+            rewind($fh);
+            fwrite($fh, json_encode($hits, JSON_THROW_ON_ERROR));
+        } finally {
+            flock($fh, LOCK_UN);
+            fclose($fh);
+        }
+
+        return count($hits) > $limit;
+    }
+
+    /**
+     * @deprecated Use hitAndCheck() for atomic check+increment. Kept for backwards compatibility.
+     */
     public function tooManyAttempts(string $bucket, string $identifier, int $limit, int $seconds): bool
     {
         return count($this->hits($bucket, $identifier, $seconds)) >= $limit;
     }
 
+    /**
+     * @deprecated Use hitAndCheck() for atomic check+increment. Kept for backwards compatibility.
+     */
     public function hit(string $bucket, string $identifier, int $seconds): void
     {
         $hits = $this->hits($bucket, $identifier, $seconds);

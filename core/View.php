@@ -8,23 +8,28 @@ use App\Models\SettingsModel;
 use RuntimeException;
 use Throwable;
 
-final readonly class View
+final class View
 {
+    /** @var array<string, string>|null */
+    private ?array $cachedSettings = null;
+
     public function __construct(
-        private string $path,
-        private Container $container,
+        private readonly string $path,
+        private readonly Container $container,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function render(string $template, array $data = [], ?string $layout = null): string
     {
         $session = $this->container->get(Session::class);
-        $settings = [];
-        try {
-            $settings = $this->container->get(SettingsModel::class)->all();
-        } catch (Throwable) {
-            $settings = [];
+        if ($this->cachedSettings === null) {
+            try {
+                $this->cachedSettings = $this->container->get(SettingsModel::class)->all();
+            } catch (Throwable) {
+                $this->cachedSettings = [];
+            }
         }
+        $settings = $this->cachedSettings;
 
         $common = [
             'session' => $session,

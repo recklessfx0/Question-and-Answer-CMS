@@ -39,6 +39,11 @@ final class Session
         if (isset($_SESSION['_ua']) && $_SESSION['_ua'] !== $userAgent) {
             $this->destroy();
             session_start();
+            // New session: initialise tracking fields immediately
+            $_SESSION['_created_at'] = time();
+            $_SESSION['_last_regeneration'] = time();
+            $_SESSION['_ua'] = $userAgent;
+            return;
         }
 
         $_SESSION['_created_at'] ??= time();
@@ -51,6 +56,7 @@ final class Session
             $_SESSION['_created_at'] = time();
             $_SESSION['_last_regeneration'] = 0;
             $_SESSION['_ua'] = $userAgent;
+            return;
         }
 
         if (time() - (int) $_SESSION['_last_regeneration'] > 300) {

@@ -63,12 +63,12 @@ final class Markdown
             }
 
             if (str_starts_with($block, '### ')) {
-                $html[] = '<h3>' . substr($block, 4) . '</h3>';
+                $html[] = '<h3>' . mb_substr($block, 4) . '</h3>';
                 continue;
             }
 
             if (str_starts_with($block, '## ')) {
-                $html[] = '<h2>' . substr($block, 3) . '</h2>';
+                $html[] = '<h2>' . mb_substr($block, 3) . '</h2>';
                 continue;
             }
 

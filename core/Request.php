@@ -57,7 +57,10 @@ final readonly class Request
         }
 
         $clean = str_replace("\0", '', trim((string) $value));
+        // Strip ASCII control characters
         $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $clean) ?? '';
+        // Strip Unicode bidi override / embedding characters (Trojan Source / UI-spoofing)
+        $clean = preg_replace('/[\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $clean) ?? '';
 
         return mb_substr($clean, 0, $max);
     }

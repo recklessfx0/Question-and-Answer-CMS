@@ -85,7 +85,9 @@ final readonly class Kernel
         }
 
         $session->set('_auth_fingerprint', $latestFingerprint);
-        unset($user['auth_fingerprint']);
+        if (array_key_exists('auth_fingerprint', $user)) {
+            unset($user['auth_fingerprint']);
+        }
         $session->set('user', $user);
     }
 
@@ -100,6 +102,11 @@ final readonly class Kernel
             if (str_starts_with($request->path, $prefix)) {
                 return false;
             }
+        }
+
+        // Also exclude the bare /question path to avoid caching redirect-like responses
+        if ($request->path === '/question') {
+            return false;
         }
 
         return true;
