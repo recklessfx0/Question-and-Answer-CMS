@@ -90,29 +90,50 @@ final class HomeController extends Controller
         ]);
     }
 
-    public function tags(): Response
+    public function tags(Request $request, array $params = []): Response
     {
-        $tags = $this->questions->popularTags();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = 48;
+        $total = $this->questions->countTags();
+        if ($this->pageOutOfRange($page, $total, $perPage)) {
+            return $this->view('errors/http', ['status' => 404, 'message' => 'Page not found'], 404);
+        }
+        $tags = $this->questions->popularTags($perPage, ($page - 1) * $perPage);
+        $canonical = $page > 1 ? url('/tags/page/' . $page) : url('/tags');
+        $pagination = $this->pagination('/tags', $page, $total, false, $perPage);
 
         return $this->view('home/tags', [
-            'title' => 'Tags',
+            'title' => $page > 1 ? 'Tags - Page ' . $page : 'Tags',
             'metaDescription' => 'Browse all question tags.',
-            'canonical' => url('/tags'),
+            'canonical' => $canonical,
             'schema' => $this->seo->tagDirectorySchema($tags),
             'tags' => $tags,
+            'page' => $page,
+            'pagination' => $pagination,
         ]);
     }
 
-    public function users(): Response
+    /** @param array<string, string> $params */
+    public function users(Request $request, array $params = []): Response
     {
-        $users = $this->users->publicUsers();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = 24;
+        $total = $this->users->count();
+        if ($this->pageOutOfRange($page, $total, $perPage)) {
+            return $this->view('errors/http', ['status' => 404, 'message' => 'Page not found'], 404);
+        }
+        $users = $this->users->publicUsers($perPage, ($page - 1) * $perPage);
+        $canonical = $page > 1 ? url('/users/page/' . $page) : url('/users');
+        $pagination = $this->pagination('/users', $page, $total, false, $perPage);
 
         return $this->view('home/users', [
-            'title' => 'Users',
+            'title' => $page > 1 ? 'Users - Page ' . $page : 'Users',
             'metaDescription' => 'Browse community members.',
-            'canonical' => url('/users'),
+            'canonical' => $canonical,
             'schema' => $this->seo->userDirectorySchema($users),
             'users' => $users,
+            'page' => $page,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -185,9 +206,9 @@ final class HomeController extends Controller
     }
 
     /** @return array{current: int, total_pages: int, total_items: int, base: string, query_mode: bool, window: array<int, int>, previous: string|null, next: string|null} */
-    private function pagination(string $base, int $page, int $total, bool $queryMode = false): array
+    private function pagination(string $base, int $page, int $total, bool $queryMode = false, int $perPage = self::PAGE_SIZE): array
     {
-        $totalPages = max(1, (int) ceil($total / self::PAGE_SIZE));
+        $totalPages = max(1, (int) ceil($total / $perPage));
         $page = min(max(1, $page), $totalPages);
         $start = max(1, $page - 2);
         $end = min($totalPages, $page + 2);
@@ -216,12 +237,12 @@ final class HomeController extends Controller
         ];
     }
 
-    private function pageOutOfRange(int $page, int $total): bool
+    private function pageOutOfRange(int $page, int $total, int $perPage = self::PAGE_SIZE): bool
     {
         if ($page <= 1) {
             return false;
         }
 
-        return $page > max(1, (int) ceil($total / self::PAGE_SIZE));
+        return $page > max(1, (int) ceil($total / $perPage));
     }
 }
