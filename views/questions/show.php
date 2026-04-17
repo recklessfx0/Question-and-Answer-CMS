@@ -254,6 +254,41 @@ $renderCommentTree = static function (array $comment, string $composerId, string
     </section>
 </article>
 
+<?php if ($related !== []): ?>
+    <aside class="related-questions" aria-label="Related questions">
+        <header class="related-header">
+            <h2>Related Questions</h2>
+            <p class="related-subtitle">You might also find these helpful</p>
+        </header>
+        <div class="related-list">
+            <?php foreach (array_slice($related, 0, 4) as $item):
+                $answerCount  = (int) ($item['answer_count'] ?? 0);
+                $votes        = (int) ($item['votes'] ?? 0);
+                $hasAccepted  = !empty($item['has_accepted']);
+                $hasAnswers   = $answerCount > 0;
+                $statusClass  = $hasAccepted ? 'related-answers-accepted' : ($hasAnswers ? 'related-answers-open' : 'related-answers-none');
+            ?>
+                <a class="related-item" href="/question/<?= h((string) $item['slug']) ?>">
+                    <div class="related-item-counters">
+                        <span class="related-counter related-counter-votes" title="<?= $votes ?> vote<?= $votes !== 1 ? 's' : '' ?>">
+                            <strong><?= $votes ?></strong>
+                            <span>vote<?= $votes !== 1 ? 's' : '' ?></span>
+                        </span>
+                        <span class="related-counter related-counter-answers <?= $statusClass ?>" title="<?= $answerCount ?> answer<?= $answerCount !== 1 ? 's' : '' ?><?= $hasAccepted ? ' (accepted)' : '' ?>">
+                            <strong><?= $answerCount ?></strong>
+                            <span>ans</span>
+                        </span>
+                    </div>
+                    <h3 class="related-item-title"><?= h((string) $item['title']) ?></h3>
+                    <?php if ($hasAccepted): ?>
+                        <span class="related-accepted-mark" aria-label="Has accepted answer" title="Has accepted answer">&#10003;</span>
+                    <?php endif; ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </aside>
+<?php endif; ?>
+
 <section class="answers" aria-label="Answers">
     <h2><?= count($answers) ?> Answers</h2>
     <?php foreach ($answers as $answer): ?>
@@ -368,11 +403,3 @@ $renderCommentTree = static function (array $comment, string $composerId, string
     <p><a href="/login">Sign in</a> to answer.</p>
 <?php endif; ?>
 
-<?php if ($related !== []): ?>
-    <aside class="related">
-        <h2>Related questions</h2>
-        <?php foreach ($related as $item): ?>
-            <a href="/question/<?= h((string) $item['slug']) ?>"><?= h((string) $item['title']) ?></a>
-        <?php endforeach; ?>
-    </aside>
-<?php endif; ?>
