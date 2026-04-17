@@ -25,7 +25,9 @@ return static function (Router $router): void {
     $router->get('/unanswered', [HomeController::class, 'unanswered']);
     $router->get('/unanswered/page/{page}', [HomeController::class, 'unanswered']);
     $router->get('/tags', [HomeController::class, 'tags']);
+    $router->get('/tags/page/{page}', [HomeController::class, 'tags']);
     $router->get('/users', [HomeController::class, 'users']);
+    $router->get('/users/page/{page}', [HomeController::class, 'users']);
     $router->get('/search', [HomeController::class, 'search']);
     $router->get('/tag/{slug}', [HomeController::class, 'tag']);
     $router->get('/tag/{slug}/page/{page}', [HomeController::class, 'tag']);
