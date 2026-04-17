@@ -21,6 +21,14 @@ final readonly class RateLimiter
     public function hitAndCheck(string $bucket, string $identifier, int $limit, int $seconds): bool
     {
         $file = $this->file($bucket, $identifier);
+        
+        // Ensure directory exists before attempting to write
+        $dir = dirname($file);
+        if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+            // If we can't create the directory, fail open
+            return false;
+        }
+        
         $fh = fopen($file, 'c+');
         if ($fh === false) {
             // If we can't open the file, fail open (don't block the request)

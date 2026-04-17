@@ -35,7 +35,7 @@ final class Session
         ]);
         session_start();
 
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $userAgent = $this->serverUserAgent();
         if (isset($_SESSION['_ua']) && $_SESSION['_ua'] !== $userAgent) {
             $this->destroy();
             session_start();
@@ -103,6 +103,15 @@ final class Session
     public function remove(string $key): void
     {
         unset($_SESSION[$key]);
+    }
+
+    private function serverUserAgent(): string
+    {
+        if (!isset($_SERVER['HTTP_USER_AGENT'])) {
+            return '';
+        }
+        $ua = $_SERVER['HTTP_USER_AGENT'];
+        return is_string($ua) ? substr($ua, 0, 500) : '';
     }
 
     public function flash(string $key, string $message): void
