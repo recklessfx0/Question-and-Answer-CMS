@@ -40,7 +40,13 @@ $redactedJob = static function (array $job): array {
     return $copy;
 };
 
-while ($job = $queue->pop()) {
+while (true) {
+    $job = $queue->pop();
+    if ($job === null) {
+        sleep(1);
+        continue;
+    }
+
     try {
         $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
         $name = (string) ($job['job'] ?? '');
@@ -69,8 +75,9 @@ while ($job = $queue->pop()) {
             }
         }
 
-        $queue->complete($job);
+        // Log before completing so a log-write failure surfaces as a retry rather than silent loss
         file_put_contents(STORAGE_PATH . '/logs/queue.log', '[' . date(DATE_ATOM) . '] processed ' . json_encode($redactedJob($job), JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
+        $queue->complete($job);
     } catch (\Throwable $e) {
         $queue->release($job, $e->getMessage());
         $logger->error($e);

@@ -1,0 +1,22 @@
+# Local environment configuration (contains real credentials — never commit)
+config/database.local.php
+config/local.php
+
+# Runtime storage (sessions, cache, queue jobs, logs)
+storage/sessions/
+storage/cache/
+storage/logs/
+storage/queue/
+
+# User-uploaded media
+public-assets/images/avatars/
+public-assets/images/uploads/
+public-assets/images/levels/
+public-assets/images/reactions/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
