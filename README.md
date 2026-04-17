@@ -4,6 +4,7 @@
 Q&A Platform is a **lightweight, production-ready question & answer system** built with **pure PHP 8.2+**, designed for **maximum performance, strong security, and SEO dominance**.
 
 <video src="video-questionandanswer.mp4" controls width="600"></video>
+![video](video-questionandanswer.mp4)
 
 This project follows a **custom MVC architecture** with zero external dependencies, giving developers full control and transparency.
 
