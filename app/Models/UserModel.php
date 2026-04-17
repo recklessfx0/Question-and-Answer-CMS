@@ -466,7 +466,7 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function publicUsers(int $limit = 100): array
+    public function publicUsers(int $limit = 100, int $offset = 0): array
     {
         return $this->db->fetchAll(
             'SELECT u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at,
@@ -477,8 +477,8 @@ final readonly class UserModel
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
              GROUP BY u.id, u.username, u.updated_at, u.created_at
              ORDER BY u.reputation DESC, u.created_at DESC
-             LIMIT :limit',
-            [':limit' => $limit]
+             LIMIT :limit OFFSET :offset',
+            [':limit' => $limit, ':offset' => $offset]
         );
     }
 

@@ -292,16 +292,22 @@ final readonly class QuestionModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function popularTags(int $limit = 100): array
+    public function popularTags(int $limit = 100, int $offset = 0): array
     {
         return $this->db->fetchAll(
             'SELECT t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro, COUNT(qt.question_id) AS question_count
              FROM tags t
              LEFT JOIN question_tags qt ON qt.tag_id = t.id
              GROUP BY t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro
-             ORDER BY question_count DESC, t.name ASC LIMIT :limit',
-            [':limit' => $limit]
+             ORDER BY question_count DESC, t.name ASC LIMIT :limit OFFSET :offset',
+            [':limit' => $limit, ':offset' => $offset]
         );
+    }
+
+    public function countTags(): int
+    {
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM tags');
+        return (int) ($row['total'] ?? 0);
     }
 
     /** @return array<string, mixed>|null */
@@ -807,10 +813,13 @@ final readonly class QuestionModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function related(int $questionId, int $limit = 5): array
+    public function related(int $questionId, int $limit = 4): array
     {
         return $this->db->fetchAll(
-            'SELECT DISTINCT q.id, q.title, q.slug
+            'SELECT DISTINCT q.id, q.title, q.slug,
+                    COALESCE(q.votes, 0) AS votes,
+                    (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL) AS answer_count,
+                    EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.is_accepted = 1 AND a.deleted_at IS NULL) AS has_accepted
              FROM questions q
              JOIN question_tags qt ON qt.question_id = q.id
              WHERE qt.tag_id IN (SELECT tag_id FROM question_tags WHERE question_id = :id)
