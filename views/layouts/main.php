@@ -59,7 +59,7 @@ if (isset($schemas) && is_array($schemas)) {
     <link rel="preload" href="/public-assets/css/app.css" as="style">
     <link rel="stylesheet" href="/public-assets/css/app.css">
     <?php foreach ($schemaBlocks as $schemaBlock): ?>
-        <script type="application/ld+json"><?= $schemaBlock ?></script>
+        <script type="application/ld+json"><?= str_replace(['</', '<', '>'], ['\u003C/', '\u003C', '\u003E'], (string) $schemaBlock) ?></script>
     <?php endforeach; ?>
     <?php if (isset($securitySettings) && is_array($securitySettings) && setting_enabled($securitySettings, 'recaptcha_enabled') && trim((string) ($securitySettings['recaptcha_site_key'] ?? '')) !== ''): ?>
         <link rel="preconnect" href="https://www.google.com">
