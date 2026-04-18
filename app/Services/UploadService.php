@@ -72,6 +72,12 @@ final readonly class UploadService
             throw new RuntimeException('Upload failed.');
         }
 
+        // Size check comes first — before any file reading — so oversized uploads
+        // are rejected without touching the filesystem or running GD.
+        if ((int) ($file['size'] ?? 0) > 12_000_000) {
+            throw new RuntimeException('Upload is too large.');
+        }
+
         $tmp = (string) ($file['tmp_name'] ?? '');
         if ($tmp === '' || !is_file($tmp)) {
             throw new RuntimeException('Upload is invalid.');
@@ -86,10 +92,6 @@ final readonly class UploadService
         $extensions = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
         if (!isset($extensions[$mime])) {
             throw new RuntimeException('Unsupported file type.');
-        }
-
-        if ((int) ($file['size'] ?? 0) > 12_000_000) {
-            throw new RuntimeException('Upload is too large.');
         }
 
         if (str_contains($directory, '..') || str_contains($directory, "\0")) {
