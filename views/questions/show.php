@@ -12,6 +12,7 @@ $renderVote = static function (string $type, int $id, int $votes, string $label)
             <input type="hidden" name="value" value="1"><button class="vote-button vote-up" aria-label="Upvote <?= h($label) ?>" title="Upvote"><span aria-hidden="true"><?= $upIcon ?></span></button>
         </form>
         <strong><?= (int) $votes ?></strong>
+        <form method="post" action="/post/<?= h($type) ?>/<?= $id ?>/vote">
             <?= $csrf->field('/post/' . $type . '/' . $id . '/vote') ?>
             <input type="hidden" name="value" value="-1"><button class="vote-button vote-down" aria-label="Downvote <?= h($label) ?>" title="Downvote"><span aria-hidden="true"><?= $downIcon ?></span></button>
         </form>
