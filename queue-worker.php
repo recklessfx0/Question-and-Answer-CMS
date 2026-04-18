@@ -16,6 +16,9 @@ $database = new \Core\Database(require BASE_PATH . '/config/database.php');
 $notifications = new \App\Models\NotificationModel($database);
 
 $sendMail = static function (string $to, string $subject, string $body) use ($config): void {
+    // Strip CR, LF, and NUL from $to and $subject to prevent mail header injection.
+    $to      = str_replace(["\r", "\n", "\0"], '', $to);
+    $subject = str_replace(["\r", "\n", "\0"], '', $subject);
     $headers = [
         'From: ' . (string) $config['name'] . ' <no-reply@' . parse_url((string) $config['url'], PHP_URL_HOST) . '>',
         'Content-Type: text/plain; charset=UTF-8',
@@ -50,6 +53,13 @@ while (true) {
     try {
         $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
         $name = (string) ($job['job'] ?? '');
+
+        // Explicit allowlist — unknown job names are rejected to prevent tampered queue files
+        // from triggering unintended code paths.
+        $knownJobs = ['SendEmailVerification', 'SendPasswordReset', 'AnswerPostedNotification', 'NotifyModerators'];
+        if (!in_array($name, $knownJobs, true)) {
+            throw new RuntimeException("Unknown job name: {$name}");
+        }
 
         if ($name === 'SendEmailVerification') {
             $link = rtrim((string) $config['url'], '/') . '/email/verify/' . rawurlencode((string) $payload['token']);
