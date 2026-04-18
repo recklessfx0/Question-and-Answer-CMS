@@ -11,8 +11,7 @@ $renderVote = static function (string $type, int $id, int $votes, string $label)
             <?= $csrf->field('/post/' . $type . '/' . $id . '/vote') ?>
             <input type="hidden" name="value" value="1"><button class="vote-button vote-up" aria-label="Upvote <?= h($label) ?>" title="Upvote"><span aria-hidden="true"><?= $upIcon ?></span></button>
         </form>
-        <strong><?= $votes ?></strong>
-        <form method="post" action="/post/<?= h($type) ?>/<?= $id ?>/vote">
+        <strong><?= (int) $votes ?></strong>
             <?= $csrf->field('/post/' . $type . '/' . $id . '/vote') ?>
             <input type="hidden" name="value" value="-1"><button class="vote-button vote-down" aria-label="Downvote <?= h($label) ?>" title="Downvote"><span aria-hidden="true"><?= $downIcon ?></span></button>
         </form>
@@ -270,12 +269,12 @@ $renderCommentTree = static function (array $comment, string $composerId, string
             ?>
                 <a class="related-item" href="/question/<?= h((string) $item['slug']) ?>">
                     <div class="related-item-counters">
-                        <span class="related-counter related-counter-votes" title="<?= $votes ?> vote<?= $votes !== 1 ? 's' : '' ?>">
-                            <strong><?= $votes ?></strong>
+                        <span class="related-counter related-counter-votes" title="<?= (int) $votes ?> vote<?= $votes !== 1 ? 's' : '' ?>">
+                            <strong><?= (int) $votes ?></strong>
                             <span>vote<?= $votes !== 1 ? 's' : '' ?></span>
                         </span>
-                        <span class="related-counter related-counter-answers <?= $statusClass ?>" title="<?= $answerCount ?> answer<?= $answerCount !== 1 ? 's' : '' ?><?= $hasAccepted ? ' (accepted)' : '' ?>">
-                            <strong><?= $answerCount ?></strong>
+                        <span class="related-counter related-counter-answers <?= $statusClass ?>" title="<?= (int) $answerCount ?> answer<?= $answerCount !== 1 ? 's' : '' ?><?= $hasAccepted ? ' (accepted)' : '' ?>">
+                            <strong><?= (int) $answerCount ?></strong>
                             <span>ans</span>
                         </span>
                     </div>
@@ -402,4 +401,3 @@ $renderCommentTree = static function (array $comment, string $composerId, string
 <?php else: ?>
     <p><a href="/login">Sign in</a> to answer.</p>
 <?php endif; ?>
-
