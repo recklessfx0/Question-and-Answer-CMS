@@ -1,6 +1,12 @@
 # Question And Answer Platform
 
-Universal PHP 8.2+ question and answer platform with no Composer, no framework dependencies, root `index.php` entry, MVC flow, PDO prepared statements, file cache, file queue, RBAC, CSRF, rate limiting, and QAPage JSON-LD. It is designed to be branded through environment variables and database settings so it can be reused for different communities and projects.
+I built this platform for my own private projects, mainly because every alternative I found was outdated, insecure, and far behind current coding and security standards. So I decided to start fresh.
+
+It's a universal PHP 8.2+ question and answer platform with zero external dependencies: no Composer, no framework, just a clean root `index.php` entry point, MVC flow, PDO prepared statements, file cache, file queue, RBAC, CSRF protection, and rate limiting. Everything you actually need, nothing you don't.
+
+One thing I paid special attention to is how AI is reshaping SEO. LLMs are now crawling and interpreting content differently than traditional search engines, so I optimized this platform to be highly machine-readable, with proper QAPage JSON-LD schemas and a range of other SEO tweaks baked in from the start.
+
+The platform is fully brandable through environment variables and database settings, making it easy to reuse across different communities and projects. Whether you're building a niche knowledge base, a support forum, or a community question and answer site, this is a solid foundation to build on.
 
 ## Install
 
