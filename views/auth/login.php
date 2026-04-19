@@ -1,15 +1,25 @@
 <?php declare(strict_types=1); ?>
-<section class="narrow">
-    <h1>Sign in</h1>
-    <form method="post" action="/login">
-        <?= $csrf->field('/login') ?>
-        <label>Email <input name="email" type="email" autocomplete="email" required></label>
-        <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-        <?= recaptcha_widget($securitySettings ?? []) ?>
-        <button type="submit">Sign in</button>
-    </form>
-    <?php if (isset($googleAuthUrl) && is_string($googleAuthUrl)): ?>
-        <p><a class="button button-secondary" href="<?= h($googleAuthUrl) ?>">Continue with Google</a></p>
-    <?php endif; ?>
-    <p><a href="/forgot-password">Forgot your password?</a></p>
+<section class="auth-page auth-page-login">
+    <div class="auth-panel">
+        <header class="auth-head">
+            <p class="eyebrow"><?= h(t('auth.login.eyebrow', 'Welcome back')) ?></p>
+            <h1><?= h(t('auth.login.title', 'Sign In')) ?></h1>
+            <p><?= h(t('auth.login.description', 'Continue your questions, answers, notifications, and saved settings.')) ?></p>
+        </header>
+        <form method="post" action="/login" class="auth-form">
+            <?= $csrf->field('/login') ?>
+            <label><?= h(t('auth.email', 'Email')) ?><input name="email" type="email" autocomplete="email" spellcheck="false" required></label>
+            <label><?= h(t('auth.password', 'Password')) ?><input name="password" type="password" autocomplete="current-password" required></label>
+            <?= recaptcha_widget($securitySettings ?? []) ?>
+            <button type="submit"><?= h(t('auth.login.submit', 'Sign In')) ?></button>
+        </form>
+        <?php if (isset($googleAuthUrl) && is_string($googleAuthUrl)): ?>
+            <div class="auth-divider"><span><?= h(t('auth.or', 'Or')) ?></span></div>
+            <a class="button button-secondary auth-provider-button" href="<?= h($googleAuthUrl) ?>"><?= h(t('auth.google.continue', 'Continue with Google')) ?></a>
+        <?php endif; ?>
+        <div class="auth-links">
+            <a href="/forgot-password"><?= h(t('auth.login.forgot_password', 'Forgot your password?')) ?></a>
+            <a href="/register"><?= h(t('auth.login.create_account', 'Create an account')) ?></a>
+        </div>
+    </div>
 </section>

@@ -148,9 +148,21 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     flex: 0 0 auto;
 }
 .recaptcha-wrap {
-    max-width: 100%;
-    overflow-x: auto;
-    padding: 2px 0;
+    --recaptcha-width: 304px;
+    --recaptcha-height: 78px;
+    --recaptcha-scale: 1;
+    display: block;
+    width: min(100%, calc(var(--recaptcha-width) * var(--recaptcha-scale)));
+    min-width: 0;
+    height: calc(var(--recaptcha-height) * var(--recaptcha-scale));
+    overflow: hidden;
+    padding: 0;
+}
+.recaptcha-wrap .g-recaptcha {
+    width: var(--recaptcha-width);
+    max-width: none;
+    transform: scale(var(--recaptcha-scale));
+    transform-origin: top left;
 }
 .inline { display: inline-flex; }
 .inline button { padding: 6px 10px; }
@@ -328,6 +340,71 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 }
 .user-directory-card span { grid-column: 2; }
 .narrow { max-width: 680px; margin-inline: auto; }
+.auth-page {
+    display: grid;
+    place-items: start center;
+    min-height: min(720px, calc(100vh - 180px));
+    padding-block: clamp(12px, 4vw, 48px);
+}
+.auth-panel {
+    width: min(100%, 520px);
+    display: grid;
+    gap: 18px;
+    padding: clamp(18px, 4vw, 28px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+}
+.auth-head {
+    display: grid;
+    gap: 6px;
+}
+.auth-head h1,
+.auth-head p {
+    margin: 0;
+}
+.auth-head h1 {
+    text-wrap: balance;
+}
+.auth-head p:not(.eyebrow) {
+    color: var(--muted);
+}
+.auth-form {
+    display: grid;
+    gap: 12px;
+}
+.auth-form label {
+    margin: 0;
+    min-width: 0;
+}
+.auth-form input {
+    min-width: 0;
+}
+.auth-form button,
+.auth-provider-button {
+    width: 100%;
+}
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--line);
+}
+.auth-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 14px;
+    font-weight: 650;
+}
 .ask-shell { max-width: 1100px; margin-inline: auto; }
 .ask-head {
     display: flex;
@@ -2453,6 +2530,22 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
         justify-content: flex-start;
     }
     button, .button, .site-header nav a { width: 100%; }
+    .auth-page {
+        min-height: auto;
+        padding-block: 0;
+    }
+    .auth-panel {
+        padding: 16px;
+    }
+    .auth-links {
+        justify-content: flex-start;
+    }
+    .auth-form .recaptcha-wrap {
+        --recaptcha-scale: 0.86;
+    }
+    .auth-form .recaptcha-wrap iframe {
+        max-width: none;
+    }
     .admin-nav a, .admin-card { width: 100%; }
     .question-top-actions,
     .question-top-actions form,
