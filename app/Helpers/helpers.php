@@ -9,11 +9,79 @@ function h(mixed $value): string
 
 function url(string $path = ''): string
 {
+    return site_url() . '/' . ltrim($path, '/');
+}
+
+function site_url(): string
+{
     static $base = null;
-    if ($base === null) {
-        $base = rtrim((string) (require BASE_PATH . '/config/app.php')['url'], '/');
+    if ($base !== null) {
+        return $base;
     }
-    return $base . '/' . ltrim($path, '/');
+
+    $config = require BASE_PATH . '/config/app.php';
+    $base = normalize_site_url((string) ($config['url'] ?? '')) ?: 'https://example.com';
+
+    try {
+        $databaseConfig = require BASE_PATH . '/config/database.php';
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+            $databaseConfig['host'],
+            $databaseConfig['port'],
+            $databaseConfig['database'],
+            $databaseConfig['charset']
+        );
+        $pdo = new \PDO($dsn, (string) $databaseConfig['username'], (string) $databaseConfig['password'], [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            \PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+        $statement = $pdo->prepare('SELECT value FROM settings WHERE `key` = :key LIMIT 1');
+        $statement->execute([':key' => 'site_url']);
+        $configured = $statement->fetchColumn();
+        $settingUrl = is_string($configured) ? normalize_site_url($configured) : '';
+        if ($settingUrl !== '') {
+            $base = $settingUrl;
+        }
+    } catch (\Throwable) {
+        // Keep URL generation available during installation, migrations, or DB outages.
+    }
+
+    return $base;
+}
+
+function normalize_site_url(string $url): string
+{
+    $url = trim(str_replace("\0", '', $url));
+    if ($url === '') {
+        return '';
+    }
+
+    if (!str_contains($url, '://')) {
+        $url = 'https://' . $url;
+    }
+
+    $validated = filter_var($url, FILTER_VALIDATE_URL);
+    if (!is_string($validated) || $validated === '') {
+        return '';
+    }
+
+    $parts = parse_url($validated);
+    if (!is_array($parts)) {
+        return '';
+    }
+
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    if (!in_array($scheme, ['http', 'https'], true) || $host === '') {
+        return '';
+    }
+
+    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+    $path = '/' . trim((string) ($parts['path'] ?? ''), '/');
+    $path = $path === '/' ? '' : $path;
+
+    return $scheme . '://' . $host . $port . $path;
 }
 
 function excerpt(string $text, int $length = 160): string

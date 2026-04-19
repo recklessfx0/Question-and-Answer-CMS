@@ -288,6 +288,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), reputation_delta = VALUES(reputatio
 
 INSERT INTO settings (`key`, value, updated_at) VALUES
 ('site_title', 'Question And Answer Platform', NOW()),
+('site_url', 'https://example.com', NOW()),
 ('site_description', 'A fast, secure community question and answer platform.', NOW()),
 ('recaptcha_enabled', '0', NOW()),
 ('recaptcha_site_key', '', NOW()),

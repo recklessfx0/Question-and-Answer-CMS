@@ -53,6 +53,7 @@ final readonly class AdminService
     public function saveSettings(array $input): void
     {
         $this->settings->set('site_title', excerpt($input['site_title'] ?? '', 80));
+        $this->settings->set('site_url', normalize_site_url($input['site_url'] ?? ''));
         $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 160));
         foreach ([
             'about_description' => 240,

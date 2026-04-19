@@ -9,6 +9,8 @@
         <?= $csrf->field('/admin/settings') ?>
         <h2>SEO</h2>
         <label>Site title <input name="site_title" value="<?= h($settings['site_title'] ?? '') ?>" maxlength="100"></label>
+        <label>Website URL <input name="site_url" type="url" value="<?= h(($settings['site_url'] ?? '') !== '' ? (string) $settings['site_url'] : site_url()) ?>" maxlength="255" placeholder="https://example.com"></label>
+        <p class="meta">Used for canonical URLs, sitemap URLs, robots.txt, llms.txt, structured data, and email links.</p>
         <label>Site description <textarea name="site_description" rows="3" maxlength="200"><?= h($settings['site_description'] ?? '') ?></textarea></label>
         <h2>Trust pages</h2>
         <label>About description <textarea name="about_description" rows="2" maxlength="240"><?= h($settings['about_description'] ?? '') ?></textarea></label>

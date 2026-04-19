@@ -12,15 +12,17 @@ require BASE_PATH . '/app/Helpers/helpers.php';
 $queue = new \Core\Queue(STORAGE_PATH . '/queue');
 $logger = new \Core\Logger(STORAGE_PATH . '/logs/queue.log');
 $config = require BASE_PATH . '/config/app.php';
+$siteUrl = site_url();
 $database = new \Core\Database(require BASE_PATH . '/config/database.php');
 $notifications = new \App\Models\NotificationModel($database);
 
-$sendMail = static function (string $to, string $subject, string $body) use ($config): void {
+$sendMail = static function (string $to, string $subject, string $body) use ($config, $siteUrl): void {
     // Strip CR, LF, and NUL from $to and $subject to prevent mail header injection.
     $to      = str_replace(["\r", "\n", "\0"], '', $to);
     $subject = str_replace(["\r", "\n", "\0"], '', $subject);
+    $host = (string) parse_url($siteUrl, PHP_URL_HOST);
     $headers = [
-        'From: ' . (string) $config['name'] . ' <no-reply@' . parse_url((string) $config['url'], PHP_URL_HOST) . '>',
+        'From: ' . (string) $config['name'] . ' <no-reply@' . $host . '>',
         'Content-Type: text/plain; charset=UTF-8',
     ];
     if (!mail($to, $subject, $body, implode("\r\n", $headers))) {
@@ -62,13 +64,13 @@ while (true) {
         }
 
         if ($name === 'SendEmailVerification') {
-            $link = rtrim((string) $config['url'], '/') . '/email/verify/' . rawurlencode((string) $payload['token']);
+            $link = url('/email/verify/' . rawurlencode((string) $payload['token']));
             $sendMail((string) $payload['email'], 'Verify your email', "Open this link to verify your email:\n\n{$link}");
             $notifications->create((int) $payload['user_id'], 'Email verification', ['message' => 'Verification email queued.', 'url' => '/settings/profile']);
         }
 
         if ($name === 'SendPasswordReset') {
-            $link = rtrim((string) $config['url'], '/') . '/reset-password/' . rawurlencode((string) $payload['token']);
+            $link = url('/reset-password/' . rawurlencode((string) $payload['token']));
             $sendMail((string) $payload['email'], 'Reset your password', "Open this link to reset your password:\n\n{$link}");
         }
 

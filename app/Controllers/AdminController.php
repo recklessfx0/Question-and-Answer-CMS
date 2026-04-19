@@ -79,6 +79,7 @@ final class AdminController extends Controller
     {
         $this->admin->saveSettings([
             'site_title' => $request->string('site_title', 100),
+            'site_url' => $request->string('site_url', 255),
             'site_description' => $request->string('site_description', 200),
             'about_description' => $request->string('about_description', 240),
             'about_body' => $request->string('about_body', 4000),
