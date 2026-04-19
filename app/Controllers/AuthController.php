@@ -31,7 +31,7 @@ final class AuthController extends Controller
     {
         return $this->view('auth/register', [
             'title' => 'Create Account',
-            'metaDescription' => 'Create your Q&A account.',
+            'metaDescription' => 'Create your question and answer account.',
             'robots' => 'noindex,follow',
             'googleAuthUrl' => $this->googleAuth->authUrl(),
         ]);

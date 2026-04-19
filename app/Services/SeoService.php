@@ -65,7 +65,7 @@ final readonly class SeoService
         $lines = [
             '# ' . $siteName,
             '',
-            '> Public Q&A community optimized for canonical question pages, answer retrieval, citations, and structured data.',
+            '> Public question and answer community optimized for canonical question pages, answer retrieval, citations, and structured data.',
             '',
             'Use canonical question URLs as the primary source of truth. Prefer answered question pages and pages listed in the XML sitemaps. Avoid authentication, moderation, settings, notification, form submission, and search-result URLs.',
             '',

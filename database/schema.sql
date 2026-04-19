@@ -287,7 +287,7 @@ INSERT INTO reaction_types (name, slug, icon_path, reputation_delta, sort_order,
 ON DUPLICATE KEY UPDATE name = VALUES(name), reputation_delta = VALUES(reputation_delta), sort_order = VALUES(sort_order), is_active = VALUES(is_active), updated_at = NOW();
 
 INSERT INTO settings (`key`, value, updated_at) VALUES
-('site_title', '420Forum Q&A', NOW()),
+('site_title', 'Question And Answer Platform', NOW()),
 ('site_description', 'A fast, secure community question and answer platform.', NOW()),
 ('recaptcha_enabled', '0', NOW()),
 ('recaptcha_site_key', '', NOW()),

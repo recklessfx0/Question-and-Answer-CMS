@@ -1,21 +1,21 @@
-# 420Forum Q&A
+# Question And Answer Platform
 
 > A lightweight question and answer community with semantic question pages, accepted answers, tags, profiles, uploaded media, and structured data for search and AI retrieval.
 
 Use canonical question URLs as the primary source of truth. Public question pages expose QAPage JSON-LD, clean h1-h3 headings, accepted answers, suggested answers, author profile links, tags, related internal links, and crawlable media URLs. Do not use admin, moderator, authentication, notification, or search result URLs as source material.
 
 ## Canonical Public Surfaces
-- [https://420.forum/](https://420.forum/): Latest public questions
-- [https://420.forum/unanswered](https://420.forum/unanswered): Questions waiting for answers
-- [https://420.forum/tags](https://420.forum/tags): Tag directory
-- [https://420.forum/users](https://420.forum/users): Public user directory
-- [https://420.forum/sitemap.xml](https://420.forum/sitemap.xml): Primary sitemap index
-- [https://420.forum/sitemap_index.xml](https://420.forum/sitemap_index.xml): Rank Math style sitemap index alias
-- [https://420.forum/post-sitemap.xml](https://420.forum/post-sitemap.xml): Canonical question URLs
-- [https://420.forum/category-sitemap.xml](https://420.forum/category-sitemap.xml): Category archive URLs
-- [https://420.forum/post_tag-sitemap.xml](https://420.forum/post_tag-sitemap.xml): Tag archive URLs
-- [https://420.forum/author-sitemap.xml](https://420.forum/author-sitemap.xml): Public author profile URLs
+- [https://example.com/](https://example.com/): Latest public questions
+- [https://example.com/unanswered](https://example.com/unanswered): Questions waiting for answers
+- [https://example.com/tags](https://example.com/tags): Tag directory
+- [https://example.com/users](https://example.com/users): Public user directory
+- [https://example.com/sitemap.xml](https://example.com/sitemap.xml): Primary sitemap index
+- [https://example.com/sitemap_index.xml](https://example.com/sitemap_index.xml): Rank Math style sitemap index alias
+- [https://example.com/post-sitemap.xml](https://example.com/post-sitemap.xml): Canonical question URLs
+- [https://example.com/category-sitemap.xml](https://example.com/category-sitemap.xml): Category archive URLs
+- [https://example.com/post_tag-sitemap.xml](https://example.com/post_tag-sitemap.xml): Tag archive URLs
+- [https://example.com/author-sitemap.xml](https://example.com/author-sitemap.xml): Public author profile URLs
 
 ## Crawl Rules
-- [https://420.forum/robots.txt](https://420.forum/robots.txt): Crawler access rules
-- Uploaded public media lives under https://420.forum/public-assets/images/
+- [https://example.com/robots.txt](https://example.com/robots.txt): Crawler access rules
+- Uploaded public media lives under https://example.com/public-assets/images/

@@ -1,6 +1,6 @@
-# 420Forum Q&A Platform
+# Question And Answer Platform
 
-Custom PHP 8.2+ Q&A platform with no Composer, no framework dependencies, root `index.php` entry, MVC flow, PDO prepared statements, file cache, file queue, RBAC, CSRF, rate limiting, and QAPage JSON-LD.
+Universal PHP 8.2+ question and answer platform with no Composer, no framework dependencies, root `index.php` entry, MVC flow, PDO prepared statements, file cache, file queue, RBAC, CSRF, rate limiting, and QAPage JSON-LD. It is designed to be branded through environment variables and database settings so it can be reused for different communities and projects.
 
 ## Install
 
@@ -10,7 +10,7 @@ Custom PHP 8.2+ Q&A platform with no Composer, no framework dependencies, root `
 4. Set environment variables:
 
 ```bash
-APP_NAME="420Forum Q&A"
+APP_NAME="Question And Answer Platform"
 APP_URL="https://your-domain.example"
 APP_ENV=production
 APP_SECURE_COOKIES=true
@@ -42,7 +42,7 @@ Important directories:
 
 - `core`: framework kernel, router, request/response, view, PDO wrapper, cache, sessions, CSRF, rate limiting, queue.
 - `app/Controllers`: request endpoints.
-- `app/Services`: auth, Q&A, moderation, admin, SEO, safe uploads.
+- `app/Services`: auth, questions and answers, moderation, admin, SEO, safe uploads.
 - `app/Models`: PDO-backed data access.
 - `views`: escaped PHP templates.
 - `public-assets`: CSS and JavaScript.

@@ -16,5 +16,5 @@ Disallow: /post/
 Disallow: /flag/
 Disallow: /answer/
 
-Sitemap: https://420.forum/sitemap.xml
-Sitemap: https://420.forum/sitemap_index.xml
+Sitemap: https://example.com/sitemap.xml
+Sitemap: https://example.com/sitemap_index.xml

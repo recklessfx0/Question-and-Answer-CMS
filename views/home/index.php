@@ -1,6 +1,6 @@
 <?php declare(strict_types=1); ?>
 <section class="page-head">
-    <h1><?= h($heading ?? $title ?? 'Cannabis') ?></h1>
+    <h1><?= h($heading ?? $title ?? 'Latest Questions') ?></h1>
     <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
     <?php if (!empty($category) && is_array($category)): ?>
         <div class="hub-panel" aria-label="Category hub">

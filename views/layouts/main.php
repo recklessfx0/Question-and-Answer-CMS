@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $site = (require BASE_PATH . '/config/app.php')['name'];
 $pageTitle = isset($title) ? (string) $title . ' | ' . $site : $site;
-$description = (string) ($metaDescription ?? 'A fast, secure community Q&A platform.');
+$description = (string) ($metaDescription ?? 'A fast, secure community question and answer platform.');
 $requestPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
 $canonicalUrl = (string) ($canonical ?? url($requestPath));
 $ogType = (string) ($ogType ?? 'website');
