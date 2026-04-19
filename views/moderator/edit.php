@@ -15,6 +15,16 @@
                 <?= $csrf->field('/moderator/question/' . (int) $post['id'] . '/close') ?>
                 <button type="submit">Close question</button>
             </form>
+            <form method="post" action="/moderator/question/<?= (int) $post['id'] ?>/duplicate" class="duplicate-form">
+                <?= $csrf->field('/moderator/question/' . (int) $post['id'] . '/duplicate') ?>
+                <label>Canonical question ID
+                    <input name="duplicate_of_id" type="number" min="0" value="<?= (int) ($post['duplicate_of_id'] ?? 0) ?>" placeholder="0 clears duplicate">
+                </label>
+                <?php if (!empty($post['duplicate_slug'])): ?>
+                    <p class="meta">Current canonical: <a href="/question/<?= h((string) $post['duplicate_slug']) ?>"><?= h((string) ($post['duplicate_title'] ?? $post['duplicate_slug'])) ?></a></p>
+                <?php endif; ?>
+                <button type="submit">Update duplicate canonical</button>
+            </form>
         <?php endif; ?>
         <?php if (in_array($type, ['question', 'answer', 'comment'], true)): ?>
             <form method="post" action="/moderator/<?= h((string) $type) ?>/<?= (int) $post['id'] ?>/delete">

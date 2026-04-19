@@ -83,10 +83,6 @@ final readonly class GamificationService
             return null;
         }
 
-        if ($reputation < (int) ($levels[0]['min_reputation'] ?? 0)) {
-            return null;
-        }
-
         $current = $levels[0];
         $next = null;
         foreach ($levels as $level) {
@@ -108,7 +104,9 @@ final readonly class GamificationService
             'title' => (string) $current['title'],
             'current' => $currentThreshold,
             'next' => $nextThreshold,
-            'progress' => $next === null ? 100 : min(100, max(0, (int) floor((($reputation - $currentThreshold) / $range) * 100))),
+            'progress' => $reputation < $currentThreshold
+                ? 0
+                : ($next === null ? 100 : min(100, max(0, (int) floor((($reputation - $currentThreshold) / $range) * 100)))),
             'icon_path' => (string) ($current['icon_path'] ?? ''),
         ];
     }

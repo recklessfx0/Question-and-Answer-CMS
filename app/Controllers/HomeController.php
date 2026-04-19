@@ -37,10 +37,11 @@ final class HomeController extends Controller
         $pagination = $this->pagination('/questions', $page, $total);
 
         return $this->view('home/index', [
-            'title' => $page > 1 ? 'Latest Questions - Page ' . $page : 'Latest Questions',
+            'title' => $page > 1 ? 'Latest Questions - Page ' . $page : null,
+            'heading' => $page > 1 ? 'Latest Questions - Page ' . $page : 'Latest Questions',
             'metaDescription' => $page > 1 ? 'Fresh community questions and expert answers, page ' . $page . '.' : 'Fresh community questions and expert answers.',
             'canonical' => $canonical,
-            'schema' => $this->seo->itemListSchema('Latest Questions', $canonical, $questions),
+            'schema' => $this->seo->itemListSchema('Latest Questions', $canonical, $questions, 'Fresh community questions and expert answers.', [], 'Community questions'),
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -83,7 +84,7 @@ final class HomeController extends Controller
             'title' => $page > 1 ? 'Unanswered Questions - Page ' . $page : 'Unanswered Questions',
             'metaDescription' => $page > 1 ? 'Questions still waiting for an answer, page ' . $page . '.' : 'Questions still waiting for an answer.',
             'canonical' => $canonical,
-            'schema' => $this->seo->itemListSchema('Unanswered Questions', $canonical, $questions),
+            'schema' => $this->seo->itemListSchema('Unanswered Questions', $canonical, $questions, 'Questions still waiting for an answer.', [], 'Unanswered questions'),
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -123,6 +124,7 @@ final class HomeController extends Controller
             return $this->view('errors/http', ['status' => 404, 'message' => 'Page not found'], 404);
         }
         $users = $this->users->publicUsers($perPage, ($page - 1) * $perPage);
+        $summary = $this->users->directorySummary();
         $canonical = $page > 1 ? url('/users/page/' . $page) : url('/users');
         $pagination = $this->pagination('/users', $page, $total, false, $perPage);
 
@@ -131,6 +133,7 @@ final class HomeController extends Controller
             'metaDescription' => 'Browse community members.',
             'canonical' => $canonical,
             'schema' => $this->seo->userDirectorySchema($users),
+            'summary' => $summary,
             'users' => $users,
             'page' => $page,
             'pagination' => $pagination,
@@ -161,7 +164,7 @@ final class HomeController extends Controller
             'title' => $page > 1 ? $baseTitle . ' - Page ' . $page : $baseTitle,
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $pageCanonical,
-            'schema' => $this->seo->itemListSchema('Questions tagged ' . (string) $tag['name'], $pageCanonical, $questions),
+            'schema' => $this->seo->itemListSchema('Questions tagged ' . (string) $tag['name'], $pageCanonical, $questions, $baseDescription, [(string) $tag['name']], (string) $tag['name']),
             'questions' => $questions,
             'tag' => (string) $tag['slug'],
             'tagInfo' => $tag,
@@ -190,16 +193,18 @@ final class HomeController extends Controller
         $pagination = $this->pagination('/category/' . rawurlencode((string) $category['slug']), $page, $total);
         $baseTitle = (string) (($category['seo_title'] ?? '') ?: $category['name']);
         $baseDescription = (string) (($category['seo_description'] ?? '') ?: ($category['description'] ?: 'Questions in ' . (string) $category['name'] . '.'));
+        $relatedTags = $this->questions->popularTagsForCategory((int) $category['id']);
 
         return $this->view('home/index', [
             'title' => $page > 1 ? $baseTitle . ' - Page ' . $page : $baseTitle,
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $pageCanonical,
-            'schema' => $this->seo->itemListSchema((string) $category['name'], $pageCanonical, $questions),
+            'robots' => $total < 1 ? 'noindex,follow' : null,
+            'schema' => $this->seo->itemListSchema((string) $category['name'], $pageCanonical, $questions, $baseDescription, array_map(static fn (array $tag): string => (string) ($tag['name'] ?? ''), $relatedTags), (string) $category['name']),
             'questions' => $questions,
             'category' => $category,
             'subcategories' => $this->categories->children((int) $category['id']),
-            'relatedTags' => $this->questions->popularTagsForCategory((int) $category['id']),
+            'relatedTags' => $relatedTags,
             'page' => $page,
             'pagination' => $pagination,
         ]);

@@ -54,9 +54,9 @@ while (true) {
         $payload = is_array($job['payload'] ?? null) ? $job['payload'] : [];
         $name = (string) ($job['job'] ?? '');
 
-        // Explicit allowlist — unknown job names are rejected to prevent tampered queue files
+        // Explicit allowlist; unknown job names are rejected to prevent tampered queue files
         // from triggering unintended code paths.
-        $knownJobs = ['SendEmailVerification', 'SendPasswordReset', 'AnswerPostedNotification', 'NotifyModerators'];
+        $knownJobs = ['SendEmailVerification', 'SendPasswordReset', 'AnswerPostedNotification', 'NotifyModerators', 'MentionNotification'];
         if (!in_array($name, $knownJobs, true)) {
             throw new RuntimeException("Unknown job name: {$name}");
         }
@@ -83,6 +83,17 @@ while (true) {
             foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator")') as $moderator) {
                 $notifications->create((int) $moderator['id'], 'New question', ['message' => 'A new question was posted.', 'url' => '/moderator']);
             }
+        }
+
+        if ($name === 'MentionNotification') {
+            $notifications->create(
+                (int) $payload['user_id'],
+                is_string($payload['type'] ?? null) && (string) $payload['type'] !== '' ? (string) $payload['type'] : 'Mention',
+                [
+                    'message' => is_string($payload['message'] ?? null) && (string) $payload['message'] !== '' ? (string) $payload['message'] : 'You were mentioned.',
+                    'url' => safe_internal_path((string) ($payload['url'] ?? '')),
+                ]
+            );
         }
 
         // Log before completing so a log-write failure surfaces as a retry rather than silent loss

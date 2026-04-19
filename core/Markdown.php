@@ -4,41 +4,89 @@ declare(strict_types=1);
 
 namespace Core;
 
+use App\Models\UserModel;
+
 final class Markdown
 {
+    /** @var array<string, string|null> */
+    private array $mentionSlugs = [];
+
+    public function __construct(private readonly ?UserModel $users = null) {}
+
     public function toHtml(string $markdown): string
     {
         $escaped = h($markdown);
         $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped) ?? $escaped;
         $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped) ?? $escaped;
-        $escaped = preg_replace('/`([^`]+)`/', '<code>$1</code>', $escaped) ?? $escaped;
+        $codeBlocks = [];
+        $htmlBlocks = [];
+        $escaped = preg_replace_callback(
+            '/`([^`]+)`/',
+            static function (array $matches) use (&$codeBlocks): string {
+                $placeholder = '%%CODE_BLOCK_' . count($codeBlocks) . '%%';
+                $codeBlocks[$placeholder] = '<code>' . $matches[1] . '</code>';
+
+                return $placeholder;
+            },
+            $escaped
+        ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/!\[([^\]]*)\]\((\/public-assets\/images\/[a-zA-Z0-9\/._-]+)\)/',
-            static function (array $matches): string {
+            static function (array $matches) use (&$htmlBlocks): string {
                 $alt = trim((string) $matches[1]) !== '' ? (string) $matches[1] : \media_alt_text((string) $matches[2]);
                 $path = $matches[2];
                 $image = \uploaded_image($path, '', $alt);
+                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $htmlBlocks[$placeholder] = '<a class="media-link" href="' . $path . '" data-media-popup="1">' . $image . '</a>';
 
-                return '<a class="media-link" href="' . $path . '" data-media-popup="1">' . $image . '</a>';
+                return $placeholder;
             },
             $escaped
         ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/\[uploaded video\]\((\/public-assets\/images\/[a-zA-Z0-9\/._-]+\.(?:mp4|webm))\)/',
-            static function (array $matches): string {
+            static function (array $matches) use (&$htmlBlocks): string {
                 $path = $matches[1];
                 $type = str_ends_with(strtolower($path), '.webm') ? 'video/webm' : 'video/mp4';
+                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $htmlBlocks[$placeholder] = '<a class="media-link media-video-link" href="' . $path . '" data-media-popup="1"><video controls preload="metadata" aria-label="Uploaded video"><source src="' . $path . '" type="' . $type . '"></video></a>';
 
-                return '<a class="media-link media-video-link" href="' . $path . '" data-media-popup="1"><video controls preload="metadata" aria-label="Uploaded video"><source src="' . $path . '" type="' . $type . '"></video></a>';
+                return $placeholder;
             },
             $escaped
         ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/\[embedded video\]\((https?:\/\/[^\s)]+)\)/',
-            fn (array $matches): string => $this->renderExternalVideo((string) $matches[1]),
+            function (array $matches) use (&$htmlBlocks): string {
+                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $htmlBlocks[$placeholder] = $this->renderExternalVideo((string) $matches[1]);
+
+                return $placeholder;
+            },
             $escaped
         ) ?? $escaped;
-        $escaped = preg_replace('/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/', '<a href="$2" rel="nofollow ugc noopener">$1</a>', $escaped) ?? $escaped;
+        $escaped = preg_replace_callback(
+            '/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/',
+            function (array $matches) use (&$htmlBlocks): string {
+                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $url = html_entity_decode((string) $matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $safeUrl = safe_external_url($url);
+                if ($safeUrl === '') {
+                    return $matches[0];
+                }
+                $htmlBlocks[$placeholder] = '<a href="' . h($safeUrl) . '" rel="nofollow ugc noopener noreferrer">' . $matches[1] . '</a>';
+
+                return $placeholder;
+            },
+            $escaped
+        ) ?? $escaped;
+        $escaped = $this->renderMentions($escaped);
+        if ($codeBlocks !== []) {
+            $escaped = strtr($escaped, $codeBlocks);
+        }
+        if ($htmlBlocks !== []) {
+            $escaped = strtr($escaped, $htmlBlocks);
+        }
 
         $blocks = array_map('trim', preg_split('/\R{2,}/', $escaped) ?: []);
         $html = [];
@@ -79,12 +127,55 @@ final class Markdown
         return implode("\n", $html);
     }
 
+    private function renderMentions(string $escaped): string
+    {
+        return preg_replace_callback(
+            '/(^|[\s>(])@([a-z0-9][a-z0-9_-]{2,31})\b/i',
+            function (array $matches): string {
+                $prefix = (string) $matches[1];
+                $username = (string) $matches[2];
+                $slug = $this->mentionSlug($username);
+                if ($slug === null) {
+                    return $matches[0];
+                }
+
+                return $prefix . '<a href="/user/' . h(rawurlencode($slug)) . '" class="user-mention">@' . h($slug) . '</a>';
+            },
+            $escaped
+        ) ?? $escaped;
+    }
+
+    private function mentionSlug(string $username): ?string
+    {
+        $key = strtolower($username);
+        if (array_key_exists($key, $this->mentionSlugs)) {
+            return $this->mentionSlugs[$key];
+        }
+
+        if ($this->users === null) {
+            $this->mentionSlugs[$key] = null;
+
+            return null;
+        }
+
+        $user = $this->users->findByUsername($username);
+        $slug = is_array($user) ? (string) ($user['username'] ?? '') : '';
+        $this->mentionSlugs[$key] = $slug !== '' ? $slug : null;
+
+        return $this->mentionSlugs[$key];
+    }
+
     private function renderExternalVideo(string $url): string
     {
         $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $embed = $this->externalVideoEmbedUrl($url);
         if ($embed === null) {
-            return '<a href="' . h($url) . '" rel="nofollow ugc noopener">' . h($url) . '</a>';
+            $safeUrl = safe_external_url($url);
+            if ($safeUrl === '') {
+                return h($url);
+            }
+
+            return '<a href="' . h($safeUrl) . '" rel="nofollow ugc noopener noreferrer">' . h($safeUrl) . '</a>';
         }
 
         return '<div class="video-embed"><iframe src="' . h($embed['src']) . '" title="' . h($embed['title']) . '" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';

@@ -54,6 +54,18 @@ final readonly class AdminService
     {
         $this->settings->set('site_title', excerpt($input['site_title'] ?? '', 80));
         $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 160));
+        foreach ([
+            'about_description' => 240,
+            'contact_description' => 240,
+            'privacy_description' => 240,
+            'terms_description' => 240,
+            'guidelines_description' => 240,
+        ] as $key => $length) {
+            $this->settings->set($key, excerpt($input[$key] ?? '', $length));
+        }
+        foreach (['about_body', 'contact_body', 'privacy_body', 'terms_body', 'guidelines_body'] as $key) {
+            $this->settings->set($key, $this->plainTextSetting($input[$key] ?? '', 4000));
+        }
         $this->settings->set('recaptcha_enabled', ($input['recaptcha_enabled'] ?? '0') === '1' ? '1' : '0');
         $this->settings->set('recaptcha_site_key', excerpt($input['recaptcha_site_key'] ?? '', 255));
         if (trim($input['recaptcha_secret_key'] ?? '') !== '') {
@@ -172,10 +184,14 @@ final readonly class AdminService
         return false;
     }
 
-    public function resolveReport(int $reportId, string $status, int $adminId): void
+    public function resolveReport(int $reportId, string $status, int $adminId): bool
     {
-        $this->questions->resolveFlag($reportId, $status);
+        if (!$this->questions->resolveFlag($reportId, $status)) {
+            return false;
+        }
+
         $this->audit->record($adminId, 'report_' . $status, 'flag', $reportId);
+        return true;
     }
 
     public function deleteReportedContent(string $type, int $id, int $adminId): void
@@ -221,5 +237,13 @@ final readonly class AdminService
         } catch (RuntimeException) {
             return null;
         }
+    }
+
+    private function plainTextSetting(string $value, int $length): string
+    {
+        $value = trim(str_replace("\0", '', $value));
+        $value = (string) preg_replace('/[^\P{C}\r\n\t]+/u', '', $value);
+
+        return mb_strlen($value) <= $length ? $value : rtrim(mb_substr($value, 0, $length - 1)) . '...';
     }
 }

@@ -1,6 +1,6 @@
 <?php declare(strict_types=1); ?>
 <section class="page-head">
-    <h1><?= h($title ?? 'Latest Questions') ?></h1>
+    <h1><?= h($heading ?? $title ?? 'Cannabis') ?></h1>
     <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
     <?php if (!empty($category) && is_array($category)): ?>
         <div class="hub-panel" aria-label="Category hub">
@@ -50,14 +50,15 @@
         <?php $activityUsers = is_array($question['activity_users'] ?? null) ? array_slice($question['activity_users'], 0, 9) : []; ?>
         <?php $latestMedia = is_array($question['latest_media'] ?? null) ? array_slice($question['latest_media'], 0, 4) : []; ?>
         <?php $activityDays = is_array($question['activity_days'] ?? null) ? $question['activity_days'] : []; ?>
+        <?php $totalVotes = (int) ($question['total_vote_count'] ?? $question['votes'] ?? 0); ?>
         <?php $maxActivity = max([1, ...array_values(array_map('intval', $activityDays))]); ?>
         <?php $activityTotal = array_sum(array_map('intval', $activityDays)); ?>
         <article class="question-row question-card <?= $activityUsers !== [] ? 'question-card-has-activity' : '' ?> <?= $latestMedia !== [] ? 'question-card-has-media' : '' ?>">
             <div class="question-side">
                 <div class="question-stats" aria-label="Question stats">
                     <div class="question-stat">
-                        <strong><?= (int) ($question['votes'] ?? 0) ?></strong>
-                        <span><?= (int) ($question['votes'] ?? 0) === 1 ? 'vote' : 'votes' ?></span>
+                        <strong><?= $totalVotes ?></strong>
+                        <span><?= $totalVotes === 1 ? 'vote' : 'votes' ?></span>
                     </div>
                     <div class="question-stat">
                         <strong><?= (int) ($question['answer_count'] ?? 0) ?></strong>
@@ -82,7 +83,7 @@
                         <?php if (!empty($question['category_slug'])): ?>
                             <p class="meta">Category <a href="/category/<?= h((string) $question['category_slug']) ?>"><?= h((string) $question['category_name']) ?></a></p>
                         <?php endif; ?>
-                        <p class="meta">Asked by <a href="/user/<?= h((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
+                        <p class="meta">Asked by <a href="/user/<?= rawurlencode((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
                     </div>
                     <?php if ($latestMedia !== []): ?>
                         <div class="card-media-strip" aria-label="Latest uploaded content">
@@ -104,7 +105,7 @@
                 <aside class="question-activity-panel" aria-label="Latest question activity">
                     <div class="activity-grid" aria-label="Latest activity users">
                         <?php foreach ($activityUsers as $activityUser): ?>
-                            <a class="activity-icon" href="/user/<?= h((string) $activityUser['username']) ?>" title="<?= h((string) $activityUser['username']) ?>">
+                            <a class="activity-icon" href="/user/<?= rawurlencode((string) $activityUser['username']) ?>" title="<?= h((string) $activityUser['username']) ?>">
                                 <?php if (!empty($activityUser['avatar_path'])): ?>
                                     <?= uploaded_image((string) $activityUser['avatar_path'], '', (string) $activityUser['username'] . ' avatar') ?>
                                 <?php else: ?>

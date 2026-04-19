@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Core\Database;
+use Throwable;
 
 final readonly class QuestionModel
 {
+    public const int MAX_QUESTION_TAGS = 8;
+
     public function __construct(private Database $db) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -73,6 +76,36 @@ final readonly class QuestionModel
         );
         foreach ($answerRows as $row) {
             $answerCounts[(int) $row['question_id']] = (int) $row['answer_count'];
+        }
+
+        $voteTotalsByQuestion = [];
+        $voteParams = [];
+        $voteQuestionIn = $this->inParams($ids, 'vote_question', $voteParams);
+        $voteAnswerIn = $this->inParams($ids, 'vote_answer', $voteParams);
+        $voteCommentQuestionIn = $this->inParams($ids, 'vote_comment_question', $voteParams);
+        $voteCommentAnswerIn = $this->inParams($ids, 'vote_comment_answer', $voteParams);
+        $voteRows = $this->db->fetchAll(
+            "SELECT question_id, SUM(vote_total) AS total_votes
+             FROM (
+                SELECT q.id AS question_id, COALESCE(q.votes, 0) AS vote_total
+                FROM questions q
+                WHERE q.id IN ({$voteQuestionIn})
+                UNION ALL
+                SELECT a.question_id, COALESCE(a.votes, 0) AS vote_total
+                FROM answers a
+                WHERE a.deleted_at IS NULL AND a.question_id IN ({$voteAnswerIn})
+                UNION ALL
+                SELECT COALESCE(c.question_id, a.question_id) AS question_id, COALESCE(c.votes, 0) AS vote_total
+                FROM comments c
+                LEFT JOIN answers a ON a.id = c.answer_id
+                WHERE c.question_id IN ({$voteCommentQuestionIn}) OR a.question_id IN ({$voteCommentAnswerIn})
+             ) vote_totals
+             WHERE question_id IS NOT NULL
+             GROUP BY question_id",
+            $voteParams
+        );
+        foreach ($voteRows as $row) {
+            $voteTotalsByQuestion[(int) $row['question_id']] = (int) ($row['total_votes'] ?? 0);
         }
 
         $activityByQuestion = [];
@@ -193,6 +226,7 @@ final readonly class QuestionModel
             $question['activity_users'] = $activityByQuestion[$id] ?? [];
             $question['latest_media'] = $mediaByQuestion[$id] ?? [];
             $question['activity_days'] = $activityDaysByQuestion[$id] ?? [];
+            $question['total_vote_count'] = $voteTotalsByQuestion[$id] ?? (int) ($question['votes'] ?? 0);
             if (!isset($question['answer_count'])) {
                 $question['answer_count'] = $answerCounts[$id] ?? 0;
             }
@@ -453,8 +487,22 @@ final readonly class QuestionModel
     /** @return array<string, mixed>|null */
     public function findBySlug(string $slug): ?array
     {
+        if ($this->duplicateColumnAvailable()) {
+            return $this->db->fetch(
+                'SELECT q.*, u.username, u.reputation, u.avatar_path, c.name AS category_name, c.slug AS category_slug,
+                        dq.slug AS duplicate_slug, dq.title AS duplicate_title
+                 FROM questions q
+                 JOIN users u ON u.id = q.user_id
+                 LEFT JOIN categories c ON c.id = q.category_id
+                 LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL
+                 WHERE q.slug = :slug AND q.deleted_at IS NULL LIMIT 1',
+                [':slug' => $slug]
+            );
+        }
+
         return $this->db->fetch(
-            'SELECT q.*, u.username, u.reputation, u.avatar_path, c.name AS category_name, c.slug AS category_slug
+            'SELECT q.*, u.username, u.reputation, u.avatar_path, c.name AS category_name, c.slug AS category_slug,
+                    NULL AS duplicate_of_id, NULL AS duplicate_slug, NULL AS duplicate_title
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
@@ -472,6 +520,18 @@ final readonly class QuestionModel
     {
         $row = $this->db->fetch('SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL AND closed_at IS NULL LIMIT 1', [':id' => $questionId]);
         return $row !== null;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function findSummaryById(int $id): ?array
+    {
+        return $this->db->fetch(
+            'SELECT id, user_id, title, slug
+             FROM questions
+             WHERE id = :id AND deleted_at IS NULL
+             LIMIT 1',
+            [':id' => $id]
+        );
     }
 
     public function create(int $userId, ?int $categoryId, string $title, string $slug, string $body, string $metaDescription): int
@@ -497,6 +557,8 @@ final readonly class QuestionModel
 
     public function attachTags(int $questionId, array $tags): void
     {
+        $attached = 0;
+        $seenSlugs = [];
         foreach ($tags as $tag) {
             $name = trim(mb_strtolower((string) $tag));
             if ($name === '') {
@@ -509,10 +571,19 @@ final readonly class QuestionModel
                 continue;
             }
 
+            if (isset($seenSlugs[$slug])) {
+                continue;
+            }
+            $seenSlugs[$slug] = true;
+
             $this->db->execute('INSERT INTO tags (name, slug, created_at) VALUES (:name, :slug, NOW()) ON DUPLICATE KEY UPDATE id = id', [':name' => $name, ':slug' => $slug]);
             $tagRow = $this->db->fetch('SELECT id FROM tags WHERE slug = :slug LIMIT 1', [':slug' => $slug]);
             if ($tagRow !== null) {
                 $this->db->execute('INSERT IGNORE INTO question_tags (question_id, tag_id) VALUES (:question, :tag)', [':question' => $questionId, ':tag' => (int) $tagRow['id']]);
+                $attached++;
+                if ($attached >= self::MAX_QUESTION_TAGS) {
+                    break;
+                }
             }
         }
     }
@@ -548,7 +619,7 @@ final readonly class QuestionModel
     public function findAnswer(int $id): ?array
     {
         return $this->db->fetch(
-            'SELECT a.*, q.slug AS question_slug
+            'SELECT a.*, q.slug AS question_slug, q.title AS question_title
              FROM answers a
              JOIN questions q ON q.id = a.question_id
              WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL
@@ -613,7 +684,7 @@ final readonly class QuestionModel
         $this->applyVote($type, $postId, $userId, $value);
     }
 
-    /** @return array{user_id: int, reputation_delta: int}|null */
+    /** @return array{user_id: int, reputation_delta: int, votes: int, current_vote: int}|null */
     public function applyVote(string $type, int $postId, int $userId, int $value): ?array
     {
         $value = $value > 0 ? 1 : -1;
@@ -656,6 +727,8 @@ final readonly class QuestionModel
             return [
                 'user_id' => $ownerUserId,
                 'reputation_delta' => ($value - $currentVote) * $points,
+                'votes' => (int) ($total['total'] ?? 0),
+                'current_vote' => $value,
             ];
         });
     }
@@ -766,9 +839,15 @@ final readonly class QuestionModel
             return false;
         }
 
-        $this->db->execute('UPDATE answers SET verified_at = NULL, verified_by = NULL, review_note = "", updated_at = NOW() WHERE id = :id', [':id' => $answerId]);
+        $updated = $this->db->query(
+            'UPDATE answers a
+             JOIN questions q ON q.id = a.question_id
+             SET a.verified_at = NULL, a.verified_by = NULL, a.review_note = "", a.updated_at = NOW()
+             WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL',
+            [':id' => $answerId]
+        )->rowCount();
 
-        return true;
+        return $updated > 0;
     }
 
     public function flag(string $type, int $postId, int $userId, string $reason): void
@@ -815,24 +894,52 @@ final readonly class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function related(int $questionId, int $limit = 4): array
     {
+        $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
+
         return $this->db->fetchAll(
-            'SELECT DISTINCT q.id, q.title, q.slug,
+            'SELECT q.id, q.title, q.slug,
                     COALESCE(q.votes, 0) AS votes,
                     (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL) AS answer_count,
-                    EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.is_accepted = 1 AND a.deleted_at IS NULL) AS has_accepted
+                    EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.is_accepted = 1 AND a.deleted_at IS NULL) AS has_accepted,
+                    COUNT(DISTINCT qt.tag_id) AS tag_overlap
              FROM questions q
-             JOIN question_tags qt ON qt.question_id = q.id
-             WHERE qt.tag_id IN (SELECT tag_id FROM question_tags WHERE question_id = :id)
+             JOIN questions current_question ON current_question.id = :id
+             LEFT JOIN question_tags qt ON qt.question_id = q.id AND qt.tag_id IN (SELECT tag_id FROM question_tags WHERE question_id = :tag_source_id)
+             WHERE (
+                    qt.tag_id IS NOT NULL
+                    OR (current_question.category_id IS NOT NULL AND q.category_id = current_question.category_id)
+               )
                AND q.id <> :exclude_id AND q.deleted_at IS NULL
-             ORDER BY q.created_at DESC LIMIT :limit',
-            [':id' => $questionId, ':exclude_id' => $questionId, ':limit' => $limit]
+               ' . $duplicateFilter . '
+             GROUP BY q.id, q.title, q.slug, q.votes, q.created_at
+             ORDER BY tag_overlap DESC, has_accepted DESC, answer_count DESC, q.votes DESC, q.created_at DESC
+             LIMIT :limit',
+            [':id' => $questionId, ':tag_source_id' => $questionId, ':exclude_id' => $questionId, ':limit' => $limit]
         );
     }
 
     /** @return array<int, array<string, mixed>> */
     public function sitemapQuestions(): array
     {
-        return $this->db->fetchAll('SELECT slug, body, updated_at FROM questions WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50000');
+        $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
+
+        return $this->db->fetchAll(
+            'SELECT q.slug, q.body, q.updated_at
+             FROM questions q
+             WHERE q.deleted_at IS NULL
+               ' . $duplicateFilter . '
+               AND (
+                   CHAR_LENGTH(TRIM(q.body)) >= 180
+                   OR EXISTS (
+                       SELECT 1
+                       FROM answers a
+                       WHERE a.question_id = q.id
+                         AND a.deleted_at IS NULL
+                   )
+               )
+             ORDER BY q.updated_at DESC
+             LIMIT 50000'
+        );
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -884,13 +991,18 @@ final readonly class QuestionModel
         );
     }
 
-    public function resolveFlag(int $flagId, string $status): void
+    public function resolveFlag(int $flagId, string $status): bool
     {
-        if (!in_array($status, ['resolved', 'rejected'], true)) {
-            return;
+        if ($flagId < 1 || !in_array($status, ['resolved', 'rejected'], true)) {
+            return false;
         }
 
-        $this->db->execute('UPDATE flags SET status = :status, resolved_at = NOW() WHERE id = :id', [':status' => $status, ':id' => $flagId]);
+        $updated = $this->db->query(
+            'UPDATE flags SET status = :status, resolved_at = NOW() WHERE id = :id AND status = "open"',
+            [':status' => $status, ':id' => $flagId]
+        )->rowCount();
+
+        return $updated > 0;
     }
 
     /** @return array<int, int> */
@@ -1044,7 +1156,18 @@ final readonly class QuestionModel
     public function findPost(string $type, int $id): ?array
     {
         if ($type === 'question') {
-            return $this->db->fetch('SELECT id, title, body, slug, closed_at FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => $id]);
+            if ($this->duplicateColumnAvailable()) {
+                return $this->db->fetch(
+                    'SELECT q.id, q.title, q.body, q.slug, q.closed_at, q.duplicate_of_id,
+                            dq.slug AS duplicate_slug, dq.title AS duplicate_title
+                     FROM questions q
+                     LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL
+                     WHERE q.id = :id AND q.deleted_at IS NULL LIMIT 1',
+                    [':id' => $id]
+                );
+            }
+
+            return $this->db->fetch('SELECT id, title, body, slug, closed_at, NULL AS duplicate_of_id, NULL AS duplicate_slug, NULL AS duplicate_title FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => $id]);
         }
 
         if ($type === 'answer') {
@@ -1082,6 +1205,41 @@ final readonly class QuestionModel
         if ($type === 'comment') {
             $this->db->execute('UPDATE comments SET body = :body WHERE id = :id', [':body' => $body, ':id' => $id]);
         }
+    }
+
+    public function setDuplicateOf(int $questionId, ?int $duplicateOfId): bool
+    {
+        if ($questionId < 1 || !$this->duplicateColumnAvailable()) {
+            return false;
+        }
+
+        if ($duplicateOfId === null) {
+            $this->db->execute(
+                'UPDATE questions SET duplicate_of_id = NULL, updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+                [':id' => $questionId]
+            );
+
+            return true;
+        }
+
+        if ($duplicateOfId < 1 || $duplicateOfId === $questionId) {
+            return false;
+        }
+
+        $target = $this->db->fetch(
+            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL AND (duplicate_of_id IS NULL OR duplicate_of_id <> :question_id) LIMIT 1',
+            [':id' => $duplicateOfId, ':question_id' => $questionId]
+        );
+        if ($target === null) {
+            return false;
+        }
+
+        $this->db->execute(
+            'UPDATE questions SET duplicate_of_id = :duplicate_of_id, closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            [':duplicate_of_id' => $duplicateOfId, ':id' => $questionId]
+        );
+
+        return true;
     }
 
     /** @return array<string, int> */
@@ -1230,5 +1388,24 @@ final readonly class QuestionModel
         }
 
         return array_map('intval', array_keys($seen));
+    }
+
+    private function duplicateColumnAvailable(): bool
+    {
+        static $available = null;
+        if ($available !== null) {
+            return $available;
+        }
+
+        try {
+            $row = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'duplicate_of_id' LIMIT 1"
+            );
+            $available = $row !== null;
+        } catch (Throwable) {
+            $available = false;
+        }
+
+        return $available;
     }
 }

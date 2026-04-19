@@ -2,19 +2,23 @@
 
 declare(strict_types=1);
 
-$renderVote = static function (string $type, int $id, int $votes, string $label) use ($csrf): void {
-    $upIcon = $type === 'question' ? '&uarr;' : '&#128077;';
-    $downIcon = $type === 'question' ? '&darr;' : '&#128078;';
+$renderVote = static function (string $type, int $id, int $votes, string $label) use ($csrf, $authUser): void {
+    $upIcon = '<svg class="vote-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6.7 14.7 12 9.4l5.3 5.3 1.4-1.4L12 6.6l-6.7 6.7 1.4 1.4Z"/></svg>';
+    $downIcon = '<svg class="vote-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6.7 9.3 5.3 5.3 5.3-5.3 1.4 1.4-6.7 6.7-6.7-6.7 1.4-1.4Z"/></svg>';
+    $action = '/post/' . $type . '/' . $id . '/vote';
+    $asyncAttributes = is_array($authUser) ? ' data-vote-box data-post-type="' . h($type) . '" data-post-id="' . $id . '"' : '';
     ?>
-    <div class="vote-box <?= $type === 'comment' ? 'vote-box-compact' : '' ?>">
-        <form method="post" action="/post/<?= h($type) ?>/<?= $id ?>/vote">
-            <?= $csrf->field('/post/' . $type . '/' . $id . '/vote') ?>
-            <input type="hidden" name="value" value="1"><button class="vote-button vote-up" aria-label="Upvote <?= h($label) ?>" title="Upvote"><span aria-hidden="true"><?= $upIcon ?></span></button>
+    <div class="vote-box <?= $type === 'comment' ? 'vote-box-compact' : '' ?>"<?= $asyncAttributes ?>>
+        <form method="post" action="<?= h($action) ?>"<?= is_array($authUser) ? ' data-async-vote-form' : '' ?>>
+            <?= $csrf->field($action) ?>
+            <input type="hidden" name="value" value="1">
+            <button class="vote-button vote-up" aria-label="Upvote <?= h($label) ?>" title="Upvote" data-vote-button data-vote-value="1" aria-pressed="false"><?= $upIcon ?></button>
         </form>
-        <strong><?= (int) $votes ?></strong>
-        <form method="post" action="/post/<?= h($type) ?>/<?= $id ?>/vote">
-            <?= $csrf->field('/post/' . $type . '/' . $id . '/vote') ?>
-            <input type="hidden" name="value" value="-1"><button class="vote-button vote-down" aria-label="Downvote <?= h($label) ?>" title="Downvote"><span aria-hidden="true"><?= $downIcon ?></span></button>
+        <strong data-vote-count><?= (int) $votes ?></strong>
+        <form method="post" action="<?= h($action) ?>"<?= is_array($authUser) ? ' data-async-vote-form' : '' ?>>
+            <?= $csrf->field($action) ?>
+            <input type="hidden" name="value" value="-1">
+            <button class="vote-button vote-down" aria-label="Downvote <?= h($label) ?>" title="Downvote" data-vote-button data-vote-value="-1" aria-pressed="false"><?= $downIcon ?></button>
         </form>
     </div>
     <?php
@@ -35,7 +39,7 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
     }
 
     ?>
-    <div class="reaction-bar" aria-label="Reactions">
+    <div class="reaction-bar" aria-label="Reactions"<?= is_array($authUser) ? ' data-reaction-bar data-post-type="' . h($type) . '" data-post-id="' . $id . '"' : '' ?>>
         <?php foreach ($items as $reaction): ?>
             <?php
             $name = (string) ($reaction['name'] ?? 'Reaction');
@@ -44,17 +48,17 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
             $active = !empty($reaction['reacted']);
             ?>
             <?php if (is_array($authUser)): ?>
-                <form method="post" action="<?= h($action) ?>">
+                <form method="post" action="<?= h($action) ?>" data-async-reaction-form data-reaction-id="<?= (int) $reaction['id'] ?>">
                     <?= $csrf->field($action) ?>
                     <input type="hidden" name="reaction_type_id" value="<?= (int) $reaction['id'] ?>">
-                    <button type="submit" class="reaction-button <?= $active ? 'is-active' : '' ?>" aria-pressed="<?= $active ? 'true' : 'false' ?>" title="<?= h($name) ?>">
+                    <button type="submit" class="reaction-button <?= $active ? 'is-active' : '' ?>" aria-pressed="<?= $active ? 'true' : 'false' ?>" title="<?= h($name) ?>" data-reaction-button>
                         <?php if ($iconPath !== ''): ?>
                             <?= uploaded_image($iconPath, 'reaction-icon', $name . ' reaction icon') ?>
                         <?php else: ?>
                             <span class="reaction-icon-fallback"><?= h(mb_strtoupper(mb_substr($name, 0, 1))) ?></span>
                         <?php endif; ?>
                         <span><?= h($name) ?></span>
-                        <strong><?= (int) ($reaction['count'] ?? 0) ?></strong>
+                        <strong data-reaction-count><?= (int) ($reaction['count'] ?? 0) ?></strong>
                     </button>
                 </form>
             <?php else: ?>
@@ -111,7 +115,7 @@ $renderComment = static function (array $comment, string $composerId, string $ac
             <header class="comment-head">
                 <span class="comment-author-wrap">
                     <?php if (!empty($comment['avatar_path'])): ?><?= uploaded_image((string) $comment['avatar_path'], 'avatar', (string) $comment['username'] . ' avatar') ?><?php endif; ?>
-                    <strong class="comment-author"><?= h((string) $comment['username']) ?></strong>
+                    <a class="comment-author" href="/user/<?= rawurlencode((string) $comment['username']) ?>"><?= h((string) $comment['username']) ?></a>
                 </span>
                 <span class="comment-date"><?= h((string) ($comment['created_at'] ?? '')) ?></span>
             </header>
@@ -141,7 +145,7 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                             <input type="hidden" name="parent_id" value="<?= (int) $comment['id'] ?>" data-quote-parent-input>
                             <input type="hidden" name="quoted_comment_id" value="<?= (int) $comment['id'] ?>" data-quote-id-input>
                             <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                            <textarea name="body" rows="2" maxlength="2000" placeholder="Reply to <?= h((string) $comment['username']) ?>"></textarea>
+                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply to <?= h((string) $comment['username']) ?>. Use @username to mention someone."></textarea>
                             <div class="comment-compose-tools">
                                 <label class="attachment-control">Attach media
                                     <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
@@ -198,6 +202,12 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                 </div>
             <?php endif; ?>
         </div>
+        <?php if (is_array($duplicateCanonical ?? null)): ?>
+            <aside class="duplicate-notice">
+                <strong>Marked as duplicate</strong>
+                <span>Canonical discussion: <a href="/question/<?= h((string) $duplicateCanonical['slug']) ?>"><?= h((string) (($duplicateCanonical['title'] ?? '') ?: $duplicateCanonical['slug'])) ?></a></span>
+            </aside>
+        <?php endif; ?>
         <?php if (!empty($question['closed_at'])): ?>
             <p class="flash">Closed to new answers.</p>
         <?php endif; ?>
@@ -221,7 +231,7 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                     <?php endif; ?>
                 </div>
                 <div class="question-meta-right">
-                    <p class="meta question-asked-meta">Asked by <a href="/user/<?= h((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
+                    <p class="meta question-asked-meta">Asked by <a href="/user/<?= rawurlencode((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
                     <?php if (is_array($authUser)): ?><div class="post-actions question-report-actions"><?php $renderReportButton('question', (int) $question['id'], 'Report question'); ?></div><?php endif; ?>
                 </div>
             </div>
@@ -234,20 +244,23 @@ $renderCommentTree = static function (array $comment, string $composerId, string
             </div>
         <?php endforeach; ?>
         <?php if (is_array($authUser) && $commentsOpen): ?>
-            <form method="post" action="/question/<?= h((string) $question['slug']) ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data" id="question-comment-composer">
-                <?= $csrf->field('/question/' . (string) $question['slug'] . '/comment') ?>
-                <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
-                <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
-                <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                <textarea name="body" rows="2" maxlength="2000" placeholder="Add a clarification or quote someone above"></textarea>
-                <div class="comment-compose-tools">
-                    <label class="attachment-control">Attach media
-                        <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
-                    </label>
-                    <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
-                    <button type="submit">Comment</button>
-                </div>
-            </form>
+            <details class="thread-reply-details comment-thread-composer" id="question-comment-composer">
+                <summary>Reply in this thread</summary>
+                <form method="post" action="/question/<?= h((string) $question['slug']) ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data">
+                    <?= $csrf->field('/question/' . (string) $question['slug'] . '/comment') ?>
+                    <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
+                    <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
+                    <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
+                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone."></textarea>
+                    <div class="comment-compose-tools">
+                        <label class="attachment-control">Attach media
+                            <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
+                        </label>
+                        <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
+                        <button type="submit">Reply</button>
+                    </div>
+                </form>
+            </details>
         <?php elseif (is_array($authUser)): ?>
             <p class="flash">This question is closed to new clarifications.</p>
         <?php endif; ?>
@@ -304,45 +317,48 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                     <?php $renderReactions('answer', (int) $answer['id']); ?>
                     <p class="meta">
                         <?php if (!empty($answer['avatar_path'])): ?><?= uploaded_image((string) $answer['avatar_path'], 'avatar', (string) $answer['username'] . ' avatar') ?><?php endif; ?>
-                        Answered by <a href="/user/<?= h((string) $answer['username']) ?>"><?= h((string) $answer['username']) ?></a> &middot; <?= h((string) $answer['created_at']) ?>
+                        Answered by <a href="/user/<?= rawurlencode((string) $answer['username']) ?>"><?= h((string) $answer['username']) ?></a> &middot; <?= h((string) $answer['created_at']) ?>
                     </p>
                     <?php if (!empty($answer['verified_at'])): ?>
                         <p class="meta verified-review">
-                            Reviewed by <a href="/user/<?= h((string) $answer['verified_by_username']) ?>"><?= h((string) $answer['verified_by_username']) ?></a> &middot; <?= h((string) $answer['verified_at']) ?>
+                            Reviewed by <a href="/user/<?= rawurlencode((string) $answer['verified_by_username']) ?>"><?= h((string) $answer['verified_by_username']) ?></a> &middot; <?= h((string) $answer['verified_at']) ?>
                             <?php if (!empty($answer['review_note'])): ?><br><?= h((string) $answer['review_note']) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>
-                    <?php if (is_array($authUser)): ?><div class="post-actions"><?php $renderReportButton('answer', (int) $answer['id'], 'Report answer'); ?></div><?php endif; ?>
-                    <?php if ($canModerate): ?>
-                        <div class="moderation-actions inline-moderation-actions">
-                            <a class="button button-secondary" href="/moderator/answer/<?= (int) $answer['id'] ?>/edit">Edit answer</a>
-                            <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/delete">
-                                <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/delete') ?>
-                                <button type="submit">Delete answer</button>
-                            </form>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (is_array($authUser) && in_array(active_role($authUser), ['moderator', 'administrator'], true)): ?>
-                        <div class="moderation-actions answer-review-actions">
-                            <?php if (empty($answer['verified_at'])): ?>
-                                <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/verify">
-                                    <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/verify') ?>
-                                    <input name="review_note" maxlength="240" placeholder="Optional review note">
-                                    <button type="submit">Mark reviewed</button>
-                                </form>
-                            <?php else: ?>
-                                <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/unverify">
-                                    <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/unverify') ?>
-                                    <button type="submit">Remove review</button>
-                                </form>
+                    <?php if (is_array($authUser)): ?>
+                        <?php $canAcceptAnswer = (int) $authUser['id'] === (int) $question['user_id']; ?>
+                        <div class="answer-action-layout">
+                            <?php if ($canAcceptAnswer || $canModerate): ?>
+                                <div class="moderation-actions inline-moderation-actions answer-action-bar">
+                                    <?php if ($canAcceptAnswer): ?>
+                                        <form method="post" action="/answer/<?= (int) $answer['id'] ?>/accept">
+                                            <?= $csrf->field('/answer/' . (int) $answer['id'] . '/accept') ?>
+                                            <button type="submit"><?= (int) $answer['is_accepted'] === 1 ? 'Accepted' : 'Accept answer' ?></button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <?php if ($canModerate): ?>
+                                        <?php if (empty($answer['verified_at'])): ?>
+                                            <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/verify" class="answer-review-form">
+                                                <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/verify') ?>
+                                                <input name="review_note" maxlength="240" placeholder="Optional review note">
+                                                <button type="submit">Mark reviewed</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/unverify">
+                                                <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/unverify') ?>
+                                                <button type="submit">Remove review</button>
+                                            </form>
+                                        <?php endif; ?>
+                                        <a class="button button-secondary" href="/moderator/answer/<?= (int) $answer['id'] ?>/edit">Edit answer</a>
+                                        <form method="post" action="/moderator/answer/<?= (int) $answer['id'] ?>/delete">
+                                            <?= $csrf->field('/moderator/answer/' . (int) $answer['id'] . '/delete') ?>
+                                            <button type="submit" class="button-danger">Delete answer</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             <?php endif; ?>
+                            <div class="post-actions answer-report-actions"><?php $renderReportButton('answer', (int) $answer['id'], 'Report answer'); ?></div>
                         </div>
-                    <?php endif; ?>
-                    <?php if (is_array($authUser) && (int) $authUser['id'] === (int) $question['user_id']): ?>
-                        <form method="post" action="/answer/<?= (int) $answer['id'] ?>/accept" class="inline">
-                            <?= $csrf->field('/answer/' . (int) $answer['id'] . '/accept') ?>
-                            <button type="submit">Accept answer</button>
-                        </form>
                     <?php endif; ?>
                     <section class="comments" aria-label="Answer clarifications">
                         <?php $answerCommentTree = $answerCommentTrees[(int) $answer['id']] ?? []; ?>
@@ -352,20 +368,23 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                             </div>
                         <?php endforeach; ?>
                         <?php if (is_array($authUser) && $commentsOpen): ?>
-                            <form method="post" action="/answer/<?= (int) $answer['id'] ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data" id="answer-<?= (int) $answer['id'] ?>-comment-composer">
-                                <?= $csrf->field('/answer/' . (int) $answer['id'] . '/comment') ?>
-                                <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
-                                <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
-                                <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                                <textarea name="body" rows="2" maxlength="2000" placeholder="Add a clarification or quote someone above"></textarea>
-                                <div class="comment-compose-tools">
-                                    <label class="attachment-control">Attach media
-                                        <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
-                                    </label>
-                                    <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
-                                    <button type="submit">Comment</button>
-                                </div>
-                            </form>
+                            <details class="thread-reply-details comment-thread-composer" id="answer-<?= (int) $answer['id'] ?>-comment-composer">
+                                <summary>Reply in this thread</summary>
+                                <form method="post" action="/answer/<?= (int) $answer['id'] ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data">
+                                    <?= $csrf->field('/answer/' . (int) $answer['id'] . '/comment') ?>
+                                    <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
+                                    <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
+                                    <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
+                                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone."></textarea>
+                                    <div class="comment-compose-tools">
+                                        <label class="attachment-control">Attach media
+                                            <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
+                                        </label>
+                                        <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
+                                        <button type="submit">Reply</button>
+                                    </div>
+                                </form>
+                            </details>
                         <?php elseif (is_array($authUser)): ?>
                             <p class="flash">This question is closed to new clarifications.</p>
                         <?php endif; ?>
@@ -383,7 +402,8 @@ $renderCommentTree = static function (array $comment, string $composerId, string
             <?= $csrf->field('/question/' . (string) $question['slug'] . '/answer') ?>
             <div class="form-row form-row-full">
                 <label>Your answer
-                    <textarea name="body" rows="10" minlength="10" required data-markdown-editor placeholder="Share the steps, tradeoffs, or source that helped you solve it."></textarea>
+                    <textarea name="body" rows="12" minlength="10" required data-markdown-editor data-editor-context="answer" data-editor-autosave="1" data-editor-min-words="8" placeholder="Share the steps, tradeoffs, source, or exact fix that helped you solve it."></textarea>
+                    <span class="field-help">Use headings, lists, links, quotes, and code to make the answer easy to scan.</span>
                 </label>
             </div>
             <div class="form-row form-row-actions">

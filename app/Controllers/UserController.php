@@ -20,6 +20,8 @@ use RuntimeException;
 
 final class UserController extends Controller
 {
+    private const int PROFILE_STREAM_LIMIT = 10;
+
     public function __construct(
         View $view,
         Session $session,
@@ -46,6 +48,14 @@ final class UserController extends Controller
         $stats = $this->users->activityStats((int) $user['id']);
         $rank = $this->gamification->rank((int) $user['reputation']);
         $badges = $this->gamification->badges((int) $user['id']);
+        $questions = $this->users->recentQuestions((int) $user['id'], self::PROFILE_STREAM_LIMIT);
+        $answers = $this->users->recentAnswers((int) $user['id'], self::PROFILE_STREAM_LIMIT);
+        $activity = $this->users->recentActivity((int) $user['id'], self::PROFILE_STREAM_LIMIT);
+        $participantQuestionIds = array_values(array_unique(array_filter(array_merge(
+            array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions),
+            array_map(static fn (array $answer): int => (int) ($answer['question_id'] ?? 0), $answers),
+            array_map(static fn (array $item): int => (int) ($item['question_id'] ?? 0), $activity),
+        ), static fn (int $id): bool => $id > 0)));
         $indexableProfile =
             (int) ($stats['questions'] ?? 0) > 0
             || (int) ($stats['answers'] ?? 0) > 0
@@ -65,9 +75,10 @@ final class UserController extends Controller
             'robots' => $indexableProfile ? null : 'noindex,follow',
             'schema' => $this->seo->profileSchema($user, $stats, $rank, $badges),
             'profile' => $user,
-            'questions' => $this->users->recentQuestions((int) $user['id']),
-            'answers' => $this->users->recentAnswers((int) $user['id']),
-            'activity' => $this->users->recentActivity((int) $user['id']),
+            'questions' => $questions,
+            'answers' => $answers,
+            'activity' => $activity,
+            'participantMap' => $this->users->participantsForQuestions($participantQuestionIds),
             'activityStats' => $stats,
             'rank' => $rank,
             'badges' => $badges,

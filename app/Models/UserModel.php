@@ -134,6 +134,24 @@ final readonly class UserModel
         return (int) ($row['total'] ?? 0);
     }
 
+    /** @return array{top_reputation: int, total_answers: int, total_questions: int} */
+    public function directorySummary(): array
+    {
+        $row = $this->db->fetch(
+            'SELECT
+                COALESCE(MAX(u.reputation), 0) AS top_reputation,
+                (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.deleted_at IS NULL AND q.deleted_at IS NULL) AS total_answers,
+                (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL) AS total_questions
+             FROM users u'
+        );
+
+        return [
+            'top_reputation' => (int) ($row['top_reputation'] ?? 0),
+            'total_answers' => (int) ($row['total_answers'] ?? 0),
+            'total_questions' => (int) ($row['total_questions'] ?? 0),
+        ];
+    }
+
     public function updateLastLogin(int $id): void
     {
         $this->db->execute('UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id', [':id' => $id]);
@@ -404,7 +422,7 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function recentQuestions(int $userId, int $limit = 8): array
+    public function recentQuestions(int $userId, int $limit = 10): array
     {
         return $this->db->fetchAll(
             'SELECT q.*, COUNT(DISTINCT a.id) AS answer_count
@@ -419,10 +437,10 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function recentAnswers(int $userId, int $limit = 8): array
+    public function recentAnswers(int $userId, int $limit = 10): array
     {
         return $this->db->fetchAll(
-            'SELECT a.id, a.body, a.votes, a.is_accepted, a.created_at, q.title AS question_title, q.slug AS question_slug
+            'SELECT a.id, a.body, a.votes, a.is_accepted, a.created_at, q.id AS question_id, q.title AS question_title, q.slug AS question_slug
              FROM answers a
              JOIN questions q ON q.id = a.question_id
              WHERE a.user_id = :user AND a.deleted_at IS NULL AND q.deleted_at IS NULL
@@ -433,21 +451,21 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function recentActivity(int $userId, int $limit = 12): array
+    public function recentActivity(int $userId, int $limit = 10): array
     {
         return $this->db->fetchAll(
             "SELECT *
              FROM (
-                SELECT 'question' AS type, 'Asked' AS label, q.title AS title, q.slug AS slug, q.body AS summary, q.created_at AS created_at
+                SELECT 'question' AS type, 'Asked' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, q.body AS summary, q.created_at AS created_at
                 FROM questions q
                 WHERE q.user_id = :question_user AND q.deleted_at IS NULL
                 UNION ALL
-                SELECT 'answer' AS type, 'Answered' AS label, q.title AS title, q.slug AS slug, a.body AS summary, a.created_at AS created_at
+                SELECT 'answer' AS type, 'Answered' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, a.body AS summary, a.created_at AS created_at
                 FROM answers a
                 JOIN questions q ON q.id = a.question_id
                 WHERE a.user_id = :answer_user AND a.deleted_at IS NULL AND q.deleted_at IS NULL
                 UNION ALL
-                SELECT 'comment' AS type, 'Commented' AS label, q.title AS title, q.slug AS slug, c.body AS summary, c.created_at AS created_at
+                SELECT 'comment' AS type, 'Commented' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, c.body AS summary, c.created_at AS created_at
                 FROM comments c
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
@@ -457,6 +475,73 @@ final readonly class UserModel
              LIMIT :limit",
             [':question_user' => $userId, ':answer_user' => $userId, ':comment_user' => $userId, ':limit' => $limit]
         );
+    }
+
+    /** @param array<int, int> $questionIds @return array<int, array<int, array<string, mixed>>> */
+    public function participantsForQuestions(array $questionIds, int $limitPerQuestion = 6): array
+    {
+        $questionIds = array_values(array_unique(array_filter($questionIds, static fn (int $id): bool => $id > 0)));
+        if ($questionIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $questionIn = $this->inParams($questionIds, 'participant_question', $params);
+        $answerIn = $this->inParams($questionIds, 'participant_answer', $params);
+        $commentQuestionIn = $this->inParams($questionIds, 'participant_comment_question', $params);
+        $commentAnswerIn = $this->inParams($questionIds, 'participant_comment_answer', $params);
+        $rows = $this->db->fetchAll(
+            "SELECT activity.question_id, activity.user_id, u.username, u.avatar_path, MAX(activity.last_activity) AS last_activity
+             FROM (
+                SELECT q.id AS question_id, q.user_id, q.created_at AS last_activity
+                FROM questions q
+                WHERE q.id IN ({$questionIn}) AND q.deleted_at IS NULL
+                UNION ALL
+                SELECT a.question_id, a.user_id, a.created_at AS last_activity
+                FROM answers a
+                JOIN questions q ON q.id = a.question_id
+                WHERE a.question_id IN ({$answerIn}) AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+                UNION ALL
+                SELECT COALESCE(c.question_id, a.question_id) AS question_id, c.user_id, c.created_at AS last_activity
+                FROM comments c
+                LEFT JOIN answers a ON a.id = c.answer_id
+                LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
+                WHERE (c.question_id IN ({$commentQuestionIn}) OR a.question_id IN ({$commentAnswerIn}))
+                  AND q.deleted_at IS NULL
+                  AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
+             ) activity
+             JOIN users u ON u.id = activity.user_id
+             WHERE activity.question_id IS NOT NULL
+             GROUP BY activity.question_id, activity.user_id, u.username, u.avatar_path
+             ORDER BY activity.question_id, last_activity DESC",
+            $params
+        );
+
+        $participants = [];
+        foreach ($rows as $row) {
+            $questionId = (int) $row['question_id'];
+            $participants[$questionId] ??= [];
+            if (count($participants[$questionId]) >= $limitPerQuestion) {
+                continue;
+            }
+
+            $participants[$questionId][] = $row;
+        }
+
+        return $participants;
+    }
+
+    /** @param array<int, int> $ids @param array<string, mixed> $params */
+    private function inParams(array $ids, string $prefix, array &$params): string
+    {
+        $placeholders = [];
+        foreach ($ids as $index => $id) {
+            $key = ':' . $prefix . $index;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+
+        return implode(',', $placeholders);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -475,7 +560,7 @@ final readonly class UserModel
              FROM users u
              LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
-             GROUP BY u.id, u.username, u.updated_at, u.created_at
+             GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              ORDER BY u.reputation DESC, u.created_at DESC
              LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]

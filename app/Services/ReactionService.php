@@ -15,16 +15,21 @@ final readonly class ReactionService
         private GamificationService $gamification,
     ) {}
 
-    public function toggle(string $postType, int $postId, int $reactionTypeId): void
+    /** @return array<int, array<string, mixed>> */
+    public function toggle(string $postType, int $postId, int $reactionTypeId): array
     {
         $userId = (int) $this->session->get('user_id');
-        $result = $this->reactions->toggleForUser($userId, $postType, $postId, $reactionTypeId);
-        if ($result === null || (int) ($result['reputation_delta'] ?? 0) === 0) {
-            return;
+        if ($userId < 1) {
+            return [];
         }
 
-        $reason = (int) $result['reputation_delta'] > 0 ? 'reaction_' . (string) $result['slug'] : 'reaction_removed_' . (string) $result['slug'];
-        $this->gamification->award((int) $result['target_user_id'], (int) $result['reputation_delta'], $reason, $postType, $postId);
+        $result = $this->reactions->toggleForUser($userId, $postType, $postId, $reactionTypeId);
+        if ($result !== null && (int) ($result['reputation_delta'] ?? 0) !== 0) {
+            $reason = (int) $result['reputation_delta'] > 0 ? 'reaction_' . (string) $result['slug'] : 'reaction_removed_' . (string) $result['slug'];
+            $this->gamification->award((int) $result['target_user_id'], (int) $result['reputation_delta'], $reason, $postType, $postId);
+        }
+
+        return $this->forTargets([['type' => $postType, 'id' => $postId]])[$postType . ':' . $postId] ?? [];
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */

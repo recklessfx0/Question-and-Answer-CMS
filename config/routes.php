@@ -9,6 +9,7 @@ use App\Controllers\ModeratorController;
 use App\Controllers\NotificationController;
 use App\Controllers\QuestionController;
 use App\Controllers\SeoController;
+use App\Controllers\StaticPageController;
 use App\Controllers\UserController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\AdminMiddleware;
@@ -29,6 +30,11 @@ return static function (Router $router): void {
     $router->get('/users', [HomeController::class, 'users']);
     $router->get('/users/page/{page}', [HomeController::class, 'users']);
     $router->get('/search', [HomeController::class, 'search']);
+    $router->get('/about', [StaticPageController::class, 'about']);
+    $router->get('/contact', [StaticPageController::class, 'contact']);
+    $router->get('/privacy', [StaticPageController::class, 'privacy']);
+    $router->get('/terms', [StaticPageController::class, 'terms']);
+    $router->get('/community-guidelines', [StaticPageController::class, 'guidelines']);
     $router->get('/tag/{slug}', [HomeController::class, 'tag']);
     $router->get('/tag/{slug}/page/{page}', [HomeController::class, 'tag']);
     $router->get('/category/{slug}', [HomeController::class, 'category']);
@@ -70,6 +76,7 @@ return static function (Router $router): void {
     $router->post('/moderator/{type}/{id}/edit', [ModeratorController::class, 'update'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/{type}/{id}/delete', [ModeratorController::class, 'delete'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/question/{id}/close', [ModeratorController::class, 'closeQuestion'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderator/question/{id}/duplicate', [ModeratorController::class, 'markDuplicate'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/answer/{id}/verify', [ModeratorController::class, 'verifyAnswer'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/answer/{id}/unverify', [ModeratorController::class, 'unverifyAnswer'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/flags/{id}/resolve', [ModeratorController::class, 'resolveFlag'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
@@ -111,4 +118,5 @@ return static function (Router $router): void {
     $router->get('/sitemap-users.xml', [SeoController::class, 'sitemapUsers']);
     $router->get('/robots.txt', [SeoController::class, 'robots']);
     $router->get('/llms.txt', [SeoController::class, 'llms']);
+    $router->get('/llms-full.txt', [SeoController::class, 'llmsFull']);
 };

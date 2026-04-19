@@ -33,11 +33,15 @@ final class QuestionController extends Controller
 
     public function askForm(): Response
     {
+        $categories = $this->categories->all();
+
         return $this->view('questions/form', [
             'title' => 'Ask a Question',
             'metaDescription' => 'Ask a clear question and get community answers.',
             'robots' => 'noindex,follow',
-            'categories' => $this->categories->all(),
+            'categories' => $categories,
+            'categoryCount' => count($categories),
+            'maxTags' => QuestionModel::MAX_QUESTION_TAGS,
         ]);
     }
 
@@ -53,7 +57,7 @@ final class QuestionController extends Controller
     {
         $categoryId = $request->int('category_id', 0, 0);
         $media = $this->mediaFiles($request);
-        $result = $this->service->ask($request->string('title', 180), $request->string('body', 20000), $request->string('tags', 300), $categoryId > 0 ? $categoryId : null, $media, $request->string('video_urls', 1000));
+        $result = $this->service->ask($request->string('title', 180), $request->string('body', 20000), $request->string('tags', 240), $categoryId > 0 ? $categoryId : null, $media, $request->string('video_urls', 1000));
         if (!$result['ok']) {
             $this->flash('error', implode(' ', $result['errors']));
             return $this->redirect('/ask');
@@ -83,21 +87,23 @@ final class QuestionController extends Controller
         $schema = $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $questionComments, $answerComments);
         $ogImage = $this->seo->firstImageFromBodies((string) $question['body'], ...array_map(static fn (array $answer): string => (string) $answer['body'], $answers));
         $thinUnanswered = count($answers) === 0 && mb_strlen(trim(strip_tags((string) $question['body']))) < 180;
+        $duplicateSlug = (string) ($question['duplicate_slug'] ?? '');
         $tags = $this->questions->tags((int) $question['id']);
 
         return $this->view('questions/show', [
             'title' => (string) $question['title'],
             'metaDescription' => $this->seo->questionMetaDescription($question, $answers),
-            'canonical' => url('/question/' . (string) $question['slug']),
+            'canonical' => $duplicateSlug !== '' ? url('/question/' . $duplicateSlug) : url('/question/' . (string) $question['slug']),
             'ogType' => 'article',
             'ogImage' => $ogImage,
-            'robots' => $thinUnanswered ? 'noindex,follow' : null,
+            'robots' => $duplicateSlug === '' && $thinUnanswered ? 'noindex,follow' : null,
             'authorName' => (string) ($question['username'] ?? ''),
             'publishedAt' => (string) ($question['created_at'] ?? ''),
             'modifiedAt' => (string) ($question['updated_at'] ?? $question['created_at'] ?? ''),
             'sectionName' => (string) ($question['category_name'] ?? ''),
             'keywords' => implode(', ', array_map(static fn (array $tag): string => (string) $tag['name'], $tags)),
             'question' => $question,
+            'duplicateCanonical' => $duplicateSlug !== '' ? ['slug' => $duplicateSlug, 'title' => (string) ($question['duplicate_title'] ?? '')] : null,
             'answers' => $answers,
             'questionComments' => $questionComments,
             'answerComments' => $answerComments,
@@ -151,14 +157,33 @@ final class QuestionController extends Controller
     /** @param array<string, string> $params */
     public function vote(Request $request, array $params): Response
     {
-        $this->service->vote($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->int('value', 1, -1, 1));
+        $state = $this->service->vote($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->int('value', 1, -1, 1));
+        if ($this->wantsJson($request)) {
+            if ($state === null) {
+                return $this->json(['ok' => false], 422);
+            }
+
+            return $this->json([
+                'ok' => true,
+                'votes' => (int) ($state['votes'] ?? 0),
+                'current_vote' => (int) ($state['current_vote'] ?? 0),
+            ]);
+        }
+
         return Response::redirect($this->localReferer($request));
     }
 
     /** @param array<string, string> $params */
     public function react(Request $request, array $params): Response
     {
-        $this->reactionService->toggle($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->int('reaction_type_id', 0, 1));
+        $items = $this->reactionService->toggle($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->int('reaction_type_id', 0, 1));
+        if ($this->wantsJson($request)) {
+            return $this->json([
+                'ok' => $items !== [],
+                'reactions' => $items,
+            ], $items === [] ? 422 : 200);
+        }
+
         return Response::redirect($this->localReferer($request));
     }
 
@@ -194,5 +219,23 @@ final class QuestionController extends Controller
         }
 
         return is_array($request->files['image'] ?? null) ? $request->files['image'] : null;
+    }
+
+    private function wantsJson(Request $request): bool
+    {
+        $accept = strtolower((string) ($request->server['HTTP_ACCEPT'] ?? ''));
+        $requestedWith = strtolower((string) ($request->server['HTTP_X_REQUESTED_WITH'] ?? ''));
+
+        return str_contains($accept, 'application/json') || $requestedWith === 'xmlhttprequest';
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function json(array $payload, int $status = 200): Response
+    {
+        return new Response(
+            json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            $status,
+            ['Content-Type' => 'application/json; charset=utf-8']
+        );
     }
 }

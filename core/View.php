@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Core;
 
+use App\Services\SeoService;
 use App\Models\SettingsModel;
 use RuntimeException;
 use Throwable;
@@ -30,6 +31,12 @@ final class View
             }
         }
         $settings = $this->cachedSettings;
+        $siteSchema = '';
+        try {
+            $siteSchema = $this->container->get(SeoService::class)->websiteSchema();
+        } catch (Throwable) {
+            $siteSchema = '';
+        }
 
         $common = [
             'session' => $session,
@@ -37,6 +44,7 @@ final class View
             'authUser' => $session->get('user'),
             'flash' => $session->consumeFlash(),
             'securitySettings' => $settings,
+            'siteSchema' => $siteSchema,
         ];
         $file = $this->safeTemplatePath($template);
         $content = $this->renderFile($file, array_merge($common, $data));

@@ -1,17 +1,20 @@
 User-agent: *
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Google-Extended
+User-agent: CCBot
 Allow: /
 Allow: /public-assets/images/
 Disallow: /admin/
 Disallow: /moderator/
 Disallow: /settings/
 Disallow: /notifications
-Disallow: /login
-Disallow: /register
-Disallow: /auth/
-Disallow: /search
 Disallow: /post/
 Disallow: /flag/
 Disallow: /answer/
 
-Sitemap: https://domain.com/sitemap.xml
-Sitemap: https://domain.com/sitemap_index.xml
+Sitemap: https://420.forum/sitemap.xml
+Sitemap: https://420.forum/sitemap_index.xml

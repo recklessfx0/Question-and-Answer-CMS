@@ -80,6 +80,16 @@ final class AdminController extends Controller
         $this->admin->saveSettings([
             'site_title' => $request->string('site_title', 100),
             'site_description' => $request->string('site_description', 200),
+            'about_description' => $request->string('about_description', 240),
+            'about_body' => $request->string('about_body', 4000),
+            'contact_description' => $request->string('contact_description', 240),
+            'contact_body' => $request->string('contact_body', 4000),
+            'privacy_description' => $request->string('privacy_description', 240),
+            'privacy_body' => $request->string('privacy_body', 4000),
+            'terms_description' => $request->string('terms_description', 240),
+            'terms_body' => $request->string('terms_body', 4000),
+            'guidelines_description' => $request->string('guidelines_description', 240),
+            'guidelines_body' => $request->string('guidelines_body', 4000),
             'recaptcha_enabled' => (string) $request->int('recaptcha_enabled', 0, 0, 1),
             'recaptcha_site_key' => $request->string('recaptcha_site_key', 255),
             'recaptcha_secret_key' => $request->string('recaptcha_secret_key', 255),
@@ -193,7 +203,8 @@ final class AdminController extends Controller
     /** @param array<string, string> $params */
     public function resolveReport(Request $request, array $params): Response
     {
-        $this->admin->resolveReport((int) ($params['id'] ?? 0), $request->string('status', 20), (int) $this->session->get('user_id'));
+        $updated = $this->admin->resolveReport((int) ($params['id'] ?? 0), $request->string('status', 20), (int) $this->session->get('user_id'));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Report updated.' : 'Report could not be updated.');
         return Response::redirect('/admin/reports');
     }
 

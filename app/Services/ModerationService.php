@@ -57,6 +57,16 @@ final readonly class ModerationService
         $this->audit->record((int) $this->session->get('user_id'), 'close', 'question', $questionId);
     }
 
+    public function markDuplicate(int $questionId, ?int $duplicateOfId): bool
+    {
+        if (!$this->questions->setDuplicateOf($questionId, $duplicateOfId)) {
+            return false;
+        }
+
+        $this->audit->record((int) $this->session->get('user_id'), $duplicateOfId === null ? 'clear_duplicate' : 'mark_duplicate', 'question', $questionId);
+        return true;
+    }
+
     public function verifyAnswer(int $answerId, string $note): void
     {
         $moderatorId = (int) $this->session->get('user_id');
@@ -65,17 +75,24 @@ final readonly class ModerationService
         }
     }
 
-    public function unverifyAnswer(int $answerId): void
+    public function unverifyAnswer(int $answerId): bool
     {
         if ($this->questions->unverifyAnswer($answerId)) {
             $this->audit->record((int) $this->session->get('user_id'), 'unverify', 'answer', $answerId);
+            return true;
         }
+
+        return false;
     }
 
-    public function resolveFlag(int $flagId, string $status): void
+    public function resolveFlag(int $flagId, string $status): bool
     {
-        $this->questions->resolveFlag($flagId, $status);
+        if (!$this->questions->resolveFlag($flagId, $status)) {
+            return false;
+        }
+
         $this->audit->record((int) $this->session->get('user_id'), 'flag_' . $status, 'flag', $flagId);
+        return true;
     }
 
     /** @return array<int, array<string, mixed>> */

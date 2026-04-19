@@ -6,6 +6,8 @@ $appEnv    = getenv('APP_ENV') ?: 'production';
 $dbPass    = getenv('DB_PASSWORD');
 $localFile = __DIR__ . '/database.local.php';
 
+// In production, refuse to start if DB_PASSWORD is not set and no local override exists.
+// A hardcoded fallback would let a misconfigured deployment run with a known weak password.
 if ($dbPass === false && !is_file($localFile) && $appEnv !== 'development') {
     throw new RuntimeException('DB_PASSWORD environment variable is not set. Refusing to start with insecure defaults.');
 }

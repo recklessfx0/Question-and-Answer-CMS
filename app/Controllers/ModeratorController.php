@@ -75,6 +75,16 @@ final class ModeratorController extends Controller
     }
 
     /** @param array<string, string> $params */
+    public function markDuplicate(Request $request, array $params): Response
+    {
+        $duplicateId = $request->int('duplicate_of_id', 0, 0);
+        $updated = $this->moderation->markDuplicate((int) ($params['id'] ?? 0), $duplicateId > 0 ? $duplicateId : null);
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Duplicate canonical updated.' : 'Duplicate canonical could not be updated.');
+
+        return Response::redirect($this->localReferer($request));
+    }
+
+    /** @param array<string, string> $params */
     public function verifyAnswer(Request $request, array $params): Response
     {
         $this->moderation->verifyAnswer((int) ($params['id'] ?? 0), $request->string('review_note', 240));
@@ -86,8 +96,8 @@ final class ModeratorController extends Controller
     /** @param array<string, string> $params */
     public function unverifyAnswer(Request $request, array $params): Response
     {
-        $this->moderation->unverifyAnswer((int) ($params['id'] ?? 0));
-        $this->flash('success', 'Answer review removed.');
+        $updated = $this->moderation->unverifyAnswer((int) ($params['id'] ?? 0));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Answer review removed.' : 'Answer review could not be removed.');
 
         return Response::redirect($this->localReferer($request));
     }
@@ -95,8 +105,8 @@ final class ModeratorController extends Controller
     /** @param array<string, string> $params */
     public function resolveFlag(Request $request, array $params): Response
     {
-        $this->moderation->resolveFlag((int) ($params['id'] ?? 0), $request->string('status', 20));
-        $this->flash('success', 'Flag updated.');
+        $updated = $this->moderation->resolveFlag((int) ($params['id'] ?? 0), $request->string('status', 20));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Flag updated.' : 'Flag could not be updated.');
 
         return Response::redirect('/moderator');
     }

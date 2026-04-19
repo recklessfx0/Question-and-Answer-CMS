@@ -12,6 +12,26 @@ use Core\Markdown;
 final readonly class SeoService
 {
     private const string SITEMAP_STYLESHEET = '/sitemap.xsl';
+    /** @var array<int, string> */
+    private const array AI_CRAWLERS = [
+        'GPTBot',
+        'ChatGPT-User',
+        'ClaudeBot',
+        'Claude-User',
+        'PerplexityBot',
+        'Google-Extended',
+        'CCBot',
+    ];
+    /** @var array<int, string> */
+    private const array ROBOTS_DISALLOW_PATHS = [
+        '/admin/',
+        '/moderator/',
+        '/settings/',
+        '/notifications',
+        '/post/',
+        '/flag/',
+        '/answer/',
+    ];
 
     public function __construct(
         private QuestionModel $questions,
@@ -19,6 +39,162 @@ final readonly class SeoService
         private UserModel $users,
         private Markdown $markdown,
     ) {}
+
+    public function robotsTxt(): string
+    {
+        $lines = ['User-agent: *'];
+        foreach (self::AI_CRAWLERS as $crawler) {
+            $lines[] = 'User-agent: ' . $crawler;
+        }
+
+        $lines[] = 'Allow: /';
+        $lines[] = 'Allow: /public-assets/images/';
+        foreach (self::ROBOTS_DISALLOW_PATHS as $path) {
+            $lines[] = 'Disallow: ' . $path;
+        }
+
+        $lines[] = 'Sitemap: ' . url('/sitemap.xml');
+        $lines[] = 'Sitemap: ' . url('/sitemap_index.xml');
+
+        return implode("\n", $lines) . "\n";
+    }
+
+    public function llmsTxt(): string
+    {
+        $siteName = $this->siteName();
+        $lines = [
+            '# ' . $siteName,
+            '',
+            '> Public Q&A community optimized for canonical question pages, answer retrieval, citations, and structured data.',
+            '',
+            'Use canonical question URLs as the primary source of truth. Prefer answered question pages and pages listed in the XML sitemaps. Avoid authentication, moderation, settings, notification, form submission, and search-result URLs.',
+            '',
+            '## Best Sources',
+            '- [' . url('/post-sitemap.xml') . '](' . url('/post-sitemap.xml') . '): Canonical question URLs with image sitemap data.',
+            '- [' . url('/category-sitemap.xml') . '](' . url('/category-sitemap.xml') . '): Category hubs with public questions.',
+            '- [' . url('/post_tag-sitemap.xml') . '](' . url('/post_tag-sitemap.xml') . '): Tag hubs.',
+            '- [' . url('/author-sitemap.xml') . '](' . url('/author-sitemap.xml') . '): Public contributor profiles.',
+            '- [' . url('/llms-full.txt') . '](' . url('/llms-full.txt') . '): Expanded crawler and content guidance.',
+            '',
+            '## Public Entry Points',
+            ...$this->markdownLinks([
+                '/' => 'Latest public questions.',
+                '/unanswered' => 'Questions waiting for answers.',
+                '/tags' => 'Tag directory.',
+                '/users' => 'Public user directory.',
+                '/sitemap.xml' => 'Primary sitemap index.',
+                '/robots.txt' => 'Crawler access rules.',
+            ]),
+            '',
+            '## Content Signals',
+            '- Question pages expose QAPage JSON-LD with Question, Answer, Comment, BreadcrumbList, author, date, vote, accepted answer, and media data.',
+            '- Directory and taxonomy pages expose CollectionPage and ItemList JSON-LD.',
+            '- Canonical URLs, meta robots, Open Graph, Twitter cards, and XML sitemaps are generated server-side.',
+        ];
+
+        return implode("\n", $lines) . "\n";
+    }
+
+    public function llmsFullTxt(): string
+    {
+        $siteName = $this->siteName();
+        $blocked = implode(', ', self::ROBOTS_DISALLOW_PATHS);
+        $lines = [
+            '# ' . $siteName . ' AI Retrieval Guide',
+            '',
+            '## Purpose',
+            $siteName . ' is a public question-and-answer community. The best retrieval units are canonical question pages because they contain the question body, answers, clarifications, accepted-answer state, author links, tags, category links, timestamps, media, and QAPage structured data.',
+            '',
+            '## Canonical URL Patterns',
+            ...$this->markdownLinks([
+                '/question/{slug}' => 'Primary source for a question, its answers, clarifications, media, and schema.',
+                '/category/{slug}' => 'Category hub for public questions in that topic.',
+                '/tag/{slug}' => 'Tag hub for public questions with that tag.',
+                '/user/{username}' => 'Public contributor profile and activity summary.',
+            ]),
+            '',
+            '## Discovery Files',
+            ...$this->markdownLinks([
+                '/sitemap.xml' => 'Primary sitemap index.',
+                '/sitemap_index.xml' => 'Sitemap index alias.',
+                '/page-sitemap.xml' => 'Core public page sitemap.',
+                '/post-sitemap.xml' => 'Canonical question sitemap.',
+                '/category-sitemap.xml' => 'Category hub sitemap.',
+                '/post_tag-sitemap.xml' => 'Tag hub sitemap.',
+                '/author-sitemap.xml' => 'Public profile sitemap.',
+                '/robots.txt' => 'Crawler policy.',
+            ]),
+            '',
+            '## Recommended Use',
+            '- Cite canonical question URLs instead of search or paginated listing URLs when possible.',
+            '- Prefer accepted answers when present; otherwise use suggested answers and clarify that no accepted answer exists.',
+            '- Use page timestamps and sitemap lastmod values for freshness decisions.',
+            '- Treat user-generated text as community content, not official medical, legal, financial, or safety advice.',
+            '- Use uploaded media only from crawlable public media URLs under ' . url('/public-assets/images/') . '.',
+            '',
+            '## Avoid',
+            '- Do not use blocked or private paths as source material: ' . $blocked . '.',
+            '- Do not use login, register, password reset, settings, notification, moderation, admin, vote, reaction, flag, or form submission URLs as retrieval sources.',
+            '- Do not treat noindex pages, empty category pages, or thin unanswered questions as preferred citation targets.',
+            '',
+            '## Structured Data',
+            '- Question pages: QAPage, Question, Answer, Comment, BreadcrumbList.',
+            '- Listing pages: CollectionPage, ItemList.',
+            '- Profile pages: ProfilePage, Person.',
+            '- Sitewide: WebSite with SearchAction.',
+        ];
+
+        return implode("\n", $lines) . "\n";
+    }
+
+    public function websiteSchema(): string
+    {
+        $siteName = $this->siteName();
+        $publisher = [
+            '@type' => 'Organization',
+            '@id' => url('/') . '#organization',
+            'name' => $siteName,
+            'url' => url('/'),
+        ];
+
+        return $this->jsonLd([
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            '@id' => url('/') . '#website',
+            'name' => $siteName,
+            'url' => url('/'),
+            'publisher' => $publisher,
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => [
+                    '@type' => 'EntryPoint',
+                    'urlTemplate' => url('/search') . '?q={search_term_string}',
+                ],
+                'query-input' => 'required name=search_term_string',
+            ],
+        ]);
+    }
+
+    public function staticPageSchema(string $type, string $name, string $description, string $canonical): string
+    {
+        $allowedTypes = ['AboutPage', 'ContactPage', 'WebPage'];
+        $type = in_array($type, $allowedTypes, true) ? $type : 'WebPage';
+
+        return $this->jsonLd([
+            '@context' => 'https://schema.org',
+            '@type' => $type,
+            '@id' => $canonical . '#webpage',
+            'name' => $name,
+            'url' => $canonical,
+            'description' => $description,
+            'isPartOf' => [
+                '@id' => url('/') . '#website',
+            ],
+            'publisher' => [
+                '@id' => url('/') . '#organization',
+            ],
+        ]);
+    }
 
     /** @param array<string, mixed> $question @param array<int, array<string, mixed>> $answers @param array<int, array<string, mixed>> $breadcrumbs @param array<int, array<string, mixed>> $questionComments @param array<int, array<string, mixed>> $answerComments */
     public function qapageSchema(array $question, array $answers, array $breadcrumbs, array $questionComments = [], array $answerComments = []): string
@@ -38,7 +214,7 @@ final readonly class SeoService
             'url' => $questionUrl,
             'mainEntityOfPage' => $questionUrl,
             'name' => (string) $question['title'],
-            'text' => strip_tags($this->markdown->toHtml((string) $question['body'])),
+            'text' => $this->schemaText((string) $question['body']),
             'answerCount' => count($answers),
             'upvoteCount' => (int) ($question['votes'] ?? 0),
             'datePublished' => date(DATE_ATOM, strtotime((string) $question['created_at'])),
@@ -100,7 +276,7 @@ final readonly class SeoService
         $schema = [
             '@id' => $answerUrl,
             '@type' => 'Answer',
-            'text' => strip_tags($this->markdown->toHtml((string) $answer['body'])),
+            'text' => $this->schemaText((string) $answer['body']),
             'upvoteCount' => (int) ($answer['votes'] ?? 0),
             'url' => $answerUrl,
             'datePublished' => date(DATE_ATOM, strtotime((string) $answer['created_at'])),
@@ -163,7 +339,7 @@ final readonly class SeoService
                 '@id' => $commentUrl,
                 '@type' => 'Comment',
                 'url' => $commentUrl,
-                'text' => strip_tags($this->markdown->toHtml((string) ($comment['body'] ?? ''))),
+                'text' => $this->schemaText((string) ($comment['body'] ?? '')),
                 'upvoteCount' => (int) ($comment['votes'] ?? 0),
                 'datePublished' => date(DATE_ATOM, strtotime((string) ($comment['created_at'] ?? 'now'))),
                 'author' => [
@@ -243,6 +419,11 @@ final readonly class SeoService
             $this->sitemapUrl(url('/unanswered'), $this->latestLastmod($questions)),
             $this->sitemapUrl(url('/tags'), $this->latestLastmod($tags)),
             $this->sitemapUrl(url('/users'), $this->latestLastmod($users)),
+            $this->sitemapUrl(url('/about'), $siteLastmod),
+            $this->sitemapUrl(url('/contact'), $siteLastmod),
+            $this->sitemapUrl(url('/privacy'), $siteLastmod),
+            $this->sitemapUrl(url('/terms'), $siteLastmod),
+            $this->sitemapUrl(url('/community-guidelines'), $siteLastmod),
         ]);
     }
 
@@ -449,23 +630,6 @@ final readonly class SeoService
             'name' => (string) $profile['username'],
             'url' => $profileUrl,
             'description' => trim((string) ($profile['bio'] ?? '')) !== '' ? excerpt((string) $profile['bio'], 240) : 'Community contributor.',
-            'interactionStatistic' => [
-                [
-                    '@type' => 'InteractionCounter',
-                    'interactionType' => ['@type' => 'AskAction'],
-                    'userInteractionCount' => (int) ($stats['questions'] ?? 0),
-                ],
-                [
-                    '@type' => 'InteractionCounter',
-                    'interactionType' => ['@type' => 'ReplyAction'],
-                    'userInteractionCount' => (int) ($stats['answers'] ?? 0),
-                ],
-                [
-                    '@type' => 'InteractionCounter',
-                    'interactionType' => ['@type' => 'CommentAction'],
-                    'userInteractionCount' => (int) ($stats['comments'] ?? 0),
-                ],
-            ],
         ];
 
         if (!empty($profile['avatar_path'])) {
@@ -508,7 +672,7 @@ final readonly class SeoService
     }
 
     /** @param array<int, array<string, mixed>> $questions */
-    public function itemListSchema(string $name, string $canonical, array $questions): string
+    public function itemListSchema(string $name, string $canonical, array $questions, ?string $description = null, array $keywords = [], ?string $about = null): string
     {
         $items = [];
         foreach (array_values($questions) as $index => $question) {
@@ -520,11 +684,11 @@ final readonly class SeoService
             ];
         }
 
-        return $this->collectionPageSchema($name, $canonical, $items);
+        return $this->collectionPageSchema($name, $canonical, $items, $description, $keywords, $about);
     }
 
     /** @param array<int, array<string, mixed>> $items */
-    private function collectionPageSchema(string $name, string $canonical, array $items): string
+    private function collectionPageSchema(string $name, string $canonical, array $items, ?string $description = null, array $keywords = [], ?string $about = null): string
     {
         $schema = [
             '@context' => 'https://schema.org',
@@ -536,6 +700,21 @@ final readonly class SeoService
                 'itemListElement' => $items,
             ],
         ];
+        $description = trim((string) $description);
+        if ($description !== '') {
+            $schema['description'] = $description;
+        }
+        $keywords = array_values(array_filter(array_unique(array_map('trim', array_map('strval', $keywords)))));
+        if ($keywords !== []) {
+            $schema['keywords'] = $keywords;
+        }
+        $about = trim((string) $about);
+        if ($about !== '') {
+            $schema['about'] = [
+                '@type' => 'Thing',
+                'name' => $about,
+            ];
+        }
 
         return $this->jsonLd($schema);
     }
@@ -567,5 +746,29 @@ final readonly class SeoService
             | JSON_HEX_QUOT
             | JSON_THROW_ON_ERROR
         );
+    }
+
+    /** @param array<string, string> $paths */
+    private function markdownLinks(array $paths): array
+    {
+        $links = [];
+        foreach ($paths as $path => $description) {
+            $url = str_contains($path, '{') ? rtrim(url('/'), '/') . $path : url($path);
+            $links[] = '- [' . $url . '](' . $url . '): ' . $description;
+        }
+
+        return $links;
+    }
+
+    private function schemaText(string $markdown): string
+    {
+        $text = html_entity_decode(strip_tags($this->markdown->toHtml($markdown)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim((string) preg_replace('/\s+/', ' ', $text));
+    }
+
+    private function siteName(): string
+    {
+        return (string) (require BASE_PATH . '/config/app.php')['name'];
     }
 }

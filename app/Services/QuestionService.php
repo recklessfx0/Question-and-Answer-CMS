@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\QuestionModel;
+use App\Models\UserModel;
 use Core\Markdown;
 use Core\Queue;
 use Core\Session;
@@ -22,6 +23,7 @@ final readonly class QuestionService
         private Queue $queue,
         private UploadService $uploads,
         private GamificationService $gamification,
+        private UserModel $users,
     ) {}
 
     /** @return array{ok: bool, slug: string, errors: array<string, string>} */
@@ -44,6 +46,7 @@ final readonly class QuestionService
         [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);
         $this->queue->push('NotifyModerators', ['question_id' => $id]);
+        $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . $title, '/question/' . $slug);
         $this->gamification->award($userId, 3, 'question_created', 'question', $id);
 
         return ['ok' => true, 'slug' => $slug, 'errors' => []];
@@ -51,6 +54,10 @@ final readonly class QuestionService
 
     public function answer(int $questionId, string $body, ?array $media = null, string $videoUrls = ''): bool
     {
+        if ((int) $this->session->get('user_id') < 1) {
+            return false;
+        }
+
         if (!$this->questions->isQuestionOpen($questionId)) {
             return false;
         }
@@ -62,15 +69,24 @@ final readonly class QuestionService
             return false;
         }
 
-        $id = $this->questions->addAnswer($questionId, (int) $this->session->get('user_id'), $body);
+        $userId = (int) $this->session->get('user_id');
+        $id = $this->questions->addAnswer($questionId, $userId, $body);
         $this->queue->push('AnswerPostedNotification', ['question_id' => $questionId, 'answer_id' => $id]);
-        $this->gamification->award((int) $this->session->get('user_id'), 5, 'answer_created', 'answer', $id);
+        $question = $this->questions->findSummaryById($questionId);
+        if ($question !== null) {
+            $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . (string) $question['title'], '/question/' . (string) $question['slug'] . '#answer-' . $id);
+        }
+        $this->gamification->award($userId, 5, 'answer_created', 'answer', $id);
 
         return true;
     }
 
     public function comment(string $type, int $postId, string $body, ?int $parentId = null, ?array $media = null, string $videoUrls = ''): bool
     {
+        if ((int) $this->session->get('user_id') < 1) {
+            return false;
+        }
+
         if (!in_array($type, ['question', 'answer'], true)) {
             return false;
         }
@@ -97,24 +113,45 @@ final readonly class QuestionService
             return false;
         }
 
-        $id = $this->questions->comment($type, $postId, (int) $this->session->get('user_id'), $body, $parentId);
-        $this->gamification->award((int) $this->session->get('user_id'), 1, 'clarification_created', 'comment', $id);
+        $userId = (int) $this->session->get('user_id');
+        $id = $this->questions->comment($type, $postId, $userId, $body, $parentId);
+        if ($type === 'question') {
+            $question = $this->questions->findSummaryById($postId);
+            if ($question !== null) {
+                $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) $question['title'], '/question/' . (string) $question['slug'] . '#comment-' . $id);
+            }
+        } elseif (isset($answer) && is_array($answer)) {
+            $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) ($answer['question_title'] ?? 'a question'), '/question/' . (string) $answer['question_slug'] . '#comment-' . $id);
+        }
+        $this->gamification->award($userId, 1, 'clarification_created', 'comment', $id);
         return true;
     }
 
-    public function vote(string $type, int $postId, int $value): void
+    /** @return array{votes: int, current_vote: int}|null */
+    public function vote(string $type, int $postId, int $value): ?array
     {
         if (!in_array($type, ['question', 'answer', 'comment'], true)) {
-            return;
+            return null;
         }
 
         $userId = (int) $this->session->get('user_id');
-        $result = $this->questions->applyVote($type, $postId, $userId, $value);
-        if ($result === null || (int) ($result['reputation_delta'] ?? 0) === 0) {
-            return;
+        if ($userId < 1) {
+            return null;
         }
 
-        $this->gamification->award((int) $result['user_id'], (int) $result['reputation_delta'], $type . '_vote', $type, $postId);
+        $result = $this->questions->applyVote($type, $postId, $userId, $value);
+        if ($result === null) {
+            return null;
+        }
+
+        if ((int) ($result['reputation_delta'] ?? 0) !== 0) {
+            $this->gamification->award((int) $result['user_id'], (int) $result['reputation_delta'], $type . '_vote', $type, $postId);
+        }
+
+        return [
+            'votes' => (int) ($result['votes'] ?? 0),
+            'current_vote' => (int) ($result['current_vote'] ?? 0),
+        ];
     }
 
     public function accept(int $answerId): bool
@@ -266,6 +303,53 @@ final readonly class QuestionService
         }
 
         return false;
+    }
+
+    private function notifyMentions(string $body, int $authorId, string $type, string $message, string $url): void
+    {
+        foreach ($this->mentionedUsers($body, $authorId) as $user) {
+            $this->queue->push('MentionNotification', [
+                'user_id' => (int) $user['id'],
+                'type' => $type,
+                'message' => $message,
+                'url' => $url,
+            ]);
+        }
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function mentionedUsers(string $body, int $authorId): array
+    {
+        $text = $this->mentionSearchText($body);
+        preg_match_all('/(^|[\s>(])@([a-z0-9][a-z0-9_-]{2,31})\b/i', $text, $matches);
+
+        $users = [];
+        $seenNames = [];
+        foreach ($matches[2] ?? [] as $username) {
+            $key = strtolower((string) $username);
+            if (isset($seenNames[$key])) {
+                continue;
+            }
+            $seenNames[$key] = true;
+
+            $user = $this->users->findByUsername((string) $username);
+            if ($user === null || (int) ($user['id'] ?? 0) === $authorId) {
+                continue;
+            }
+
+            $users[(int) $user['id']] = $user;
+        }
+
+        return array_values($users);
+    }
+
+    private function mentionSearchText(string $body): string
+    {
+        $text = preg_replace('/`[^`]+`/', ' ', $body) ?? $body;
+        $text = preg_replace('/!\[[^\]]*\]\((?:\/public-assets\/images\/[a-zA-Z0-9\/._-]+|https?:\/\/[^\s)]+)\)/i', ' ', $text) ?? $text;
+        $text = preg_replace('/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/i', ' ', $text) ?? $text;
+
+        return $text;
     }
 
     /** @param array<string, mixed> $files @return array<int, array<string, mixed>> */

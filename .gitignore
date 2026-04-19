@@ -8,6 +8,9 @@ storage/cache/
 storage/logs/
 storage/queue/
 
+# Internal audit/deployment notes
+PATCHES-*.txt
+
 # User-uploaded media
 public-assets/images/avatars/
 public-assets/images/uploads/

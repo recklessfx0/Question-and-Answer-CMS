@@ -10,7 +10,16 @@ $canonicalUrl = (string) ($canonical ?? url($requestPath));
 $ogType = (string) ($ogType ?? 'website');
 $ogImage = isset($ogImage) ? (string) $ogImage : '';
 $robotsContent = isset($robots) && is_string($robots) && trim($robots) !== '' ? trim($robots) : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+$assetUrl = static function (string $path): string {
+    $file = BASE_PATH . $path;
+    $version = is_file($file) ? (string) filemtime($file) : '1';
+
+    return $path . '?v=' . rawurlencode($version);
+};
 $schemaBlocks = [];
+if (isset($siteSchema) && is_string($siteSchema) && trim($siteSchema) !== '') {
+    $schemaBlocks[] = $siteSchema;
+}
 if (isset($schema) && is_string($schema) && trim($schema) !== '') {
     $schemaBlocks[] = $schema;
 }
@@ -56,8 +65,8 @@ if (isset($schemas) && is_array($schemas)) {
         <meta property="article:section" content="<?= h($sectionName) ?>">
     <?php endif; ?>
     <meta name="twitter:card" content="<?= $ogImage !== '' ? 'summary_large_image' : 'summary' ?>">
-    <link rel="preload" href="/public-assets/css/app.css" as="style">
-    <link rel="stylesheet" href="/public-assets/css/app.css">
+    <link rel="preload" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>" as="style">
+    <link rel="stylesheet" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>">
     <?php foreach ($schemaBlocks as $schemaBlock): ?>
         <script type="application/ld+json"><?= str_replace(['</', '<', '>'], ['\u003C/', '\u003C', '\u003E'], (string) $schemaBlock) ?></script>
     <?php endforeach; ?>
@@ -105,10 +114,21 @@ if (isset($schemas) && is_array($schemas)) {
     <?= $content ?>
 </main>
 <footer class="site-footer">
-    <a href="/sitemap.xml">Sitemap</a>
-    <a href="/robots.txt">Robots</a>
-    <a href="/llms.txt">llms.txt</a>
+    <nav class="footer-links" aria-label="Discovery links">
+        <a href="/sitemap.xml">Sitemap</a>
+        <a href="/robots.txt">Robots</a>
+        <a href="/llms.txt">llms.txt</a>
+        <a href="/llms-full.txt">llms-full.txt</a>
+    </nav>
+    <nav class="footer-links" aria-label="Site information">
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/community-guidelines">Guidelines</a>
+    </nav>
+    <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. All rights reserved.</p>
 </footer>
-<script src="/public-assets/js/app.js" defer></script>
+<script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" defer></script>
 </body>
 </html>

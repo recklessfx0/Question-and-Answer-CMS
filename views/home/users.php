@@ -1,29 +1,57 @@
 <?php declare(strict_types=1);
 
-$totalUsers     = count($users);
-$roleLabel      = static function (string $role): string {
-    return match ($role) { 'administrator' => 'Admin', 'moderator' => 'Mod', default => '' };
-};
-$roleCss        = static function (string $role): string {
-    return match ($role) { 'administrator' => 'user-badge-admin', 'moderator' => 'user-badge-mod', default => '' };
-};
-$totalAnswers   = array_sum(array_map(static fn ($u): int => (int) $u['answer_count'], $users));
-$totalQuestions = array_sum(array_map(static fn ($u): int => (int) $u['question_count'], $users));
-$topRep         = $users !== [] ? max(array_map(static fn ($u): int => (int) $u['reputation'], $users)) : 0;
+$totalUsers = (int) (($pagination['total_items'] ?? null) ?? count($users));
+$summary = is_array($summary ?? null) ? $summary : [];
+$topRep = (int) ($summary['top_reputation'] ?? 0);
+$totalAnswers = (int) ($summary['total_answers'] ?? 0);
+$totalQuestions = (int) ($summary['total_questions'] ?? 0);
 
-// Configuration for stats display - easily customizable
-$userStatsConfig = [
-    ['key' => 'reputation', 'label' => 'Rep', 'icon' => 'star', 'highlight' => true],
-    ['key' => 'answers', 'label' => 'Answers', 'icon' => 'message-circle', 'highlight' => false],
-    ['key' => 'questions', 'label' => 'Questions', 'icon' => 'help-circle', 'highlight' => false],
+$roleLabel = static function (string $role): string {
+    return match ($role) {
+        'administrator' => 'Admin',
+        'moderator' => 'Mod',
+        default => '',
+    };
+};
+
+$roleCss = static function (string $role): string {
+    return match ($role) {
+        'administrator' => 'user-badge-admin',
+        'moderator' => 'user-badge-mod',
+        default => '',
+    };
+};
+
+$formatCompact = static fn (int $value): string => $value >= 1000 ? number_format($value / 1000, 1) . 'k' : (string) $value;
+$initialFor = static fn (string $username): string => h(mb_strtoupper(mb_substr($username, 0, 1)));
+
+$svgIcon = static function (string $name): string {
+    return match ($name) {
+        'trophy' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a4 4 0 0 1-4 4"/><path d="M7 5H4v2a4 4 0 0 0 4 4"/></svg>',
+        'messages' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+        'question' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>',
+        'arrow-right' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>',
+        default => '',
+    };
+};
+
+$heroStats = [
+    ['icon' => 'trophy', 'value' => $topRep, 'label' => 'Top Reputation'],
+    ['icon' => 'messages', 'value' => $totalAnswers, 'label' => 'Total Answers'],
+    ['icon' => 'question', 'value' => $totalQuestions, 'label' => 'Total Questions'],
 ];
 
-// Sort options - easily customizable
+$userStatsConfig = [
+    ['key' => 'reputation', 'label' => 'Rep', 'highlight' => true],
+    ['key' => 'answers', 'label' => 'Answers', 'highlight' => false],
+    ['key' => 'questions', 'label' => 'Questions', 'highlight' => false],
+];
+
 $sortOptions = [
-    ['value' => 'reputation', 'label' => 'Reputation', 'icon' => 'trophy'],
-    ['value' => 'answers', 'label' => 'Answers', 'icon' => 'message-circle'],
-    ['value' => 'questions', 'label' => 'Questions', 'icon' => 'help-circle'],
-    ['value' => 'name', 'label' => 'Name', 'icon' => 'user'],
+    ['value' => 'reputation', 'label' => 'Reputation'],
+    ['value' => 'answers', 'label' => 'Answers'],
+    ['value' => 'questions', 'label' => 'Questions'],
+    ['value' => 'name', 'label' => 'Name'],
 ];
 ?>
 
@@ -37,27 +65,15 @@ $sortOptions = [
     </div>
     <?php if ($totalUsers > 0): ?>
     <div class="users-hero-stats" aria-hidden="true">
+        <?php foreach ($heroStats as $stat): ?>
         <div class="users-hero-stat">
-            <div class="users-hero-stat-icon">🏆</div>
+            <div class="users-hero-stat-icon"><?= $svgIcon((string) $stat['icon']) ?></div>
             <div class="users-hero-stat-content">
-                <strong><?= $topRep >= 1000 ? number_format($topRep / 1000, 1) . 'k' : $topRep ?></strong>
-                <span>Top Reputation</span>
+                <strong><?= h($formatCompact((int) $stat['value'])) ?></strong>
+                <span><?= h((string) $stat['label']) ?></span>
             </div>
         </div>
-        <div class="users-hero-stat">
-            <div class="users-hero-stat-icon">💬</div>
-            <div class="users-hero-stat-content">
-                <strong><?= $totalAnswers >= 1000 ? number_format($totalAnswers / 1000, 1) . 'k' : $totalAnswers ?></strong>
-                <span>Total Answers</span>
-            </div>
-        </div>
-        <div class="users-hero-stat">
-            <div class="users-hero-stat-icon">❓</div>
-            <div class="users-hero-stat-content">
-                <strong><?= $totalQuestions >= 1000 ? number_format($totalQuestions / 1000, 1) . 'k' : $totalQuestions ?></strong>
-                <span>Total Questions</span>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
     <?php endif; ?>
 </header>
@@ -77,42 +93,39 @@ $sortOptions = [
             aria-label="Search members"
         >
     </div>
-    
+
     <div class="users-sort" role="group" aria-label="Sort users">
         <?php foreach ($sortOptions as $index => $option): ?>
         <button
             class="users-sort-btn <?= $index === 0 ? 'is-active' : '' ?>"
-            data-sort="<?= $option['value'] ?>"
+            data-sort="<?= h((string) $option['value']) ?>"
             type="button"
-            title="Sort by <?= h($option['label']) ?>"
+            title="Sort by <?= h((string) $option['label']) ?>"
         >
-            <?= h($option['label']) ?>
+            <?= h((string) $option['label']) ?>
         </button>
         <?php endforeach; ?>
     </div>
-    
+
     <span class="users-count" id="users-count" aria-live="polite" aria-atomic="true">
         <?= $totalUsers ?> members
     </span>
 </div>
 
-<div class="users-grid" id="users-grid" aria-label="Member list">
+<div class="users-grid" id="users-grid" data-users-directory="1" aria-label="Member list">
     <?php foreach ($users as $user): ?>
     <?php
-        $username   = (string) $user['username'];
-        $rep        = (int)    $user['reputation'];
-        $answers    = (int)    $user['answer_count'];
-        $questions  = (int)    $user['question_count'];
-        $role       = (string) $user['role'];
-        $initial    = h(mb_strtoupper(mb_substr($username, 0, 1)));
-        $badgeText  = $roleLabel($role);
-        $badgeCls   = $roleCss($role);
-        $repDisplay = $rep >= 1000 ? number_format($rep / 1000, 1) . 'k' : (string) $rep;
+        $username = (string) $user['username'];
+        $rep = (int) $user['reputation'];
+        $answers = (int) $user['answer_count'];
+        $questions = (int) $user['question_count'];
+        $role = (string) $user['role'];
+        $badgeText = $roleLabel($role);
+        $badgeCls = $roleCss($role);
     ?>
     <a
         class="user-card"
         href="/user/<?= h(rawurlencode($username)) ?>"
-        data-username="<?= h(mb_strtolower($username)) ?>"
         data-reputation="<?= $rep ?>"
         data-answers="<?= $answers ?>"
         data-questions="<?= $questions ?>"
@@ -121,9 +134,9 @@ $sortOptions = [
         <div class="user-card-header">
             <div class="user-card-avatar-wrapper">
                 <?php if (!empty($user['avatar_path'])): ?>
-                    <?= uploaded_image((string) $user['avatar_path'], 'user-card-avatar', h($username) . ' avatar') ?>
+                    <?= uploaded_image((string) $user['avatar_path'], 'user-card-avatar', $username . ' avatar') ?>
                 <?php else: ?>
-                    <div class="user-card-initials" aria-hidden="true"><?= $initial ?></div>
+                    <div class="user-card-initials" aria-hidden="true"><?= $initialFor($username) ?></div>
                 <?php endif; ?>
             </div>
             <div class="user-card-info">
@@ -133,22 +146,25 @@ $sortOptions = [
                 <?php endif; ?>
             </div>
         </div>
-        
+
         <div class="user-card-stats">
             <?php foreach ($userStatsConfig as $stat): ?>
-            <div class="user-card-stat <?= $stat['highlight'] ? 'is-highlight' : '' ?>" data-stat="<?= $stat['key'] ?>">
-                <strong><?= $stat['key'] === 'reputation' ? h($repDisplay) : ($stat['key'] === 'answers' ? $answers : $questions) ?></strong>
-                <span><?= h($stat['label']) ?></span>
+            <div class="user-card-stat <?= $stat['highlight'] ? 'is-highlight' : '' ?>" data-stat="<?= h((string) $stat['key']) ?>">
+                <strong><?= h($stat['key'] === 'reputation' ? $formatCompact($rep) : (string) ($stat['key'] === 'answers' ? $answers : $questions)) ?></strong>
+                <span><?= h((string) $stat['label']) ?></span>
             </div>
             <?php endforeach; ?>
         </div>
-        
+
         <div class="user-card-footer">
-            <span class="user-card-action">View Profile →</span>
+            <span class="user-card-action">
+                <span>View Profile</span>
+                <?= $svgIcon('arrow-right') ?>
+            </span>
         </div>
     </a>
     <?php endforeach; ?>
-    
+
     <?php if ($users === []): ?>
     <div class="users-empty">
         <div class="users-empty-icon">
@@ -195,69 +211,3 @@ $sortOptions = [
         <?php if (!empty($pagination['next'])): ?><a href="<?= h((string) $pagination['next']) ?>" rel="next">Next</a><?php endif; ?>
     </nav>
 <?php endif; ?>
-
-<script>
-(function () {
-    const grid = document.getElementById('users-grid');
-    const search = document.getElementById('users-search');
-    const count = document.getElementById('users-count');
-    const sortBtns = document.querySelectorAll('.users-sort-btn');
-    
-    if (!grid || !search) return;
-
-    const cards = Array.from(grid.querySelectorAll('.user-card'));
-    let currentSort = 'reputation';
-    let currentQuery = '';
-
-    function sortCards() {
-        return [...cards].sort(function (a, b) {
-            if (currentSort === 'name') {
-                return (a.dataset.username || '').localeCompare(b.dataset.username || '');
-            }
-            const key = currentSort === 'answers' ? 'answers' : currentSort === 'questions' ? 'questions' : 'reputation';
-            return Number(b.dataset[key] || 0) - Number(a.dataset[key] || 0);
-        });
-    }
-
-    function render() {
-        const q = currentQuery.trim().toLowerCase();
-        const emptyEl = grid.querySelector('.users-empty');
-        
-        cards.forEach(c => c.remove());
-        if (emptyEl) emptyEl.remove();
-
-        let visible = 0;
-        sortCards().forEach(function (card) {
-            const match = q === '' || (card.dataset.username || '').includes(q);
-            card.hidden = !match;
-            if (match) visible++;
-            grid.appendChild(card);
-        });
-        
-        if (emptyEl) {
-            emptyEl.hidden = visible > 0;
-            grid.appendChild(emptyEl);
-        }
-        
-        if (count) {
-            count.textContent = visible === cards.length
-                ? cards.length + ' member' + (cards.length !== 1 ? 's' : '')
-                : visible + ' of ' + cards.length + ' members';
-        }
-    }
-
-    search.addEventListener('input', function () {
-        currentQuery = search.value;
-        render();
-    });
-
-    sortBtns.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            sortBtns.forEach(function (b) { b.classList.remove('is-active'); });
-            btn.classList.add('is-active');
-            currentSort = btn.dataset.sort || 'reputation';
-            render();
-        });
-    });
-}());
-</script>

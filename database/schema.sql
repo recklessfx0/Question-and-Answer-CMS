@@ -44,6 +44,7 @@ CREATE TABLE questions (
     user_id BIGINT UNSIGNED NOT NULL,
     category_id BIGINT UNSIGNED NULL,
     accepted_answer_id BIGINT UNSIGNED NULL,
+    duplicate_of_id BIGINT UNSIGNED NULL,
     title VARCHAR(180) NOT NULL,
     slug VARCHAR(220) NOT NULL,
     body MEDIUMTEXT NOT NULL,
@@ -57,6 +58,7 @@ CREATE TABLE questions (
     UNIQUE KEY uq_questions_slug (slug),
     KEY idx_questions_user_created (user_id, created_at),
     KEY idx_questions_category_created (category_id, created_at),
+    KEY idx_questions_duplicate_of (duplicate_of_id),
     KEY idx_questions_created (created_at),
     KEY idx_questions_deleted_created (deleted_at, created_at),
     FULLTEXT KEY ft_questions_title_body (title, body),
@@ -87,6 +89,9 @@ CREATE TABLE answers (
 
 ALTER TABLE questions
     ADD CONSTRAINT fk_questions_accepted_answer FOREIGN KEY (accepted_answer_id) REFERENCES answers(id) ON DELETE SET NULL;
+
+ALTER TABLE questions
+    ADD CONSTRAINT fk_questions_duplicate_of FOREIGN KEY (duplicate_of_id) REFERENCES questions(id) ON DELETE SET NULL;
 
 CREATE TABLE comments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -289,5 +294,15 @@ INSERT INTO settings (`key`, value, updated_at) VALUES
 ('recaptcha_secret_key', '', NOW()),
 ('google_auth_enabled', '0', NOW()),
 ('google_client_id', '', NOW()),
-('google_client_secret', '', NOW())
+('google_client_secret', '', NOW()),
+('about_description', 'Learn about the community, moderation standards, and public question-and-answer content.', NOW()),
+('about_body', 'This community publishes public questions, answers, clarifications, profiles, categories, and tags so people can find helpful discussions and cite canonical question pages.', NOW()),
+('contact_description', 'Contact the site team about account, moderation, privacy, or community questions.', NOW()),
+('contact_body', 'Use the contact information configured by the site owner for account, moderation, privacy, and community requests.', NOW()),
+('privacy_description', 'Privacy information for community accounts, public posts, media, and moderation records.', NOW()),
+('privacy_body', 'Public posts, answers, clarifications, profile details, uploaded media, votes, reactions, reports, and moderation records may be processed to operate the community and protect the site.', NOW()),
+('terms_description', 'Terms for using the community question-and-answer platform.', NOW()),
+('terms_body', 'By using the community, members agree to post lawful, respectful, original content and understand that public contributions may be indexed by search engines and AI retrieval systems.', NOW()),
+('guidelines_description', 'Community guidelines for useful questions, answers, clarifications, citations, and moderation.', NOW()),
+('guidelines_body', 'Ask clear questions, share complete answers, disclose uncertainty, avoid spam, respect other members, and report content that needs moderator attention.', NOW())
 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW();

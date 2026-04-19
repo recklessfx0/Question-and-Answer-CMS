@@ -104,7 +104,8 @@ final readonly class CategoryModel
         return $this->db->fetchAll(
             'SELECT c.slug, COALESCE(MAX(q.updated_at), c.updated_at, c.created_at) AS updated_at
              FROM categories c
-             LEFT JOIN questions q ON q.category_id = c.id AND q.deleted_at IS NULL
+             LEFT JOIN categories child ON child.parent_id = c.id
+             JOIN questions q ON q.deleted_at IS NULL AND (q.category_id = c.id OR q.category_id = child.id)
              GROUP BY c.id, c.slug, c.updated_at, c.created_at
              ORDER BY updated_at DESC
              LIMIT 50000'
