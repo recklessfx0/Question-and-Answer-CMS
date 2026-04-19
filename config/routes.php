@@ -54,6 +54,7 @@ return static function (Router $router): void {
     $router->get('/reset-password/{token}', [AuthController::class, 'resetPasswordForm']);
     $router->post('/reset-password/{token}', [AuthController::class, 'resetPassword'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
     $router->get('/email/verify/{token}', [AuthController::class, 'verifyEmail']);
+    $router->post('/email/verification/resend', [AuthController::class, 'resendEmailVerification'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
 
     $router->get('/ask', [QuestionController::class, 'askForm'], [AuthMiddleware::class]);
     $router->get('/ask/suggest', [QuestionController::class, 'suggest'], [AuthMiddleware::class]);
@@ -97,6 +98,9 @@ return static function (Router $router): void {
     $router->get('/admin/tags', [AdminController::class, 'tagsPage'], [AdminMiddleware::class]);
     $router->get('/admin/reports', [AdminController::class, 'reportsPage'], [AdminMiddleware::class]);
     $router->post('/admin/users/{id}/role', [AdminController::class, 'setRole'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/users/{id}/ban', [AdminController::class, 'banUser'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/users/{id}/unban', [AdminController::class, 'unbanUser'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/users/{id}/delete', [AdminController::class, 'deleteUser'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/settings', [AdminController::class, 'settings'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/trust-pages', [AdminController::class, 'trustPages'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages', [AdminController::class, 'createLanguage'], [CsrfMiddleware::class, AdminMiddleware::class]);

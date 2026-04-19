@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-$site = (require BASE_PATH . '/config/app.php')['name'];
+$appConfig = require BASE_PATH . '/config/app.php';
+$site = trim((string) ($securitySettings['site_title'] ?? '')) ?: (string) $appConfig['name'];
 $pageTitle = isset($title) ? (string) $title . ' | ' . $site : $site;
-$description = (string) ($metaDescription ?? 'A fast, secure community question and answer platform.');
+$defaultDescription = trim((string) ($securitySettings['site_description'] ?? '')) ?: 'A fast, secure community question and answer platform.';
+$description = (string) ($metaDescription ?? $defaultDescription);
 $requestPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
 $canonicalUrl = (string) ($canonical ?? url($requestPath));
 $ogType = (string) ($ogType ?? 'website');

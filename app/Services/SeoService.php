@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\CategoryModel;
 use App\Models\QuestionModel;
+use App\Models\SettingsModel;
 use App\Models\UserModel;
 use Core\Markdown;
 
@@ -38,6 +39,7 @@ final readonly class SeoService
         private CategoryModel $categories,
         private UserModel $users,
         private Markdown $markdown,
+        private SettingsModel $settings,
     ) {}
 
     public function robotsTxt(): string
@@ -162,6 +164,7 @@ final readonly class SeoService
             '@type' => 'WebSite',
             '@id' => url('/') . '#website',
             'name' => $siteName,
+            'description' => $this->siteDescription(),
             'url' => url('/'),
             'publisher' => $publisher,
             'potentialAction' => [
@@ -769,6 +772,29 @@ final readonly class SeoService
 
     private function siteName(): string
     {
+        try {
+            $configured = trim($this->settings->get('site_title'));
+            if ($configured !== '') {
+                return $configured;
+            }
+        } catch (\Throwable) {
+            // Keep generated SEO files available during installation, migrations, or DB outages.
+        }
+
         return (string) (require BASE_PATH . '/config/app.php')['name'];
+    }
+
+    private function siteDescription(): string
+    {
+        try {
+            $configured = trim($this->settings->get('site_description'));
+            if ($configured !== '') {
+                return $configured;
+            }
+        } catch (\Throwable) {
+            // Keep generated SEO files available during installation, migrations, or DB outages.
+        }
+
+        return 'A fast, secure community question and answer platform.';
     }
 }

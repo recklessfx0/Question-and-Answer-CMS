@@ -29,6 +29,7 @@ $container->set(\Core\Cache::class, static fn (): \Core\Cache => new \Core\Cache
 $container->set(\Core\PageCache::class, static fn (): \Core\PageCache => new \Core\PageCache(STORAGE_PATH . '/cache/pages'));
 $container->set(\Core\Logger::class, static fn (): \Core\Logger => new \Core\Logger(STORAGE_PATH . '/logs/app.log'));
 $container->set(\Core\Queue::class, static fn (): \Core\Queue => new \Core\Queue(STORAGE_PATH . '/queue'));
+$container->set(\App\Services\MailService::class, static fn (\Core\Container $c): \App\Services\MailService => new \App\Services\MailService($c->get(\App\Models\SettingsModel::class), $c->get('config')));
 $container->set(\Core\Session::class, static fn (): \Core\Session => new \Core\Session(STORAGE_PATH . '/sessions', (bool) ($config['secure_cookies'] ?? true)));
 $container->set(\Core\Csrf::class, static fn (\Core\Container $c): \Core\Csrf => new \Core\Csrf($c->get(\Core\Session::class)));
 $container->set(\Core\RateLimiter::class, static fn (): \Core\RateLimiter => new \Core\RateLimiter(STORAGE_PATH . '/cache/rate-limits'));

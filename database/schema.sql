@@ -14,6 +14,8 @@ CREATE TABLE users (
     credentials VARCHAR(240) NOT NULL DEFAULT '',
     avatar_path VARCHAR(255) NULL,
     email_verified_at DATETIME NULL,
+    banned_at DATETIME NULL,
+    deleted_at DATETIME NULL,
     two_factor_secret VARCHAR(64) NOT NULL DEFAULT '',
     two_factor_enabled_at DATETIME NULL,
     last_login_at DATETIME NULL,
@@ -22,6 +24,7 @@ CREATE TABLE users (
     UNIQUE KEY uq_users_username (username),
     UNIQUE KEY uq_users_email (email),
     KEY idx_users_role (role),
+    KEY idx_users_status (deleted_at, banned_at),
     KEY idx_users_reputation (reputation)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

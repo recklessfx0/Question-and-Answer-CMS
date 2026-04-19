@@ -79,11 +79,10 @@ final class ReactionModel
     {
         $this->ensureSchema();
         try {
-            $this->db->execute('DELETE FROM reaction_types WHERE id = :id', [':id' => $id]);
+            return $this->db->query('DELETE FROM reaction_types WHERE id = :id', [':id' => $id])->rowCount() > 0;
         } catch (PDOException) {
             return false;
         }
-        return true;
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */

@@ -59,7 +59,7 @@ final readonly class AdminService
     }
 
     /** @return array<string, mixed> */
-    public function managementPage(string $section, int $page): array
+    public function managementPage(string $section, int $page, string $query = ''): array
     {
         $page = max(1, $page);
         $perPage = self::ADMIN_PAGE_SIZE;
@@ -70,8 +70,9 @@ final readonly class AdminService
             'levels' => $this->paginatedArray('gamificationLevels', '/admin/levels', $this->levels->all(), $page, $perPage),
             'reactions' => $this->paginatedArray('reactions', '/admin/reactions', $this->reactions->allTypes(), $page, $perPage),
             'users' => [
-                'users' => $this->users->all($perPage, $offset),
-                'adminPagination' => $this->pagination('/admin/users', $this->users->count(), $page, $perPage),
+                'users' => $this->users->all($perPage, $offset, $query),
+                'userSearch' => $query,
+                'adminPagination' => $this->pagination($query !== '' ? '/admin/users?q=' . rawurlencode($query) : '/admin/users', $this->users->count($query, true), $page, $perPage, $query !== ''),
             ],
             'tags' => [
                 'tags' => $this->questions->popularTags($perPage, $offset),
@@ -131,6 +132,56 @@ final readonly class AdminService
     public function setRole(int $userId, string $role): bool
     {
         return $this->users->setRole($userId, $role);
+    }
+
+    public function setUserBan(int $userId, bool $banned, int $actorId): bool
+    {
+        if ($userId < 1 || $userId === $actorId) {
+            return false;
+        }
+
+        $target = $this->users->findById($userId);
+        if ($target === null || !empty($target['deleted_at'])) {
+            return false;
+        }
+
+        if ((string) ($target['role'] ?? '') === 'administrator' && !$this->users->hasOtherAdministrator($userId)) {
+            return false;
+        }
+
+        $updated = $this->users->setBanned($userId, $banned);
+        if ($updated) {
+            $this->audit->record($actorId, $banned ? 'user_ban' : 'user_unban', 'user', $userId);
+        }
+
+        return $updated;
+    }
+
+    public function deleteUser(int $userId, bool $keepContent, int $actorId): bool
+    {
+        if ($userId < 1 || $userId === $actorId) {
+            return false;
+        }
+
+        $target = $this->users->findById($userId);
+        if ($target === null || !empty($target['deleted_at'])) {
+            return false;
+        }
+
+        if ((string) ($target['role'] ?? '') === 'administrator' && !$this->users->hasOtherAdministrator($userId)) {
+            return false;
+        }
+
+        $deleted = $this->users->adminDelete($userId, $keepContent);
+        if ($deleted !== null) {
+            $this->audit->record($actorId, 'user_delete', 'user', $userId, [
+                'old_username' => (string) ($deleted['username'] ?? ''),
+                'new_username' => (string) ($deleted['deleted_username'] ?? ''),
+                'kept_content' => $keepContent,
+            ]);
+        }
+
+        return $deleted !== null;
     }
 
     /** @param array<string, string> $input */
@@ -234,14 +285,14 @@ final readonly class AdminService
         return $this->categories->update($id, $parent, $name, $slug, excerpt($description, 240), excerpt($seoTitle, 120), excerpt($seoDescription, 180), excerpt($intro, 4000));
     }
 
-    public function updateTag(int $id, string $name, string $description, string $seoTitle, string $seoDescription, string $intro): void
+    public function updateTag(int $id, string $name, string $description, string $seoTitle, string $seoDescription, string $intro): bool
     {
         $name = trim($name);
         if ($id < 1 || mb_strlen($name) < 1 || mb_strlen($name) > 80) {
-            return;
+            return false;
         }
 
-        $this->questions->updateTagSeo($id, $name, excerpt($description, 240), excerpt($seoTitle, 120), excerpt($seoDescription, 180), excerpt($intro, 4000));
+        return $this->questions->updateTagSeo($id, $name, excerpt($description, 240), excerpt($seoTitle, 120), excerpt($seoDescription, 180), excerpt($intro, 4000));
     }
 
     public function deleteCategory(int $id): bool
@@ -412,7 +463,7 @@ final readonly class AdminService
     }
 
     /** @return array{current: int, total_pages: int, total_items: int, base: string, query_mode: bool, window: array<int, int>, previous: string|null, next: string|null} */
-    private function pagination(string $base, int $total, int $page, int $perPage): array
+    private function pagination(string $base, int $total, int $page, int $perPage, bool $queryMode = false): array
     {
         $totalPages = max(1, (int) ceil($total / $perPage));
         $page = min(max(1, $page), $totalPages);
@@ -423,13 +474,19 @@ final readonly class AdminService
             $end = min($totalPages, max($end, $start + 4));
         }
 
-        $url = static fn (int $target): string => $base . ($target > 1 ? '?page=' . $target : '');
+        $url = static function (int $target) use ($base, $queryMode): string {
+            if ($queryMode) {
+                return $base . ($target > 1 ? '&page=' . $target : '');
+            }
+
+            return $base . ($target > 1 ? '?page=' . $target : '');
+        };
 
         return [
             'current' => $page,
             'total_pages' => $totalPages,
             'total_items' => $total,
-            'base' => $base . '?',
+            'base' => $queryMode ? $base . '&' : $base . '?',
             'query_mode' => true,
             'window' => range($start, $end),
             'previous' => $page > 1 ? $url($page - 1) : null,

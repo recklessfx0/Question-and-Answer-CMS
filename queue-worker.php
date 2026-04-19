@@ -14,6 +14,7 @@ $logger = new \Core\Logger(STORAGE_PATH . '/logs/queue.log');
 $config = require BASE_PATH . '/config/app.php';
 $database = new \Core\Database(require BASE_PATH . '/config/database.php');
 $notifications = new \App\Models\NotificationModel($database);
+$users = new \App\Models\UserModel($database);
 $mail = new \App\Services\MailService(new \App\Models\SettingsModel($database), $config);
 
 $redactedJob = static function (array $job): array {
@@ -50,14 +51,20 @@ while (true) {
         }
 
         if ($name === 'SendEmailVerification') {
-            $link = url('/email/verify/' . rawurlencode((string) $payload['token']));
-            $mail->send((string) $payload['email'], 'Verify your email', "Open this link to verify your email:\n\n{$link}");
-            $notifications->create((int) $payload['user_id'], 'Email verification', ['message' => 'Verification email queued.', 'url' => '/settings/profile']);
+            $record = $users->findValidToken('email_verification', (string) $payload['token']);
+            if ($record !== null && empty($record['email_verified_at'])) {
+                $link = url('/email/verify/' . rawurlencode((string) $payload['token']));
+                $mail->send((string) $record['email'], 'Verify your email', "Open this link to verify your email:\n\n{$link}");
+                $notifications->create((int) $payload['user_id'], 'Email verification', ['message' => 'Verification email queued.', 'url' => '/settings/profile']);
+            }
         }
 
         if ($name === 'SendPasswordReset') {
-            $link = url('/reset-password/' . rawurlencode((string) $payload['token']));
-            $mail->send((string) $payload['email'], 'Reset your password', "Open this link to reset your password:\n\n{$link}");
+            $record = $users->findValidToken('password_reset', (string) $payload['token']);
+            if ($record !== null) {
+                $link = url('/reset-password/' . rawurlencode((string) $payload['token']));
+                $mail->send((string) $record['email'], 'Reset your password', "Open this link to reset your password:\n\n{$link}");
+            }
         }
 
         if ($name === 'AnswerPostedNotification') {

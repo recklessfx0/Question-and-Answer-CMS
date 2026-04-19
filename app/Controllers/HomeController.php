@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\QuestionModel;
 use App\Models\CategoryModel;
+use App\Models\SettingsModel;
 use App\Models\UserModel;
 use App\Services\SeoService;
 use Core\Controller;
@@ -19,7 +20,7 @@ final class HomeController extends Controller
 {
     private const PAGE_SIZE = 20;
 
-    public function __construct(View $view, Session $session, Csrf $csrf, private readonly QuestionModel $questions, private readonly CategoryModel $categories, private readonly UserModel $users, private readonly SeoService $seo)
+    public function __construct(View $view, Session $session, Csrf $csrf, private readonly QuestionModel $questions, private readonly CategoryModel $categories, private readonly UserModel $users, private readonly SeoService $seo, private readonly SettingsModel $settings)
     {
         parent::__construct($view, $session, $csrf);
     }
@@ -35,13 +36,14 @@ final class HomeController extends Controller
         $questions = $this->questions->withCardMeta($this->questions->latest(self::PAGE_SIZE, ($page - 1) * self::PAGE_SIZE));
         $canonical = $page > 1 ? url('/questions/page/' . $page) : url('/');
         $pagination = $this->pagination('/questions', $page, $total);
+        $baseDescription = $this->siteDescription('Fresh community questions and expert answers.');
 
         return $this->view('home/index', [
             'title' => $page > 1 ? 'Latest Questions - Page ' . $page : null,
             'heading' => $page > 1 ? 'Latest Questions - Page ' . $page : 'Latest Questions',
-            'metaDescription' => $page > 1 ? 'Fresh community questions and expert answers, page ' . $page . '.' : 'Fresh community questions and expert answers.',
+            'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $canonical,
-            'schema' => $this->seo->itemListSchema('Latest Questions', $canonical, $questions, 'Fresh community questions and expert answers.', [], 'Community questions'),
+            'schema' => $this->seo->itemListSchema('Latest Questions', $canonical, $questions, $baseDescription, [], 'Community questions'),
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -240,6 +242,17 @@ final class HomeController extends Controller
             'previous' => $page > 1 ? $url($page - 1) : null,
             'next' => $page < $totalPages ? $url($page + 1) : null,
         ];
+    }
+
+    private function siteDescription(string $fallback): string
+    {
+        try {
+            $description = trim($this->settings->get('site_description'));
+        } catch (\Throwable) {
+            return $fallback;
+        }
+
+        return $description !== '' ? $description : $fallback;
     }
 
     private function pageOutOfRange(int $page, int $total, int $perPage = self::PAGE_SIZE): bool

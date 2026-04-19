@@ -93,8 +93,7 @@ final readonly class GamificationLevelModel
     public function delete(int $id): bool
     {
         try {
-            $this->db->execute('DELETE FROM gamification_levels WHERE id = :id', [':id' => $id]);
-            return true;
+            return $this->db->query('DELETE FROM gamification_levels WHERE id = :id', [':id' => $id])->rowCount() > 0;
         } catch (PDOException) {
             return false;
         }

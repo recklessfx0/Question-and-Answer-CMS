@@ -564,6 +564,34 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 .admin-pagination {
     justify-content: flex-end;
 }
+.admin-search-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+}
+.admin-search-form label {
+    margin: 0;
+}
+.admin-search-actions,
+.admin-user-danger-zone,
+.admin-delete-user-form {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+.admin-delete-user-form {
+    margin: 0;
+}
+.admin-delete-user-form label {
+    min-width: min(100%, 220px);
+    margin: 0;
+}
 .ask-form {
     display: grid;
     gap: 14px;
@@ -1906,6 +1934,23 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 .user-mention {
     font-weight: 700;
 }
+.profile-status-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 4px 0 8px;
+}
+.profile-status-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 4px 8px;
+    border: 1px solid #f1b4b4;
+    border-radius: 8px;
+    color: var(--accent-2);
+    background: #fff5f5;
+    font-size: 0.88rem;
+    font-weight: 800;
+}
 .markdown-editor {
     display: grid;
     gap: 8px;
@@ -2098,7 +2143,9 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .admin-form-actions,
     .admin-record-actions,
     .admin-delete-form,
-    .admin-action-row {
+    .admin-action-row,
+    .admin-search-actions,
+    .admin-delete-user-form {
         align-items: stretch;
         flex-direction: column;
     }
@@ -2106,8 +2153,14 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .admin-record-actions button,
     .admin-delete-form button,
     .admin-action-row .button,
-    .admin-action-row button {
+    .admin-action-row button,
+    .admin-search-actions .button,
+    .admin-search-actions button,
+    .admin-delete-user-form button {
         width: 100%;
+    }
+    .admin-search-form {
+        grid-template-columns: 1fr;
     }
     .question-title-row {
         grid-template-columns: 1fr;

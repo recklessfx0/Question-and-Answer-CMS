@@ -52,7 +52,12 @@ final class AuthController extends Controller
             return $this->redirect('/register');
         }
 
-        $this->flash('success', 'Welcome. Your account is ready.');
+        $this->flash(
+            !empty($result['email_sent']) ? 'success' : 'error',
+            !empty($result['email_sent'])
+                ? 'Welcome. Your account is ready. Check your email to confirm your address.'
+                : 'Welcome. Your account is ready, but the confirmation email could not be sent immediately. Check SMTP settings or run the queue worker.'
+        );
         return $this->redirect('/');
     }
 
@@ -109,6 +114,14 @@ final class AuthController extends Controller
         return $this->redirect('/');
     }
 
+    public function resendEmailVerification(): Response
+    {
+        $sent = $this->auth->resendEmailVerification((int) $this->session->get('user_id', 0));
+        $this->flash($sent ? 'success' : 'error', $sent ? 'Verification email sent.' : 'Verification email could not be sent. Check SMTP settings and try again.');
+
+        return $this->redirect('/settings/profile');
+    }
+
     public function login(Request $request): Response
     {
         if (!$this->recaptcha->verify($request)) {
@@ -121,7 +134,12 @@ final class AuthController extends Controller
             return $this->redirect('/two-factor');
         }
         if ($result !== 'ok') {
-            $this->flash('error', $result === 'locked' ? 'Too many attempts. Try again later.' : 'Invalid email or password.');
+            $message = match ($result) {
+                'locked' => 'Too many attempts. Try again later.',
+                'banned' => 'This account is not allowed to sign in.',
+                default => 'Invalid email or password.',
+            };
+            $this->flash('error', $message);
             return $this->redirect('/login');
         }
 

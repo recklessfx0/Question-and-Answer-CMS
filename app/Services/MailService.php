@@ -65,7 +65,7 @@ final readonly class MailService
 
             if ($encryption === 'tls') {
                 $this->command($socket, 'STARTTLS', [220]);
-                if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                if (!stream_socket_enable_crypto($socket, true, $this->tlsCryptoMethod())) {
                     throw new RuntimeException('SMTP STARTTLS negotiation failed.');
                 }
                 $this->command($socket, 'EHLO ' . $serverName, [250]);
@@ -104,7 +104,7 @@ final readonly class MailService
             'Return-Path: <' . $fromEmail . '>',
         ];
 
-        return implode("\r\n", $headers) . "\r\n\r\n" . str_replace(["\r\n", "\r"], "\n", $body);
+        return implode("\r\n", $headers) . "\r\n\r\n" . $this->smtpBody($body);
     }
 
     /** @param array<string, string> $settings */
@@ -126,6 +126,32 @@ final readonly class MailService
 
         $host = (string) (parse_url(site_url(), PHP_URL_HOST) ?: parse_url((string) ($this->config['url'] ?? ''), PHP_URL_HOST) ?: 'localhost');
         return 'no-reply@' . $host;
+    }
+
+    private function smtpBody(string $body): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $body);
+        $lines = explode("\n", $normalized);
+        foreach ($lines as &$line) {
+            if (str_starts_with($line, '.')) {
+                $line = '.' . $line;
+            }
+        }
+        unset($line);
+
+        return implode("\r\n", $lines);
+    }
+
+    private function tlsCryptoMethod(): int
+    {
+        $method = 0;
+        foreach (['STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT', 'STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT'] as $constant) {
+            if (defined($constant)) {
+                $method |= (int) constant($constant);
+            }
+        }
+
+        return $method > 0 ? $method : STREAM_CRYPTO_METHOD_TLS_CLIENT;
     }
 
     /** @param array<int, int> $expected */

@@ -84,11 +84,14 @@ final readonly class GoogleAuthService
             $this->users->markEmailVerified($id);
             $user = $this->users->findSessionStateById($id);
         } else {
+            if (!empty($user['deleted_at']) || !empty($user['banned_at'])) {
+                return false;
+            }
             $this->users->markEmailVerified((int) $user['id']);
             $user = $this->users->findSessionStateById((int) $user['id']);
         }
 
-        if ($user === null) {
+        if ($user === null || !empty($user['deleted_at']) || !empty($user['banned_at'])) {
             return false;
         }
 

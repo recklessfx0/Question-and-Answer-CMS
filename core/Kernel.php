@@ -88,6 +88,11 @@ final readonly class Kernel
             return;
         }
 
+        if (!empty($user['banned_at']) || !empty($user['deleted_at'])) {
+            $session->destroy();
+            return;
+        }
+
         $currentFingerprint = (string) $session->get('_auth_fingerprint', '');
         $latestFingerprint = (string) ($user['auth_fingerprint'] ?? '');
         if ($currentFingerprint !== '' && $latestFingerprint !== '' && !hash_equals($currentFingerprint, $latestFingerprint)) {

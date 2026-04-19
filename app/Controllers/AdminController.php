@@ -86,7 +86,7 @@ final class AdminController extends Controller
             'title' => $title,
             'metaDescription' => $description,
             'adminPage' => max(1, $request->int('page', 1, 1)),
-        ], $this->admin->shell(), $this->admin->managementPage($section, $request->int('page', 1, 1))));
+        ], $this->admin->shell(), $this->admin->managementPage($section, $request->int('page', 1, 1), $section === 'users' ? $request->string('q', 80) : '')));
     }
 
     /** @param array<string, string> $params */
@@ -94,6 +94,33 @@ final class AdminController extends Controller
     {
         $updated = $this->admin->setRole((int) ($params['id'] ?? 0), $request->string('role', 30));
         $this->flash($updated ? 'success' : 'error', $updated ? 'User role updated.' : 'At least one administrator must remain.');
+        return Response::redirect($this->adminRedirect($request, '/admin/users'));
+    }
+
+    /** @param array<string, string> $params */
+    public function banUser(Request $request, array $params): Response
+    {
+        $banned = $this->admin->setUserBan((int) ($params['id'] ?? 0), true, (int) $this->session->get('user_id', 0));
+        $this->flash($banned ? 'success' : 'error', $banned ? 'User banned.' : 'User could not be banned.');
+        return Response::redirect($this->adminRedirect($request, '/admin/users'));
+    }
+
+    /** @param array<string, string> $params */
+    public function unbanUser(Request $request, array $params): Response
+    {
+        $unbanned = $this->admin->setUserBan((int) ($params['id'] ?? 0), false, (int) $this->session->get('user_id', 0));
+        $this->flash($unbanned ? 'success' : 'error', $unbanned ? 'User unbanned.' : 'User could not be unbanned.');
+        return Response::redirect($this->adminRedirect($request, '/admin/users'));
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteUser(Request $request, array $params): Response
+    {
+        $mode = $request->string('content_mode', 20);
+        $keepContent = $mode === 'keep';
+        $confirmed = $request->int('confirm_delete', 0, 0, 1) === 1;
+        $deleted = $confirmed && $this->admin->deleteUser((int) ($params['id'] ?? 0), $keepContent, (int) $this->session->get('user_id', 0));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'User deleted.' : 'User could not be deleted.');
         return Response::redirect($this->adminRedirect($request, '/admin/users'));
     }
 
@@ -204,7 +231,8 @@ final class AdminController extends Controller
     /** @param array<string, string> $params */
     public function updateTag(Request $request, array $params): Response
     {
-        $this->admin->updateTag((int) ($params['id'] ?? 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
+        $updated = $this->admin->updateTag((int) ($params['id'] ?? 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Tag updated.' : 'Tag could not be updated.');
         return Response::redirect($this->adminRedirect($request, '/admin/tags'));
     }
 
@@ -311,7 +339,7 @@ final class AdminController extends Controller
     private function adminRedirect(Request $request, string $fallback): string
     {
         $redirect = $request->string('redirect', 160);
-        if (preg_match('#^/admin/(?:categories|levels|reactions|users|tags|reports)(?:\?page=\d{1,5})?$#', $redirect) === 1) {
+        if (preg_match('#^/admin/(?:categories|levels|reactions|users|tags|reports)(?:\?(?:q=[a-zA-Z0-9%._~+\-]*&?)?(?:page=\d{1,5})?)?$#', $redirect) === 1) {
             return $redirect;
         }
 

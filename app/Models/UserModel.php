@@ -22,20 +22,20 @@ final readonly class UserModel
     /** @return array<string, mixed>|null */
     public function findById(int $id): ?array
     {
-        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, two_factor_secret, two_factor_enabled_at, created_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
+        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, banned_at, deleted_at, two_factor_secret, two_factor_enabled_at, created_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
     }
 
     /** @return array<string, mixed>|null */
     public function findByIdWithSecurity(int $id): ?array
     {
-        return $this->db->fetch('SELECT id, username, email, role, password_hash, two_factor_secret, two_factor_enabled_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
+        return $this->db->fetch('SELECT id, username, email, role, password_hash, banned_at, deleted_at, two_factor_secret, two_factor_enabled_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
     }
 
     /** @return array<string, mixed>|null */
     public function findSessionStateById(int $id): ?array
     {
         $row = $this->db->fetch(
-            'SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, created_at, password_hash
+            'SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, banned_at, deleted_at, created_at, password_hash
              FROM users
              WHERE id = :id
              LIMIT 1',
@@ -45,7 +45,7 @@ final readonly class UserModel
             return null;
         }
 
-        $row['auth_fingerprint'] = hash('sha256', (string) ($row['password_hash'] ?? ''));
+        $row['auth_fingerprint'] = hash('sha256', (string) ($row['password_hash'] ?? '') . '|' . (string) ($row['banned_at'] ?? '') . '|' . (string) ($row['deleted_at'] ?? '') . '|' . (string) ($row['role'] ?? ''));
         unset($row['password_hash']);
 
         return $row;
@@ -54,7 +54,7 @@ final readonly class UserModel
     /** @return array<string, mixed>|null */
     public function findByUsername(string $username): ?array
     {
-        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, created_at FROM users WHERE username = :username LIMIT 1', [':username' => $username]);
+        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, banned_at, deleted_at, created_at FROM users WHERE username = :username LIMIT 1', [':username' => $username]);
     }
 
     public function create(string $username, string $email, string $passwordHash, string $role = 'user'): int
@@ -134,9 +134,11 @@ final readonly class UserModel
         return $candidate;
     }
 
-    public function count(): int
+    public function count(string $query = '', bool $includeDeleted = false): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM users');
+        $params = [];
+        $where = $this->adminSearchWhere($query, $params, $includeDeleted);
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM users' . $where, $params);
         return (int) ($row['total'] ?? 0);
     }
 
@@ -148,7 +150,8 @@ final readonly class UserModel
                 COALESCE(MAX(u.reputation), 0) AS top_reputation,
                 (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.deleted_at IS NULL AND q.deleted_at IS NULL) AS total_answers,
                 (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL) AS total_questions
-             FROM users u'
+             FROM users u
+             WHERE u.deleted_at IS NULL'
         );
 
         return [
@@ -211,7 +214,7 @@ final readonly class UserModel
             $user = $this->db->fetch(
                 'SELECT id
                  FROM users
-                 WHERE id = :id
+                 WHERE id = :id AND deleted_at IS NULL
                  LIMIT 1
                  FOR UPDATE',
                 [':id' => $userId]
@@ -235,10 +238,10 @@ final readonly class UserModel
     public function findValidToken(string $type, string $token): ?array
     {
         return $this->db->fetch(
-            'SELECT t.*, u.email, u.username
+            'SELECT t.*, u.email, u.username, u.email_verified_at
              FROM user_tokens t
              JOIN users u ON u.id = t.user_id
-             WHERE t.type = :type AND t.token_hash = :hash AND t.expires_at > NOW()
+             WHERE t.type = :type AND t.token_hash = :hash AND t.expires_at > NOW() AND u.deleted_at IS NULL AND u.banned_at IS NULL
              LIMIT 1',
             [':type' => $type, ':hash' => hash('sha256', $token)]
         );
@@ -253,9 +256,11 @@ final readonly class UserModel
     {
         return $this->db->transaction(function () use ($token, $hash): bool {
             $record = $this->db->fetch(
-                'SELECT id, user_id
-                 FROM user_tokens
-                 WHERE type = :type AND token_hash = :hash AND expires_at > NOW()
+                'SELECT t.id, t.user_id
+                 FROM user_tokens t
+                 JOIN users u ON u.id = t.user_id
+                 WHERE t.type = :type AND t.token_hash = :hash AND t.expires_at > NOW()
+                   AND u.deleted_at IS NULL AND u.banned_at IS NULL
                  LIMIT 1
                  FOR UPDATE',
                 [':type' => 'password_reset', ':hash' => hash('sha256', $token)]
@@ -278,9 +283,11 @@ final readonly class UserModel
     {
         return $this->db->transaction(function () use ($token): ?int {
             $record = $this->db->fetch(
-                'SELECT id, user_id
-                 FROM user_tokens
-                 WHERE type = :type AND token_hash = :hash AND expires_at > NOW()
+                'SELECT t.id, t.user_id
+                 FROM user_tokens t
+                 JOIN users u ON u.id = t.user_id
+                 WHERE t.type = :type AND t.token_hash = :hash AND t.expires_at > NOW()
+                   AND u.deleted_at IS NULL AND u.banned_at IS NULL
                  LIMIT 1
                  FOR UPDATE',
                 [':type' => 'email_verification', ':hash' => hash('sha256', $token)]
@@ -321,7 +328,7 @@ final readonly class UserModel
                 $otherAdmin = $this->db->fetch(
                     'SELECT id
                      FROM users
-                     WHERE role = :role AND id <> :id
+                     WHERE role = :role AND deleted_at IS NULL AND id <> :id
                      LIMIT 1
                      FOR UPDATE',
                     [':role' => 'administrator', ':id' => $id]
@@ -566,9 +573,100 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function all(int $limit = 50, int $offset = 0): array
+    public function all(int $limit = 50, int $offset = 0, string $query = ''): array
     {
-        return $this->db->fetchAll('SELECT id, username, email, role, reputation, created_at FROM users ORDER BY id DESC LIMIT :limit OFFSET :offset', [':limit' => $limit, ':offset' => $offset]);
+        $params = [':limit' => $limit, ':offset' => $offset];
+        $where = $this->adminSearchWhere($query, $params, true);
+
+        return $this->db->fetchAll(
+            'SELECT id, username, email, role, reputation, banned_at, deleted_at, created_at FROM users' . $where . ' ORDER BY id DESC LIMIT :limit OFFSET :offset',
+            $params
+        );
+    }
+
+    public function setBanned(int $id, bool $banned): bool
+    {
+        if ($id < 1) {
+            return false;
+        }
+
+        $updated = $this->db->query(
+            'UPDATE users SET banned_at = ' . ($banned ? 'COALESCE(banned_at, NOW())' : 'NULL') . ', updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            [':id' => $id]
+        )->rowCount();
+
+        return $updated > 0;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function adminDelete(int $id, bool $keepContent): ?array
+    {
+        if ($id < 1) {
+            return null;
+        }
+
+        return $this->db->transaction(function () use ($id, $keepContent): ?array {
+            $user = $this->db->fetch('SELECT id, username, email, role, deleted_at FROM users WHERE id = :id LIMIT 1 FOR UPDATE', [':id' => $id]);
+            if ($user === null || !empty($user['deleted_at'])) {
+                return null;
+            }
+
+            if (!$keepContent) {
+                $this->removeUserContent($id);
+            }
+
+            $deletedUsername = $this->uniqueDeletedUsername($id);
+            $hash = password_hash(bin2hex(random_bytes(32)), PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1]);
+
+            $this->db->execute('DELETE FROM user_tokens WHERE user_id = :user', [':user' => $id]);
+            $this->db->execute('DELETE FROM notifications WHERE user_id = :user', [':user' => $id]);
+            $this->removeUserVotes($id);
+            $this->db->execute('DELETE FROM post_reactions WHERE user_id = :user OR target_user_id = :user', [':user' => $id]);
+            $this->db->execute('DELETE FROM flags WHERE user_id = :user', [':user' => $id]);
+            $this->db->execute('DELETE FROM reputation_events WHERE user_id = :user', [':user' => $id]);
+            $this->db->execute('DELETE FROM user_badges WHERE user_id = :user', [':user' => $id]);
+            $this->db->execute(
+                'UPDATE users
+                 SET username = :username,
+                     email = :email,
+                     password_hash = :password_hash,
+                     role = "user",
+                     reputation = 0,
+                     bio = NULL,
+                     website_url = "",
+                     expertise = "",
+                     credentials = "",
+                     avatar_path = NULL,
+                     email_verified_at = NULL,
+                     banned_at = NULL,
+                     deleted_at = NOW(),
+                     two_factor_secret = "",
+                     two_factor_enabled_at = NULL,
+                     updated_at = NOW()
+                 WHERE id = :id',
+                [
+                    ':username' => $deletedUsername,
+                    ':email' => $deletedUsername . '@deleted.local',
+                    ':password_hash' => $hash,
+                    ':id' => $id,
+                ]
+            );
+
+            return [
+                'id' => $id,
+                'username' => (string) $user['username'],
+                'deleted_username' => $deletedUsername,
+                'kept_content' => $keepContent,
+            ];
+        });
+    }
+
+    public function hasOtherAdministrator(int $id): bool
+    {
+        return $this->db->fetch(
+            'SELECT id FROM users WHERE role = "administrator" AND deleted_at IS NULL AND id <> :id LIMIT 1',
+            [':id' => $id]
+        ) !== null;
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -581,6 +679,7 @@ final readonly class UserModel
              FROM users u
              LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
+             WHERE u.deleted_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              ORDER BY u.reputation DESC, u.created_at DESC
              LIMIT :limit OFFSET :offset',
@@ -596,6 +695,7 @@ final readonly class UserModel
              FROM users u
              LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
+             WHERE u.deleted_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              HAVING COUNT(DISTINCT q.id) > 0
                  OR COUNT(DISTINCT a.id) > 0
@@ -607,5 +707,119 @@ final readonly class UserModel
              ORDER BY updated_at DESC
              LIMIT 50000'
         );
+    }
+
+    /** @param array<string, mixed> $params */
+    private function adminSearchWhere(string $query, array &$params, bool $includeDeleted): string
+    {
+        $conditions = [];
+        if (!$includeDeleted) {
+            $conditions[] = 'deleted_at IS NULL';
+        }
+
+        $query = trim($query);
+        if ($query !== '') {
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+            $params[':admin_user_query_username'] = '%' . $escaped . '%';
+            $params[':admin_user_query_email'] = '%' . $escaped . '%';
+            $conditions[] = '(username LIKE :admin_user_query_username OR email LIKE :admin_user_query_email)';
+        }
+
+        return $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions);
+    }
+
+    private function uniqueDeletedUsername(int $id): string
+    {
+        do {
+            $candidate = 'deleted' . $id . random_int(1000, 999999);
+        } while ($this->db->fetch('SELECT id FROM users WHERE username = :username LIMIT 1', [':username' => $candidate]) !== null);
+
+        return $candidate;
+    }
+
+    private function removeUserContent(int $userId): void
+    {
+        $questionRows = $this->db->fetchAll('SELECT id FROM questions WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]);
+        $answerRows = $this->db->fetchAll('SELECT id FROM answers WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]);
+        $commentRows = $this->db->fetchAll('SELECT id FROM comments WHERE user_id = :user', [':user' => $userId]);
+
+        $questionIds = array_map(static fn (array $row): int => (int) $row['id'], $questionRows);
+        $answerIds = array_map(static fn (array $row): int => (int) $row['id'], $answerRows);
+        $commentIds = array_map(static fn (array $row): int => (int) $row['id'], $commentRows);
+
+        if ($questionIds !== []) {
+            $params = [];
+            $in = $this->inParams($questionIds, 'delete_user_question', $params);
+            $this->db->execute("UPDATE questions SET deleted_at = NOW(), accepted_answer_id = NULL, updated_at = NOW() WHERE id IN ({$in})", $params);
+            $this->db->execute("UPDATE answers SET deleted_at = NOW(), is_accepted = 0, updated_at = NOW() WHERE question_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM votes WHERE post_type = 'question' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM flags WHERE post_type = 'question' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM post_reactions WHERE post_type = 'question' AND post_id IN ({$in})", $params);
+        }
+
+        if ($answerIds !== []) {
+            $params = [];
+            $in = $this->inParams($answerIds, 'delete_user_answer', $params);
+            $this->db->execute("UPDATE answers SET deleted_at = NOW(), is_accepted = 0, updated_at = NOW() WHERE id IN ({$in})", $params);
+            $this->db->execute("UPDATE questions SET accepted_answer_id = NULL, updated_at = NOW() WHERE accepted_answer_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM votes WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM flags WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM post_reactions WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
+        }
+
+        if ($commentIds !== []) {
+            $params = [];
+            $in = $this->inParams($commentIds, 'delete_user_comment', $params);
+            $this->db->execute("DELETE FROM votes WHERE post_type = 'comment' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM flags WHERE post_type = 'comment' AND post_id IN ({$in})", $params);
+            $this->db->execute("DELETE FROM comments WHERE id IN ({$in})", $params);
+        }
+    }
+
+    private function removeUserVotes(int $userId): void
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT post_type, post_id FROM votes WHERE user_id = :user',
+            [':user' => $userId]
+        );
+
+        $this->db->execute('DELETE FROM votes WHERE user_id = :user', [':user' => $userId]);
+
+        $seen = [];
+        foreach ($rows as $row) {
+            $postType = (string) $row['post_type'];
+            $postId = (int) $row['post_id'];
+            $key = $postType . ':' . $postId;
+            if ($postId < 1 || isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $table = match ($postType) {
+                'question' => 'questions',
+                'answer' => 'answers',
+                'comment' => 'comments',
+                default => null,
+            };
+
+            if ($table === null) {
+                continue;
+            }
+
+            $this->db->execute(
+                "UPDATE {$table}
+                 SET votes = (
+                     SELECT COALESCE(SUM(v.value), 0)
+                     FROM votes v
+                     WHERE v.post_type = :post_type AND v.post_id = :sum_post_id
+                 )
+                 WHERE id = :target_post_id",
+                [
+                    ':post_type' => $postType,
+                    ':sum_post_id' => $postId,
+                    ':target_post_id' => $postId,
+                ]
+            );
+        }
     }
 }

@@ -4,6 +4,8 @@ $progress = max(0, min(100, (int) ($rank['progress'] ?? 0)));
 $stats = is_array($activityStats ?? null) ? $activityStats : ['questions' => 0, 'answers' => 0, 'comments' => 0];
 $formatDate = static fn (mixed $value): string => date('M j, Y', strtotime((string) $value) ?: time());
 $websiteUrl = safe_external_url((string) ($profile['website_url'] ?? ''));
+$isBanned = !empty($profile['banned_at']);
+$isDeleted = !empty($profile['deleted_at']);
 $participantsByQuestion = is_array($participantMap ?? null) ? $participantMap : [];
 $renderParticipants = static function (array $participants): void {
     if ($participants === []) {
@@ -36,6 +38,12 @@ $renderParticipants = static function (array $participants): void {
             <div class="profile-title">
                 <p class="eyebrow"><?= h((string) $profile['role']) ?></p>
                 <h1><?= h((string) $profile['username']) ?></h1>
+                <?php if ($isBanned || $isDeleted): ?>
+                    <div class="profile-status-row">
+                        <?php if ($isBanned): ?><span class="profile-status-badge">Banned</span><?php endif; ?>
+                        <?php if ($isDeleted): ?><span class="profile-status-badge">Deleted Account</span><?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="profile-stats" aria-label="Profile activity totals">
                     <div><strong><?= (int) $stats['questions'] ?></strong><span>Questions</span></div>
                     <div><strong><?= (int) $stats['answers'] ?></strong><span>Answers</span></div>

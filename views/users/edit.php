@@ -1,6 +1,16 @@
 <?php declare(strict_types=1); ?>
 <section class="narrow">
     <h1>Profile settings</h1>
+    <?php if (empty($profile['email_verified_at'])): ?>
+        <section class="admin-panel">
+            <h2>Email confirmation</h2>
+            <p class="meta">Confirm <?= h((string) $profile['email']) ?> so account email features keep working.</p>
+            <form method="post" action="/email/verification/resend">
+                <?= $csrf->field('/email/verification/resend') ?>
+                <button type="submit">Send confirmation email</button>
+            </form>
+        </section>
+    <?php endif; ?>
     <form method="post" action="/settings/profile" enctype="multipart/form-data">
         <?= $csrf->field('/settings/profile') ?>
         <?php if (!empty($profile['avatar_path'])): ?>

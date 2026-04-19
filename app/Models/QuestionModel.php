@@ -382,16 +382,16 @@ final readonly class QuestionModel
         );
     }
 
-    public function updateTagSeo(int $id, string $name, string $description, string $seoTitle, string $seoDescription, string $intro): void
+    public function updateTagSeo(int $id, string $name, string $description, string $seoTitle, string $seoDescription, string $intro): bool
     {
         if ($id < 1 || trim($name) === '') {
-            return;
+            return false;
         }
 
         $slug = preg_replace('/[^a-z0-9]+/', '-', mb_strtolower(trim($name))) ?? '';
         $slug = trim($slug, '-');
         if ($slug === '') {
-            return;
+            return false;
         }
         $base = $slug;
         $counter = 2;
@@ -399,10 +399,19 @@ final readonly class QuestionModel
             $slug = $base . '-' . $counter++;
         }
 
-        $this->db->execute(
-            'UPDATE tags SET name = :name, slug = :slug, description = :description, seo_title = :seo_title, seo_description = :seo_description, intro = :intro WHERE id = :id',
-            [':name' => $name, ':slug' => $slug, ':description' => $description, ':seo_title' => $seoTitle, ':seo_description' => $seoDescription, ':intro' => $intro, ':id' => $id]
-        );
+        if ($this->db->fetch('SELECT id FROM tags WHERE id = :id LIMIT 1', [':id' => $id]) === null) {
+            return false;
+        }
+
+        try {
+            $this->db->execute(
+                'UPDATE tags SET name = :name, slug = :slug, description = :description, seo_title = :seo_title, seo_description = :seo_description, intro = :intro WHERE id = :id',
+                [':name' => $name, ':slug' => $slug, ':description' => $description, ':seo_title' => $seoTitle, ':seo_description' => $seoDescription, ':intro' => $intro, ':id' => $id]
+            );
+            return true;
+        } catch (\PDOException) {
+            return false;
+        }
     }
 
     /** @return array<int, array<string, mixed>> */

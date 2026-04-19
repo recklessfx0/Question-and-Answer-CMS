@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\UserModel;
+use Core\Logger;
 use Core\Queue;
 use Core\RateLimiter;
 use Core\Session;
@@ -17,11 +18,13 @@ final readonly class AuthService
         private UserModel $users,
         private Session $session,
         private Queue $queue,
+        private MailService $mail,
+        private Logger $logger,
         private Slugger $slugger,
         private RateLimiter $limiter,
     ) {}
 
-    /** @return array{ok: bool, errors: array<string, string>} */
+    /** @return array{ok: bool, errors: array<string, string>, email_sent?: bool} */
     public function register(string $username, string $email, string $password): array
     {
         $username = $this->slugger->slug($username);
@@ -55,10 +58,10 @@ final readonly class AuthService
         if ($user !== null) {
             $this->loginSession($user);
             $verifyToken = $this->users->createToken($id, 'email_verification', 86400);
-            $this->queue->push('SendEmailVerification', ['user_id' => $id, 'email' => $email, 'token' => $verifyToken]);
+            $emailSent = $this->sendVerificationEmail($id, $email, $verifyToken);
         }
 
-        return ['ok' => true, 'errors' => []];
+        return ['ok' => true, 'errors' => [], 'email_sent' => $emailSent ?? false];
     }
 
     public function login(string $email, string $password): string
@@ -81,6 +84,11 @@ final readonly class AuthService
             usleep(random_int(100000, 250000));
             $this->recordFailure('login-account', $emailKey);
             return 'invalid';
+        }
+
+        if (!empty($user['deleted_at']) || !empty($user['banned_at'])) {
+            $this->recordFailure('login-account', $emailKey);
+            return 'banned';
         }
 
         $this->limiter->reset('login-account', $emailKey);
@@ -160,7 +168,7 @@ final readonly class AuthService
         }
 
         $token = $this->users->createToken((int) $user['id'], 'password_reset', 3600);
-        $this->queue->push('SendPasswordReset', ['user_id' => (int) $user['id'], 'email' => $email, 'token' => $token]);
+        $this->sendPasswordResetEmail((int) $user['id'], (string) $user['email'], $token);
     }
 
     public function resetPassword(string $token, string $password): bool
@@ -190,6 +198,22 @@ final readonly class AuthService
         return true;
     }
 
+    public function resendEmailVerification(int $userId): bool
+    {
+        if ($userId < 1 || $this->isLocked('email-verification-account', (string) $userId)) {
+            return false;
+        }
+
+        $this->recordFailure('email-verification-account', (string) $userId);
+        $user = $this->users->findById($userId);
+        if ($user === null || !empty($user['email_verified_at']) || !empty($user['deleted_at']) || !empty($user['banned_at'])) {
+            return false;
+        }
+
+        $token = $this->users->createToken($userId, 'email_verification', 86400);
+        return $this->sendVerificationEmail($userId, (string) $user['email'], $token);
+    }
+
     /** @return array<string, mixed>|null */
     public function user(): ?array
     {
@@ -207,6 +231,43 @@ final readonly class AuthService
             unset($user['auth_fingerprint']);
         }
         $this->session->set('user', $user);
+    }
+
+    private function sendVerificationEmail(int $userId, string $email, string $token): bool
+    {
+        $link = url('/email/verify/' . rawurlencode($token));
+        return $this->sendNowOrQueue(
+            'SendEmailVerification',
+            ['user_id' => $userId, 'email' => $email, 'token' => $token],
+            $email,
+            'Verify your email',
+            "Open this link to verify your email:\n\n{$link}"
+        );
+    }
+
+    private function sendPasswordResetEmail(int $userId, string $email, string $token): bool
+    {
+        $link = url('/reset-password/' . rawurlencode($token));
+        return $this->sendNowOrQueue(
+            'SendPasswordReset',
+            ['user_id' => $userId, 'email' => $email, 'token' => $token],
+            $email,
+            'Reset your password',
+            "Open this link to reset your password:\n\n{$link}"
+        );
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function sendNowOrQueue(string $job, array $payload, string $email, string $subject, string $body): bool
+    {
+        try {
+            $this->mail->send($email, $subject, $body);
+            return true;
+        } catch (\Throwable $e) {
+            $this->logger->error($e);
+            $this->queue->push($job, $payload);
+            return false;
+        }
     }
 
     private function clearPendingTwoFactor(): void
