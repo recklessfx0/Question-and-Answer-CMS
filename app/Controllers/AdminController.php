@@ -42,34 +42,34 @@ final class AdminController extends Controller
         ], $this->admin->dashboard(), $this->admin->languageEditor($request->string('code', 20))));
     }
 
-    public function categoriesPage(): Response
+    public function categoriesPage(Request $request): Response
     {
-        return $this->adminView('admin/categories', 'Admin Categories', 'Manage categories and subcategories.');
+        return $this->adminManagementView($request, 'admin/categories', 'Admin Categories', 'Manage categories and subcategories.', 'categories');
     }
 
-    public function levelsPage(): Response
+    public function levelsPage(Request $request): Response
     {
-        return $this->adminView('admin/levels', 'Admin Gamification Levels', 'Manage gamification levels.');
+        return $this->adminManagementView($request, 'admin/levels', 'Admin Gamification Levels', 'Manage gamification levels.', 'levels');
     }
 
-    public function reactionsPage(): Response
+    public function reactionsPage(Request $request): Response
     {
-        return $this->adminView('admin/reactions', 'Admin Reactions', 'Manage reaction types and gamification rewards.');
+        return $this->adminManagementView($request, 'admin/reactions', 'Admin Reactions', 'Manage reaction types and gamification rewards.', 'reactions');
     }
 
-    public function usersPage(): Response
+    public function usersPage(Request $request): Response
     {
-        return $this->adminView('admin/users', 'Admin Users', 'Manage users and roles.');
+        return $this->adminManagementView($request, 'admin/users', 'Admin Users', 'Manage users and roles.', 'users');
     }
 
-    public function tagsPage(): Response
+    public function tagsPage(Request $request): Response
     {
-        return $this->adminView('admin/tags', 'Admin Tags', 'Manage tag SEO and topical descriptions.');
+        return $this->adminManagementView($request, 'admin/tags', 'Admin Tags', 'Manage tag SEO and topical descriptions.', 'tags');
     }
 
-    public function reportsPage(): Response
+    public function reportsPage(Request $request): Response
     {
-        return $this->adminView('admin/reports', 'Admin Reports', 'Review user reports.');
+        return $this->adminManagementView($request, 'admin/reports', 'Admin Reports', 'Review user reports.', 'reports');
     }
 
     private function adminView(string $template, string $title, string $description): Response
@@ -80,12 +80,21 @@ final class AdminController extends Controller
         ], $this->admin->dashboard()));
     }
 
+    private function adminManagementView(Request $request, string $template, string $title, string $description, string $section): Response
+    {
+        return $this->view($template, array_merge([
+            'title' => $title,
+            'metaDescription' => $description,
+            'adminPage' => max(1, $request->int('page', 1, 1)),
+        ], $this->admin->shell(), $this->admin->managementPage($section, $request->int('page', 1, 1))));
+    }
+
     /** @param array<string, string> $params */
     public function setRole(Request $request, array $params): Response
     {
         $updated = $this->admin->setRole((int) ($params['id'] ?? 0), $request->string('role', 30));
         $this->flash($updated ? 'success' : 'error', $updated ? 'User role updated.' : 'At least one administrator must remain.');
-        return Response::redirect('/admin/users');
+        return Response::redirect($this->adminRedirect($request, '/admin/users'));
     }
 
     public function settings(Request $request): Response
@@ -189,14 +198,14 @@ final class AdminController extends Controller
     {
         $updated = $this->admin->updateCategory((int) ($params['id'] ?? 0), $request->int('parent_id', 0, 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
         $this->flash($updated ? 'success' : 'error', $updated ? 'Category updated.' : 'Category could not be updated.');
-        return Response::redirect('/admin/categories');
+        return Response::redirect($this->adminRedirect($request, '/admin/categories'));
     }
 
     /** @param array<string, string> $params */
     public function updateTag(Request $request, array $params): Response
     {
         $this->admin->updateTag((int) ($params['id'] ?? 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));
-        return Response::redirect('/admin/tags');
+        return Response::redirect($this->adminRedirect($request, '/admin/tags'));
     }
 
     /** @param array<string, string> $params */
@@ -204,7 +213,7 @@ final class AdminController extends Controller
     {
         $deleted = $this->admin->deleteCategory((int) ($params['id'] ?? 0));
         $this->flash($deleted ? 'success' : 'error', $deleted ? 'Category deleted.' : 'Category could not be deleted.');
-        return Response::redirect('/admin/categories');
+        return Response::redirect($this->adminRedirect($request, '/admin/categories'));
     }
 
     public function createLevel(Request $request): Response
@@ -238,7 +247,7 @@ final class AdminController extends Controller
         );
         $this->flash($updated ? 'success' : 'error', $updated ? 'Level updated.' : 'Level could not be updated.');
 
-        return Response::redirect('/admin/levels');
+        return Response::redirect($this->adminRedirect($request, '/admin/levels'));
     }
 
     /** @param array<string, string> $params */
@@ -246,7 +255,7 @@ final class AdminController extends Controller
     {
         $deleted = $this->admin->deleteLevel((int) ($params['id'] ?? 0));
         $this->flash($deleted ? 'success' : 'error', $deleted ? 'Level deleted.' : 'Level could not be deleted.');
-        return Response::redirect('/admin/levels');
+        return Response::redirect($this->adminRedirect($request, '/admin/levels'));
     }
 
     public function createReaction(Request $request): Response
@@ -265,7 +274,7 @@ final class AdminController extends Controller
         $updated = $this->admin->updateReaction((int) ($params['id'] ?? 0), $request->string('name', 60), $request->int('reputation_delta', 1, -10, 25), $request->int('sort_order', 0, 0, 10000), $request->int('is_active', 0, 0, 1) === 1, $icon);
         $this->flash($updated ? 'success' : 'error', $updated ? 'Reaction updated.' : 'Reaction could not be updated.');
 
-        return Response::redirect('/admin/reactions');
+        return Response::redirect($this->adminRedirect($request, '/admin/reactions'));
     }
 
     /** @param array<string, string> $params */
@@ -274,7 +283,7 @@ final class AdminController extends Controller
         $deleted = $this->admin->deleteReaction((int) ($params['id'] ?? 0));
         $this->flash($deleted ? 'success' : 'error', $deleted ? 'Reaction deleted.' : 'Reaction could not be deleted.');
 
-        return Response::redirect('/admin/reactions');
+        return Response::redirect($this->adminRedirect($request, '/admin/reactions'));
     }
 
     /** @param array<string, string> $params */
@@ -282,20 +291,30 @@ final class AdminController extends Controller
     {
         $updated = $this->admin->resolveReport((int) ($params['id'] ?? 0), $request->string('status', 20), (int) $this->session->get('user_id'));
         $this->flash($updated ? 'success' : 'error', $updated ? 'Report updated.' : 'Report could not be updated.');
-        return Response::redirect('/admin/reports');
+        return Response::redirect($this->adminRedirect($request, '/admin/reports'));
     }
 
     /** @param array<string, string> $params */
     public function deleteReportedContent(Request $request, array $params): Response
     {
         $this->admin->deleteReportedContent($params['type'] ?? '', (int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
-        return Response::redirect('/admin/reports');
+        return Response::redirect($this->adminRedirect($request, '/admin/reports'));
     }
 
     /** @param array<string, string> $params */
     public function closeQuestion(Request $request, array $params): Response
     {
         $this->admin->closeQuestion((int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
-        return Response::redirect('/admin/reports');
+        return Response::redirect($this->adminRedirect($request, '/admin/reports'));
+    }
+
+    private function adminRedirect(Request $request, string $fallback): string
+    {
+        $redirect = $request->string('redirect', 160);
+        if (preg_match('#^/admin/(?:categories|levels|reactions|users|tags|reports)(?:\?page=\d{1,5})?$#', $redirect) === 1) {
+            return $redirect;
+        }
+
+        return $fallback;
     }
 }

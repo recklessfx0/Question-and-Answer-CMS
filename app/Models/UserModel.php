@@ -566,9 +566,9 @@ final readonly class UserModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function all(int $limit = 50): array
+    public function all(int $limit = 50, int $offset = 0): array
     {
-        return $this->db->fetchAll('SELECT id, username, email, role, reputation, created_at FROM users ORDER BY id DESC LIMIT :limit', [':limit' => $limit]);
+        return $this->db->fetchAll('SELECT id, username, email, role, reputation, created_at FROM users ORDER BY id DESC LIMIT :limit OFFSET :offset', [':limit' => $limit, ':offset' => $offset]);
     }
 
     /** @return array<int, array<string, mixed>> */

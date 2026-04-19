@@ -17,6 +17,8 @@ use RuntimeException;
 
 final readonly class AdminService
 {
+    private const ADMIN_PAGE_SIZE = 12;
+
     public function __construct(
         private UserModel $users,
         private QuestionModel $questions,
@@ -45,6 +47,42 @@ final readonly class AdminService
             'reactions' => $this->reactions->allTypes(),
             'reports' => $this->questions->openFlags(),
         ];
+    }
+
+    /** @return array{stats: array<string, int>, settings: array<string, string>} */
+    public function shell(): array
+    {
+        return [
+            'stats' => $this->questions->stats(),
+            'settings' => $this->settings->all(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function managementPage(string $section, int $page): array
+    {
+        $page = max(1, $page);
+        $perPage = self::ADMIN_PAGE_SIZE;
+        $offset = ($page - 1) * $perPage;
+
+        return match ($section) {
+            'categories' => $this->categoryManagementPage($page, $perPage),
+            'levels' => $this->paginatedArray('gamificationLevels', '/admin/levels', $this->levels->all(), $page, $perPage),
+            'reactions' => $this->paginatedArray('reactions', '/admin/reactions', $this->reactions->allTypes(), $page, $perPage),
+            'users' => [
+                'users' => $this->users->all($perPage, $offset),
+                'adminPagination' => $this->pagination('/admin/users', $this->users->count(), $page, $perPage),
+            ],
+            'tags' => [
+                'tags' => $this->questions->popularTags($perPage, $offset),
+                'adminPagination' => $this->pagination('/admin/tags', $this->questions->countTags(), $page, $perPage),
+            ],
+            'reports' => [
+                'reports' => $this->questions->openFlags($perPage, $offset),
+                'adminPagination' => $this->pagination('/admin/reports', $this->questions->countOpenFlags(), $page, $perPage),
+            ],
+            default => [],
+        };
     }
 
     /** @return array{languages: array<int, array<string, mixed>>, defaults: array<string, string>, selectedLanguage: array<string, mixed>|null, translations: array<string, string>} */
@@ -348,5 +386,54 @@ final readonly class AdminService
             static fn (string $key): string => str_contains($key, 'secret') || str_contains($key, 'password') ? $key . ':redacted' : $key,
             array_unique($keys)
         ));
+    }
+
+    /** @param array<int, array<string, mixed>> $items @param array<string, mixed> $extra @return array<string, mixed> */
+    private function paginatedArray(string $key, string $base, array $items, int $page, int $perPage, array $extra = []): array
+    {
+        $total = count($items);
+        $page = min($page, max(1, (int) ceil(max(1, $total) / $perPage)));
+        $offset = ($page - 1) * $perPage;
+
+        return array_replace($extra, [
+            $key => array_slice($items, $offset, $perPage),
+            'adminPagination' => $this->pagination($base, $total, $page, $perPage),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function categoryManagementPage(int $page, int $perPage): array
+    {
+        $categories = $this->categories->all();
+
+        return $this->paginatedArray('categories', '/admin/categories', $categories, $page, $perPage, [
+            'allCategories' => $categories,
+        ]);
+    }
+
+    /** @return array{current: int, total_pages: int, total_items: int, base: string, query_mode: bool, window: array<int, int>, previous: string|null, next: string|null} */
+    private function pagination(string $base, int $total, int $page, int $perPage): array
+    {
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $page), $totalPages);
+        $start = max(1, $page - 2);
+        $end = min($totalPages, $page + 2);
+        if ($end - $start < 4) {
+            $start = max(1, min($start, $end - 4));
+            $end = min($totalPages, max($end, $start + 4));
+        }
+
+        $url = static fn (int $target): string => $base . ($target > 1 ? '?page=' . $target : '');
+
+        return [
+            'current' => $page,
+            'total_pages' => $totalPages,
+            'total_items' => $total,
+            'base' => $base . '?',
+            'query_mode' => true,
+            'window' => range($start, $end),
+            'previous' => $page > 1 ? $url($page - 1) : null,
+            'next' => $page < $totalPages ? $url($page + 1) : null,
+        ];
     }
 }

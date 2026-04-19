@@ -957,7 +957,7 @@ final readonly class QuestionModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function openFlags(): array
+    public function openFlags(int $limit = 100, int $offset = 0): array
     {
         return $this->db->fetchAll(
             "SELECT f.*, reporter.username,
@@ -987,8 +987,15 @@ final readonly class QuestionModel
              LEFT JOIN questions caq ON caq.id = ca.question_id
              LEFT JOIN users target_user ON f.post_type = 'user' AND target_user.id = f.post_id
              WHERE f.status = 'open'
-             ORDER BY f.created_at DESC LIMIT 100"
+             ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset",
+            [':limit' => $limit, ':offset' => $offset]
         );
+    }
+
+    public function countOpenFlags(): int
+    {
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM flags WHERE status = "open"');
+        return (int) ($row['total'] ?? 0);
     }
 
     public function resolveFlag(int $flagId, string $status): bool

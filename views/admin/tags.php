@@ -1,31 +1,53 @@
 <?php declare(strict_types=1); ?>
 <?php require BASE_PATH . '/views/admin/_nav.php'; ?>
-<section class="page-head">
-    <h1>Tags</h1>
-    <p class="meta">Add topical descriptions and SEO snippets for tag hubs. Tags are created from questions.</p>
+<?php
+$currentPage = max(1, (int) ($adminPage ?? 1));
+$returnTo = '/admin/tags' . ($currentPage > 1 ? '?page=' . $currentPage : '');
+?>
+<section class="page-head admin-page-head">
+    <div>
+        <h1>Tags</h1>
+        <p class="meta">Tune tag hubs with helpful descriptions, intro copy, and search snippets.</p>
+    </div>
 </section>
-<section class="table-wrap">
-    <h2>Tag SEO</h2>
-    <table>
-        <thead><tr><th>Tag</th><th>Questions</th><th>Update</th></tr></thead>
-        <tbody>
+
+<section class="admin-management">
+    <div class="admin-section-head">
+        <h2>Tag SEO</h2>
+        <p class="meta"><?= (int) ($adminPagination['total_items'] ?? count($tags)) ?> tags total</p>
+    </div>
+    <div class="admin-record-list">
         <?php foreach ($tags as $tag): ?>
-            <tr>
-                <td><a href="/tag/<?= h((string) $tag['slug']) ?>">#<?= h((string) $tag['name']) ?></a></td>
-                <td><?= (int) ($tag['question_count'] ?? 0) ?></td>
-                <td>
-                    <form method="post" action="/admin/tags/<?= (int) $tag['id'] ?>/update" class="admin-table-form">
-                        <?= $csrf->field('/admin/tags/' . (int) $tag['id'] . '/update') ?>
-                        <input name="name" value="<?= h((string) $tag['name']) ?>" maxlength="80" required>
-                        <input name="description" value="<?= h((string) ($tag['description'] ?? '')) ?>" maxlength="240" placeholder="Short tag description">
-                        <input name="seo_title" value="<?= h((string) ($tag['seo_title'] ?? '')) ?>" maxlength="120" placeholder="SEO title">
-                        <input name="seo_description" value="<?= h((string) ($tag['seo_description'] ?? '')) ?>" maxlength="180" placeholder="SEO description">
-                        <textarea name="intro" rows="4" maxlength="4000" placeholder="Intro content"><?= h((string) ($tag['intro'] ?? '')) ?></textarea>
-                        <button type="submit">Save</button>
-                    </form>
-                </td>
-            </tr>
+            <article class="admin-record">
+                <div class="admin-record-summary">
+                    <div>
+                        <h3><a href="/tag/<?= h((string) $tag['slug']) ?>">#<?= h((string) $tag['name']) ?></a></h3>
+                        <p class="meta"><?= (int) ($tag['question_count'] ?? 0) ?> questions</p>
+                    </div>
+                    <div class="admin-badges">
+                        <span><?= trim((string) ($tag['description'] ?? '')) !== '' ? 'Description' : 'No Description' ?></span>
+                        <span><?= trim((string) ($tag['seo_title'] ?? '')) !== '' ? 'SEO Ready' : 'Needs SEO' ?></span>
+                    </div>
+                </div>
+                <form method="post" action="/admin/tags/<?= (int) $tag['id'] ?>/update" class="admin-record-form">
+                    <?= $csrf->field('/admin/tags/' . (int) $tag['id'] . '/update') ?>
+                    <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
+                    <div class="form-row">
+                        <label>Name <input name="name" value="<?= h((string) $tag['name']) ?>" maxlength="80" autocomplete="off" required></label>
+                        <label>Description <input name="description" value="<?= h((string) ($tag['description'] ?? '')) ?>" maxlength="240" autocomplete="off" placeholder="Short tag description…"></label>
+                    </div>
+                    <div class="form-row">
+                        <label>SEO Title <input name="seo_title" value="<?= h((string) ($tag['seo_title'] ?? '')) ?>" maxlength="120" autocomplete="off" placeholder="SEO title…"></label>
+                        <label>SEO Description <input name="seo_description" value="<?= h((string) ($tag['seo_description'] ?? '')) ?>" maxlength="180" autocomplete="off" placeholder="SEO description…"></label>
+                    </div>
+                    <label>Intro Content <textarea name="intro" rows="4" maxlength="4000" placeholder="Intro content…"><?= h((string) ($tag['intro'] ?? '')) ?></textarea></label>
+                    <div class="admin-record-actions"><button type="submit">Save Tag</button></div>
+                </form>
+            </article>
         <?php endforeach; ?>
-        </tbody>
-    </table>
+        <?php if ($tags === []): ?>
+            <p class="admin-empty">No tags yet. Tags are created when questions are posted.</p>
+        <?php endif; ?>
+    </div>
+    <?php require BASE_PATH . '/views/admin/_pagination.php'; ?>
 </section>
