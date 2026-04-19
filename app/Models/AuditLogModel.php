@@ -27,14 +27,21 @@ final class AuditLogModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function latest(int $limit = 100): array
+    public function latest(int $limit = 100, int $offset = 0): array
     {
         return $this->db->fetchAll(
             'SELECT a.*, u.username
              FROM audit_logs a
              LEFT JOIN users u ON u.id = a.actor_id
-             ORDER BY a.created_at DESC LIMIT :limit',
-            [':limit' => $limit]
+             ORDER BY a.created_at DESC LIMIT :limit OFFSET :offset',
+            [':limit' => $limit, ':offset' => max(0, $offset)]
         );
+    }
+
+    public function count(): int
+    {
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM audit_logs');
+
+        return (int) ($row['total'] ?? 0);
     }
 }
