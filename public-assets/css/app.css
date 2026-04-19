@@ -9,6 +9,17 @@
     --accent: #0f766e;
     --accent-2: #b91c1c;
     --focus: #2563eb;
+    --accepted-line: #b7d8c2;
+    --accepted-soft: #f1faf4;
+    --accepted-label-soft: #e5f6ea;
+    --community-accent: #7c5c12;
+    --community-line: #e2cf95;
+    --community-soft: #fff8df;
+    --community-label-soft: #f7e9ad;
+    --community-ink: #5f4300;
+    --verified-line: #c7d2fe;
+    --verified-soft: #eef2ff;
+    --verified-ink: #3730a3;
 }
 
 * { box-sizing: border-box; }
@@ -775,12 +786,26 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 .answer-accepted {
     margin: 10px 0;
     padding: 14px 12px 14px 14px;
-    border: 1px solid #b7d8c2;
+    border: 1px solid var(--accepted-line);
     border-left: 4px solid var(--accent);
     border-radius: 8px;
-    background: #f1faf4;
+    background: var(--accepted-soft);
 }
 .answer-accepted .post-grid { align-items: start; }
+.answer-community-chosen {
+    margin: 10px 0;
+    padding: 14px 12px 14px 14px;
+    border: 1px solid var(--community-line);
+    border-left: 4px solid var(--community-accent);
+    border-radius: 8px;
+    background: var(--community-soft);
+}
+.answer-accepted.answer-community-chosen {
+    border-color: var(--accepted-line);
+    border-right-color: var(--community-line);
+    background: linear-gradient(90deg, var(--accepted-soft), var(--community-soft));
+}
+.answer-community-chosen .post-grid { align-items: start; }
 .question-list {
     display: grid;
     gap: 12px;
@@ -2175,8 +2200,8 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 .accepted-answer-label {
     width: fit-content;
     margin: 0 0 8px;
-    border: 1px solid #b7d8c2;
-    background: #e5f6ea;
+    border: 1px solid var(--accepted-line);
+    background: var(--accepted-label-soft);
 }
 .answer-labels {
     display: flex;
@@ -2186,9 +2211,22 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
 .verified-answer-label {
     width: fit-content;
     margin: 0 0 8px;
-    border: 1px solid #c7d2fe;
-    color: #3730a3;
-    background: #eef2ff;
+    border: 1px solid var(--verified-line);
+    color: var(--verified-ink);
+    background: var(--verified-soft);
+}
+.community-answer-label {
+    width: fit-content;
+    margin: 0 0 8px;
+    border: 1px solid var(--community-line);
+    color: var(--community-ink);
+    background: var(--community-label-soft);
+}
+.community-answer-label[hidden] {
+    display: none;
+}
+.community-answer-label span {
+    font-weight: 850;
 }
 .verified-review {
     padding: 8px 10px;

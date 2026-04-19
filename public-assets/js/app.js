@@ -582,6 +582,76 @@
         }
     });
 
+    const updateCommunityChoice = () => {
+        const answerCards = Array.from(document.querySelectorAll('[data-answer-card]')).filter((card) => card instanceof HTMLElement);
+        let bestCard = null;
+        let best = null;
+
+        answerCards.forEach((card) => {
+            const votes = Number(card.dataset.answerVotes || 0);
+            let reactionScore = 0;
+            let reactionCount = 0;
+
+            card.querySelectorAll('[data-reaction-weight]').forEach((reaction) => {
+                if (!(reaction instanceof HTMLElement)) {
+                    return;
+                }
+
+                const countTarget = reaction.querySelector('[data-reaction-count]');
+                const count = countTarget instanceof HTMLElement ? Number(countTarget.textContent || 0) : 0;
+                const weight = Number(reaction.dataset.reactionWeight || 0);
+                reactionCount += count;
+                reactionScore += count * weight;
+            });
+
+            const score = votes + reactionScore;
+            card.dataset.answerReactionScore = String(reactionScore);
+            card.dataset.answerReactionCount = String(reactionCount);
+            card.dataset.communityScore = String(score);
+
+            if (score <= 0) {
+                return;
+            }
+
+            const candidate = {
+                score,
+                votes,
+                reactionCount,
+                created: Number(card.dataset.answerCreated || Number.MAX_SAFE_INTEGER),
+                id: Number(card.dataset.answerId || 0),
+            };
+
+            const better = !best
+                || candidate.score > best.score
+                || (candidate.score === best.score && candidate.votes > best.votes)
+                || (candidate.score === best.score && candidate.votes === best.votes && candidate.reactionCount > best.reactionCount)
+                || (candidate.score === best.score && candidate.votes === best.votes && candidate.reactionCount === best.reactionCount && candidate.created < best.created)
+                || (candidate.score === best.score && candidate.votes === best.votes && candidate.reactionCount === best.reactionCount && candidate.created === best.created && candidate.id < best.id);
+
+            if (better) {
+                best = candidate;
+                bestCard = card;
+            }
+        });
+
+        answerCards.forEach((card) => {
+            const isChosen = bestCard === card;
+            card.classList.toggle('answer-community-chosen', isChosen);
+            const label = card.querySelector('[data-community-choice-label]');
+            const scoreText = card.querySelector('[data-community-score-text]');
+            if (scoreText instanceof HTMLElement) {
+                scoreText.textContent = String(Number(card.dataset.communityScore || 0));
+            }
+            if (label instanceof HTMLElement) {
+                label.hidden = !isChosen;
+                const titleTemplate = label.dataset.communityScoreTitle || '';
+                if (titleTemplate) {
+                    label.title = titleTemplate.replace(':score', String(Number(card.dataset.communityScore || 0)));
+                }
+            }
+        });
+    };
+
     const updateVoteBox = (form, payload) => {
         const voteBox = form.closest('[data-vote-box]');
         if (!(voteBox instanceof HTMLElement)) {
@@ -602,6 +672,14 @@
             button.classList.toggle('is-active', isActive);
             button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
+
+        if (voteBox.dataset.postType === 'answer') {
+            const answerCard = voteBox.closest('[data-answer-card]');
+            if (answerCard instanceof HTMLElement) {
+                answerCard.dataset.answerVotes = String(Number(payload.votes || 0));
+                updateCommunityChoice();
+            }
+        }
     };
 
     const updateReactionBar = (form, payload) => {
@@ -633,6 +711,10 @@
                 count.textContent = String(Number(reaction.count || 0));
             }
         });
+
+        if (reactionBar.dataset.postType === 'answer') {
+            updateCommunityChoice();
+        }
     };
 
     document.addEventListener('submit', async (event) => {

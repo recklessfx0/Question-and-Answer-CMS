@@ -33,6 +33,17 @@ $assert(str_contains($mentionAltHtml, 'alt="hi @alice"'), 'Markdown should not r
 $validator = (new \Core\Validator())->email('email', 'not-an-email');
 $assert(!$validator->passes(), 'Validator should reject invalid email.');
 
+$communityChoice = new \App\Services\CommunityChoiceService();
+$rankedAnswers = $communityChoice->annotateAnswers([
+    ['id' => 1, 'votes' => 2, 'reaction_score' => 1, 'reaction_count' => 1, 'created_at' => '2026-04-19 10:00:00'],
+    ['id' => 2, 'votes' => 1, 'reaction_score' => 4, 'reaction_count' => 2, 'created_at' => '2026-04-19 11:00:00'],
+]);
+$assert(empty($rankedAnswers[0]['is_community_chosen']) && !empty($rankedAnswers[1]['is_community_chosen']), 'Community choice should use vote and reaction score.');
+$unscoredAnswers = $communityChoice->annotateAnswers([
+    ['id' => 3, 'votes' => 0, 'reaction_score' => 0, 'reaction_count' => 0, 'created_at' => '2026-04-19 12:00:00'],
+]);
+$assert(empty($unscoredAnswers[0]['is_community_chosen']), 'Community choice should not highlight an answer without positive community signal.');
+
 $queueDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'q2a-queue-test-' . bin2hex(random_bytes(4));
 $queue = new \Core\Queue($queueDir);
 $queue->push('ExampleJob', ['value' => 1]);

@@ -608,14 +608,28 @@ final readonly class QuestionModel
     public function answers(int $questionId): array
     {
         return $this->db->fetchAll(
-            'SELECT a.*, q.slug AS question_slug, u.username, u.reputation, u.avatar_path, reviewer.username AS verified_by_username, reviewer.avatar_path AS verified_by_avatar_path
+            "SELECT a.*, q.slug AS question_slug, u.username, u.reputation, u.avatar_path,
+                    reviewer.username AS verified_by_username, reviewer.avatar_path AS verified_by_avatar_path,
+                    COALESCE(ar.reaction_count, 0) AS reaction_count,
+                    COALESCE(ar.reaction_score, 0) AS reaction_score,
+                    COALESCE(a.votes, 0) + COALESCE(ar.reaction_score, 0) AS community_score
              FROM answers a
              JOIN questions q ON q.id = a.question_id
              JOIN users u ON u.id = a.user_id
              LEFT JOIN users reviewer ON reviewer.id = a.verified_by
+             LEFT JOIN (
+                 SELECT pr.post_id,
+                        COUNT(*) AS reaction_count,
+                        COALESCE(SUM(rt.reputation_delta), 0) AS reaction_score
+                 FROM post_reactions pr
+                 JOIN answers ra ON ra.id = pr.post_id AND ra.question_id = :reaction_question_id AND ra.deleted_at IS NULL
+                 JOIN reaction_types rt ON rt.id = pr.reaction_type_id AND rt.is_active = 1
+                 WHERE pr.post_type = 'answer'
+                 GROUP BY pr.post_id
+             ) ar ON ar.post_id = a.id
              WHERE a.question_id = :id AND a.deleted_at IS NULL
-             ORDER BY a.is_accepted DESC, a.verified_at IS NULL, a.votes DESC, a.created_at ASC',
-            [':id' => $questionId]
+             ORDER BY a.is_accepted DESC, community_score DESC, a.verified_at IS NULL, a.votes DESC, a.created_at ASC",
+            [':id' => $questionId, ':reaction_question_id' => $questionId]
         );
     }
 

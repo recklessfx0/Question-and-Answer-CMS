@@ -48,7 +48,7 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
             $active = !empty($reaction['reacted']);
             ?>
             <?php if (is_array($authUser)): ?>
-                <form method="post" action="<?= h($action) ?>" data-async-reaction-form data-reaction-id="<?= (int) $reaction['id'] ?>">
+                    <form method="post" action="<?= h($action) ?>" data-async-reaction-form data-reaction-id="<?= (int) $reaction['id'] ?>" data-reaction-weight="<?= (int) ($reaction['reputation_delta'] ?? 0) ?>">
                     <?= $csrf->field($action) ?>
                     <input type="hidden" name="reaction_type_id" value="<?= (int) $reaction['id'] ?>">
                     <button type="submit" class="reaction-button <?= $active ? 'is-active' : '' ?>" aria-pressed="<?= $active ? 'true' : 'false' ?>" title="<?= h($name) ?>" data-reaction-button>
@@ -62,14 +62,14 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
                     </button>
                 </form>
             <?php else: ?>
-                <a class="reaction-button reaction-pill" href="/register" title="<?= h($name) ?>">
+                <a class="reaction-button reaction-pill" href="/register" title="<?= h($name) ?>" data-reaction-weight="<?= (int) ($reaction['reputation_delta'] ?? 0) ?>">
                     <?php if ($iconPath !== ''): ?>
                         <?= uploaded_image($iconPath, 'reaction-icon', $name . ' reaction icon') ?>
                     <?php else: ?>
                         <span class="reaction-icon-fallback"><?= h(mb_strtoupper(mb_substr($name, 0, 1))) ?></span>
                     <?php endif; ?>
                     <span><?= h($name) ?></span>
-                    <strong><?= (int) ($reaction['count'] ?? 0) ?></strong>
+                    <strong data-reaction-count><?= (int) ($reaction['count'] ?? 0) ?></strong>
                 </a>
             <?php endif; ?>
         <?php endforeach; ?>
@@ -305,13 +305,29 @@ $renderCommentTree = static function (array $comment, string $composerId, string
 <section class="answers" aria-label="Answers">
     <h2><?= count($answers) ?> Answers</h2>
     <?php foreach ($answers as $answer): ?>
-        <article id="answer-<?= (int) $answer['id'] ?>" class="answer <?= (int) $answer['is_accepted'] === 1 ? 'answer-accepted' : '' ?>">
+        <?php
+        $isAccepted = (int) $answer['is_accepted'] === 1;
+        $isCommunityChosen = !empty($answer['is_community_chosen']);
+        $communityScore = (int) ($answer['community_score'] ?? ((int) ($answer['votes'] ?? 0) + (int) ($answer['reaction_score'] ?? 0)));
+        $answerClasses = ['answer'];
+        if ($isAccepted) {
+            $answerClasses[] = 'answer-accepted';
+        }
+        if ($isCommunityChosen) {
+            $answerClasses[] = 'answer-community-chosen';
+        }
+        ?>
+        <article id="answer-<?= (int) $answer['id'] ?>" class="<?= h(implode(' ', $answerClasses)) ?>" data-answer-card data-answer-id="<?= (int) $answer['id'] ?>" data-answer-created="<?= (int) (strtotime((string) ($answer['created_at'] ?? '')) ?: PHP_INT_MAX) ?>" data-answer-votes="<?= (int) ($answer['votes'] ?? 0) ?>" data-answer-reaction-score="<?= (int) ($answer['reaction_score'] ?? 0) ?>" data-answer-reaction-count="<?= (int) ($answer['reaction_count'] ?? 0) ?>" data-community-score="<?= $communityScore ?>">
             <div class="post-grid">
                 <?php $renderVote('answer', (int) $answer['id'], (int) $answer['votes'], 'answer'); ?>
                 <div>
                     <div class="answer-labels">
-                        <?php if ((int) $answer['is_accepted'] === 1): ?><p class="accepted accepted-answer-label">Accepted answer</p><?php endif; ?>
-                        <?php if (!empty($answer['verified_at'])): ?><p class="accepted verified-answer-label">Expert reviewed</p><?php endif; ?>
+                        <?php if ($isAccepted): ?><p class="accepted accepted-answer-label"><?= h(t('questions.answer.accepted', 'Accepted answer')) ?></p><?php endif; ?>
+                        <p class="accepted community-answer-label" data-community-choice-label data-community-score-title="<?= h(t('questions.answer.community_score_title', 'Community score: :score from votes and reactions', ['score' => ':score'])) ?>" title="<?= h(t('questions.answer.community_score_title', 'Community score: :score from votes and reactions', ['score' => $communityScore])) ?>" <?= $isCommunityChosen ? '' : 'hidden' ?>>
+                            <?= h(t('questions.answer.community_chosen', 'Community chosen')) ?>
+                            <span data-community-score-text><?= $communityScore ?></span>
+                        </p>
+                        <?php if (!empty($answer['verified_at'])): ?><p class="accepted verified-answer-label"><?= h(t('questions.answer.expert_reviewed', 'Expert reviewed')) ?></p><?php endif; ?>
                     </div>
                     <div class="post-body"><?= $markdown((string) $answer['body']) ?></div>
                     <?php $renderReactions('answer', (int) $answer['id']); ?>

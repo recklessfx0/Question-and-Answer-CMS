@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\QuestionModel;
 use App\Models\CategoryModel;
+use App\Services\CommunityChoiceService;
 use App\Services\QuestionService;
 use App\Services\ReactionService;
 use App\Services\SeoService;
@@ -26,6 +27,7 @@ final class QuestionController extends Controller
         private readonly CategoryModel $categories,
         private readonly QuestionService $service,
         private readonly ReactionService $reactionService,
+        private readonly CommunityChoiceService $communityChoice,
         private readonly SeoService $seo,
     ) {
         parent::__construct($view, $session, $csrf);
@@ -77,7 +79,7 @@ final class QuestionController extends Controller
         $this->questions->incrementViews((int) $question['id']);
         $question['views'] = (int) ($question['views'] ?? 0) + 1;
 
-        $answers = $this->questions->answers((int) $question['id']);
+        $answers = $this->communityChoice->annotateAnswers($this->questions->answers((int) $question['id']));
         $questionComments = $this->questions->commentsForQuestion((int) $question['id']);
         $answerComments = $this->questions->commentsForAnswers((int) $question['id']);
         $reactionTargets = [['type' => 'question', 'id' => (int) $question['id']]];
