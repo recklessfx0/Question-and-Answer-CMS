@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-final readonly class TwoFactorService
+final class TwoFactorService
 {
-    private const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    private const int STEP_SECONDS = 30;
-    private const int CODE_DIGITS = 6;
+    private const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    private const STEP_SECONDS = 30;
+    private const CODE_DIGITS = 6;
 
     public function generateSecret(int $length = 32): string
     {

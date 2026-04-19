@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Core;
 
-final readonly class RateLimiter
+final class RateLimiter
 {
     public function __construct(private string $path)
     {

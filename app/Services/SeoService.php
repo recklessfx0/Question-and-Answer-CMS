@@ -10,11 +10,11 @@ use App\Models\SettingsModel;
 use App\Models\UserModel;
 use Core\Markdown;
 
-final readonly class SeoService
+final class SeoService
 {
-    private const string SITEMAP_STYLESHEET = '/sitemap.xsl';
+    private const SITEMAP_STYLESHEET = '/sitemap.xsl';
     /** @var array<int, string> */
-    private const array AI_CRAWLERS = [
+    private const AI_CRAWLERS = [
         'GPTBot',
         'ChatGPT-User',
         'ClaudeBot',
@@ -24,7 +24,7 @@ final readonly class SeoService
         'CCBot',
     ];
     /** @var array<int, string> */
-    private const array ROBOTS_DISALLOW_PATHS = [
+    private const ROBOTS_DISALLOW_PATHS = [
         '/admin/',
         '/moderator/',
         '/settings/',

@@ -8,7 +8,7 @@ use Core\RateLimiter;
 use Core\Request;
 use Core\Response;
 
-final readonly class RateLimitMiddleware
+final class RateLimitMiddleware
 {
     public function __construct(private RateLimiter $limiter) {}
 

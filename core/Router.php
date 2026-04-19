@@ -83,7 +83,7 @@ final class Router
     }
 }
 
-final readonly class Route
+final class Route
 {
     /** @var array<int, string> */
     public array $segments;

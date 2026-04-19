@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Core;
 
-final readonly class Cache
+final class Cache
 {
     public function __construct(private string $path)
     {

@@ -7,7 +7,7 @@ namespace App\Services;
 use App\Models\GamificationLevelModel;
 use App\Models\UserModel;
 
-final readonly class GamificationService
+final class GamificationService
 {
     /** @var array<int, string> */
     private const LEVEL_BADGES = [

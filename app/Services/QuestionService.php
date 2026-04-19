@@ -13,7 +13,7 @@ use Core\Slugger;
 use Core\Validator;
 use RuntimeException;
 
-final readonly class QuestionService
+final class QuestionService
 {
     public function __construct(
         private QuestionModel $questions,

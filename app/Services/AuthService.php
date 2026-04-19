@@ -12,7 +12,7 @@ use Core\Session;
 use Core\Slugger;
 use Core\Validator;
 
-final readonly class AuthService
+final class AuthService
 {
     public function __construct(
         private UserModel $users,

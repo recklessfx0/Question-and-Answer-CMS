@@ -6,7 +6,7 @@ namespace App\Models;
 
 use Core\Database;
 
-final readonly class LanguageModel
+final class LanguageModel
 {
     public function __construct(private Database $db) {}
 

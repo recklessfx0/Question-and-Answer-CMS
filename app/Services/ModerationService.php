@@ -8,7 +8,7 @@ use App\Models\QuestionModel;
 use App\Models\AuditLogModel;
 use Core\Session;
 
-final readonly class ModerationService
+final class ModerationService
 {
     public function __construct(
         private QuestionModel $questions,

@@ -6,7 +6,7 @@ namespace App\Models;
 
 use Core\Database;
 
-final readonly class AuditLogModel
+final class AuditLogModel
 {
     public function __construct(private Database $db) {}
 

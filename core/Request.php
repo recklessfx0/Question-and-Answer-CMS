@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Core;
 
-final readonly class Request
+final class Request
 {
     /** @param array<string, mixed> $get @param array<string, mixed> $post @param array<string, mixed> $files @param array<string, mixed> $server */
     private function __construct(

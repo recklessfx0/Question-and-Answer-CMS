@@ -7,7 +7,7 @@ namespace App\Controllers;
 use App\Services\SeoService;
 use Core\Response;
 
-final readonly class SeoController
+final class SeoController
 {
     public function __construct(private SeoService $seo) {}
 

@@ -7,7 +7,7 @@ namespace App\Services;
 use App\Models\SettingsModel;
 use RuntimeException;
 
-final readonly class MailService
+final class MailService
 {
     /** @param array<string, mixed> $config */
     public function __construct(

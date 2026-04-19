@@ -22,7 +22,7 @@ use RuntimeException;
 
 final class UserController extends Controller
 {
-    private const int PROFILE_STREAM_LIMIT = 10;
+    private const PROFILE_STREAM_LIMIT = 10;
 
     public function __construct(
         View $view,

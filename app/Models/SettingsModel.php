@@ -6,7 +6,7 @@ namespace App\Models;
 
 use Core\Database;
 
-final readonly class SettingsModel
+final class SettingsModel
 {
     public function __construct(private Database $db) {}
 

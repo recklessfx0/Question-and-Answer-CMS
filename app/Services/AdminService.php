@@ -15,7 +15,7 @@ use App\Models\UserModel;
 use Core\Slugger;
 use RuntimeException;
 
-final readonly class AdminService
+final class AdminService
 {
     private const ADMIN_PAGE_SIZE = 12;
 

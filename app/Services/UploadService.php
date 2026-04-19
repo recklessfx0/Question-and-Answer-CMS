@@ -6,7 +6,7 @@ namespace App\Services;
 
 use RuntimeException;
 
-final readonly class UploadService
+final class UploadService
 {
     /** @param array<string, mixed> $file */
     public function storeImage(array $file, string $directory = 'public-assets/images/uploads'): string

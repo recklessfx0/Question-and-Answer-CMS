@@ -8,7 +8,7 @@ use Core\Csrf;
 use Core\Request;
 use Core\Response;
 
-final readonly class CsrfMiddleware
+final class CsrfMiddleware
 {
     public function __construct(private Csrf $csrf) {}
 

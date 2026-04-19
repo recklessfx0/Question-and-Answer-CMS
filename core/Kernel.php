@@ -9,7 +9,7 @@ use App\Middleware\SecurityHeadersMiddleware;
 use App\Services\TranslationService;
 use Throwable;
 
-final readonly class Kernel
+final class Kernel
 {
     public function __construct(
         private Container $container,

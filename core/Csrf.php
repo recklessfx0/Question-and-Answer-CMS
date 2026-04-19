@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Core;
 
-final readonly class Csrf
+final class Csrf
 {
     public function __construct(private Session $session) {}
 

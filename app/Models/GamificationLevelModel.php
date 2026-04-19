@@ -7,7 +7,7 @@ namespace App\Models;
 use Core\Database;
 use PDOException;
 
-final readonly class GamificationLevelModel
+final class GamificationLevelModel
 {
     public function __construct(private Database $db) {}
 

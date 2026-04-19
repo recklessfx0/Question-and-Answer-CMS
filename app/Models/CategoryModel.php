@@ -7,7 +7,7 @@ namespace App\Models;
 use Core\Database;
 use PDOException;
 
-final readonly class CategoryModel
+final class CategoryModel
 {
     public function __construct(private Database $db) {}
 

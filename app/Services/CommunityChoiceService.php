@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-final readonly class CommunityChoiceService
+final class CommunityChoiceService
 {
     /** @param array<int, array<string, mixed>> $answers @return array<int, array<string, mixed>> */
     public function annotateAnswers(array $answers): array

@@ -14,7 +14,7 @@ use Core\View;
 
 final class NotificationController extends Controller
 {
-    private const int PAGE_SIZE = 20;
+    private const PAGE_SIZE = 20;
 
     public function __construct(View $view, Session $session, Csrf $csrf, private readonly NotificationModel $notifications)
     {

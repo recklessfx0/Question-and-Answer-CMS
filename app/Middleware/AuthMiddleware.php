@@ -8,7 +8,7 @@ use Core\Request;
 use Core\Response;
 use Core\Session;
 
-final readonly class AuthMiddleware
+final class AuthMiddleware
 {
     public function __construct(private Session $session) {}
 

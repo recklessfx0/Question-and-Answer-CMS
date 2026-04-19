@@ -9,7 +9,7 @@ use PDOException;
 use RuntimeException;
 use Throwable;
 
-final readonly class UserModel
+final class UserModel
 {
     public function __construct(private Database $db) {}
 

@@ -16,7 +16,7 @@ use Core\View;
 final class StaticPageController extends Controller
 {
     /** @var array<string, array{title: string, description_key: string, body_key: string, path: string, schema: string}> */
-    private const array PAGES = [
+    private const PAGES = [
         'about' => [
             'title' => 'About',
             'description_key' => 'about_description',

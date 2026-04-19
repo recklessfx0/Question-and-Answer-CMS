@@ -8,7 +8,7 @@ use Core\Request;
 use Core\Response;
 use Core\Session;
 
-final readonly class AdminMiddleware
+final class AdminMiddleware
 {
     public function __construct(private Session $session) {}
 

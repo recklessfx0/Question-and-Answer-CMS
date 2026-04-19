@@ -6,7 +6,7 @@ namespace Core;
 
 use Throwable;
 
-final readonly class Logger
+final class Logger
 {
     public function __construct(private string $file)
     {

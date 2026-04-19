@@ -8,7 +8,7 @@ use App\Models\ReactionModel;
 use Core\Queue;
 use Core\Session;
 
-final readonly class ReactionService
+final class ReactionService
 {
     public function __construct(
         private ReactionModel $reactions,

@@ -10,7 +10,7 @@ use Core\Session;
 use Core\Slugger;
 use RuntimeException;
 
-final readonly class GoogleAuthService
+final class GoogleAuthService
 {
     public function __construct(
         private SettingsModel $settings,

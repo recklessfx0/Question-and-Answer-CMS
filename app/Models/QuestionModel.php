@@ -7,9 +7,9 @@ namespace App\Models;
 use Core\Database;
 use Throwable;
 
-final readonly class QuestionModel
+final class QuestionModel
 {
-    public const int MAX_QUESTION_TAGS = 8;
+    public const MAX_QUESTION_TAGS = 8;
 
     public function __construct(private Database $db) {}
 

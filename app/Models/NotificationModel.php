@@ -6,7 +6,7 @@ namespace App\Models;
 
 use Core\Database;
 
-final readonly class NotificationModel
+final class NotificationModel
 {
     public function __construct(private Database $db) {}
 

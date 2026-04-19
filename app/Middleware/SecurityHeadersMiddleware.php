@@ -10,7 +10,7 @@ use Core\Request;
 use Core\Response;
 use Throwable;
 
-final readonly class SecurityHeadersMiddleware
+final class SecurityHeadersMiddleware
 {
     public function __construct(private Container $container) {}
 

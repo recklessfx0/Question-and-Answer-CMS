@@ -8,7 +8,7 @@ use App\Models\SettingsModel;
 use Core\Request;
 use RuntimeException;
 
-final readonly class RecaptchaService
+final class RecaptchaService
 {
     public function __construct(private SettingsModel $settings) {}
 
