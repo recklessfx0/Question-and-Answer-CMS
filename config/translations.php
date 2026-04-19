@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'admin.nav.overview' => 'Overview',
     'admin.nav.settings' => 'Settings',
+    'admin.nav.trust_pages' => 'Trust Pages',
     'admin.nav.languages' => 'Languages',
     'admin.nav.categories' => 'Categories',
     'admin.nav.tags' => 'Tags',

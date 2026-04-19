@@ -29,6 +29,11 @@ final class AdminController extends Controller
         return $this->adminView('admin/settings', 'Admin Settings', 'Manage site, SEO, and security settings.');
     }
 
+    public function trustPagesPage(): Response
+    {
+        return $this->adminView('admin/trust-pages', 'Admin Trust Pages', 'Manage about, contact, privacy, terms, and community guidelines.');
+    }
+
     public function languagesPage(Request $request): Response
     {
         return $this->view('admin/languages', array_merge([
@@ -89,16 +94,6 @@ final class AdminController extends Controller
             'site_title' => $request->string('site_title', 100),
             'site_url' => $request->string('site_url', 255),
             'site_description' => $request->string('site_description', 200),
-            'about_description' => $request->string('about_description', 240),
-            'about_body' => $request->string('about_body', 4000),
-            'contact_description' => $request->string('contact_description', 240),
-            'contact_body' => $request->string('contact_body', 4000),
-            'privacy_description' => $request->string('privacy_description', 240),
-            'privacy_body' => $request->string('privacy_body', 4000),
-            'terms_description' => $request->string('terms_description', 240),
-            'terms_body' => $request->string('terms_body', 4000),
-            'guidelines_description' => $request->string('guidelines_description', 240),
-            'guidelines_body' => $request->string('guidelines_body', 4000),
             'recaptcha_enabled' => (string) $request->int('recaptcha_enabled', 0, 0, 1),
             'recaptcha_site_key' => $request->string('recaptcha_site_key', 255),
             'recaptcha_secret_key' => $request->string('recaptcha_secret_key', 255),
@@ -113,8 +108,26 @@ final class AdminController extends Controller
             'smtp_password' => $request->string('smtp_password', 255),
             'smtp_from_email' => $request->string('smtp_from_email', 255),
             'smtp_from_name' => $request->string('smtp_from_name', 120),
-        ], (int) $this->session->get('user_id', 0));
+        ], (int) $this->session->get('user_id', 0), is_array($request->files['site_logo'] ?? null) ? $request->files['site_logo'] : null);
         return Response::redirect('/admin/settings');
+    }
+
+    public function trustPages(Request $request): Response
+    {
+        $this->admin->saveTrustPages([
+            'about_description' => $request->string('about_description', 240),
+            'about_body' => $request->string('about_body', 4000),
+            'contact_description' => $request->string('contact_description', 240),
+            'contact_body' => $request->string('contact_body', 4000),
+            'privacy_description' => $request->string('privacy_description', 240),
+            'privacy_body' => $request->string('privacy_body', 4000),
+            'terms_description' => $request->string('terms_description', 240),
+            'terms_body' => $request->string('terms_body', 4000),
+            'guidelines_description' => $request->string('guidelines_description', 240),
+            'guidelines_body' => $request->string('guidelines_body', 4000),
+        ], (int) $this->session->get('user_id', 0));
+
+        return Response::redirect('/admin/trust-pages');
     }
 
     public function createLanguage(Request $request): Response

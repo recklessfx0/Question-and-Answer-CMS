@@ -34,6 +34,22 @@ final readonly class UploadService
     }
 
     /** @param array<string, mixed> $file */
+    public function storeLogo(array $file, string $directory = 'public-assets/images/logos'): string
+    {
+        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 2_000_000);
+        if ($mime === 'image/svg+xml') {
+            $this->assertSafeSvg($tmp);
+            $targetDir = $this->targetDirectory($directory);
+            $name = bin2hex(random_bytes(16)) . '.svg';
+            $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
+
+            return '/' . trim($directory, '/') . '/' . $name;
+        }
+
+        return $this->storeImage($file, $directory);
+    }
+
+    /** @param array<string, mixed> $file */
     public function storeMedia(array $file, string $directory = 'public-assets/images/uploads'): string
     {
         ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 12_000_000);
@@ -191,6 +207,9 @@ final readonly class UploadService
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $mime = $finfo->file($tmp);
             if (is_string($mime) && $mime !== '') {
+                if ($this->isSvgMime($mime, $tmp)) {
+                    return 'image/svg+xml';
+                }
                 return $mime;
             }
         }
@@ -198,6 +217,9 @@ final readonly class UploadService
         if (function_exists('mime_content_type')) {
             $mime = mime_content_type($tmp);
             if (is_string($mime) && $mime !== '') {
+                if ($this->isSvgMime($mime, $tmp)) {
+                    return 'image/svg+xml';
+                }
                 return $mime;
             }
         }
@@ -216,6 +238,17 @@ final readonly class UploadService
         }
 
         return '';
+    }
+
+    private function isSvgMime(string $mime, string $tmp): bool
+    {
+        if (in_array(strtolower($mime), ['image/svg+xml', 'image/svg', 'text/xml', 'application/xml', 'text/plain'], true)) {
+            $head = strtolower($this->readBytes($tmp, 512));
+
+            return str_contains($head, '<svg') || str_contains($head, '<?xml');
+        }
+
+        return false;
     }
 
     /** @param array<int|string, mixed>|null $imageInfo */
@@ -263,6 +296,26 @@ final readonly class UploadService
 
         if (str_starts_with($contents, 'MZ') || str_starts_with($contents, "\x7FELF") || str_starts_with($contents, "#!")) {
             throw new RuntimeException('Executable uploads are not allowed.');
+        }
+    }
+
+    private function assertSafeSvg(string $tmp): void
+    {
+        $contents = file_get_contents($tmp);
+        if (!is_string($contents) || $contents === '' || strlen($contents) > 2_000_000) {
+            throw new RuntimeException('Upload is invalid.');
+        }
+
+        $lower = strtolower($contents);
+        foreach (['<script', 'javascript:', 'data:text/html', 'data:application', 'onload=', 'onerror=', 'onclick=', 'onmouseover=', '<foreignobject', '<iframe', '<object', '<embed'] as $needle) {
+            if (str_contains($lower, $needle)) {
+                throw new RuntimeException('SVG contains unsafe content.');
+            }
+        }
+
+        $xml = simplexml_load_string($contents);
+        if (!$xml instanceof \SimpleXMLElement || strtolower((string) $xml->getName()) !== 'svg') {
+            throw new RuntimeException('Upload is not a valid SVG.');
         }
     }
 

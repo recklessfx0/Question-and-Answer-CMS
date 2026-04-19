@@ -96,23 +96,15 @@ final readonly class AdminService
     }
 
     /** @param array<string, string> $input */
-    public function saveSettings(array $input, int $actorId): void
+    /** @param array<string, mixed>|null $logo */
+    public function saveSettings(array $input, int $actorId, ?array $logo = null): void
     {
         $before = $this->settings->all();
         $this->settings->set('site_title', excerpt($input['site_title'] ?? '', 80));
         $this->settings->set('site_url', normalize_site_url($input['site_url'] ?? ''));
         $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 160));
-        foreach ([
-            'about_description' => 240,
-            'contact_description' => 240,
-            'privacy_description' => 240,
-            'terms_description' => 240,
-            'guidelines_description' => 240,
-        ] as $key => $length) {
-            $this->settings->set($key, excerpt($input[$key] ?? '', $length));
-        }
-        foreach (['about_body', 'contact_body', 'privacy_body', 'terms_body', 'guidelines_body'] as $key) {
-            $this->settings->set($key, $this->plainTextSetting($input[$key] ?? '', 4000));
+        if ($logo !== null && (int) ($logo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $this->settings->set('site_logo_path', $this->uploads->storeLogo($logo));
         }
         $this->settings->set('recaptcha_enabled', ($input['recaptcha_enabled'] ?? '0') === '1' ? '1' : '0');
         $this->settings->set('recaptcha_site_key', excerpt($input['recaptcha_site_key'] ?? '', 255));
@@ -148,6 +140,35 @@ final readonly class AdminService
         }
         if ($changed !== []) {
             $this->audit->record($actorId, 'settings_update', 'settings', 0, ['changed_keys' => $this->redactedSettingKeys($changed)]);
+        }
+    }
+
+    /** @param array<string, string> $input */
+    public function saveTrustPages(array $input, int $actorId): void
+    {
+        $before = $this->settings->all();
+        foreach ([
+            'about_description' => 240,
+            'contact_description' => 240,
+            'privacy_description' => 240,
+            'terms_description' => 240,
+            'guidelines_description' => 240,
+        ] as $key => $length) {
+            $this->settings->set($key, excerpt($input[$key] ?? '', $length));
+        }
+        foreach (['about_body', 'contact_body', 'privacy_body', 'terms_body', 'guidelines_body'] as $key) {
+            $this->settings->set($key, $this->plainTextSetting($input[$key] ?? '', 4000));
+        }
+
+        $after = $this->settings->all();
+        $changed = [];
+        foreach ($after as $key => $value) {
+            if (($before[$key] ?? null) !== $value) {
+                $changed[] = $key;
+            }
+        }
+        if ($changed !== []) {
+            $this->audit->record($actorId, 'trust_pages_update', 'settings', 0, ['changed_keys' => $this->redactedSettingKeys($changed)]);
         }
     }
 

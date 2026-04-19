@@ -16,6 +16,8 @@ public-assets/images/avatars/
 public-assets/images/uploads/
 public-assets/images/levels/
 public-assets/images/reactions/
+public-assets/images/logos/*
+!public-assets/images/logos/.htaccess
 
 # OS / editor
 .DS_Store

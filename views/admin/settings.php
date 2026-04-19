@@ -5,24 +5,20 @@
     <p class="meta">Google OAuth redirect URL: <?= h(url('/auth/google/callback')) ?></p>
 </section>
 <section class="admin-panel">
-    <form method="post" action="/admin/settings" class="admin-form">
+    <form method="post" action="/admin/settings" class="admin-form" enctype="multipart/form-data">
         <?= $csrf->field('/admin/settings') ?>
         <h2>SEO</h2>
         <label>Site title <input name="site_title" value="<?= h($settings['site_title'] ?? '') ?>" maxlength="100"></label>
+        <label>Website logo <input name="site_logo" type="file" accept="image/avif,image/webp,image/svg+xml,image/jpeg,image/png,image/gif,image/*"></label>
+        <?php if (!empty($settings['site_logo_path'])): ?>
+            <div class="logo-preview">
+                <span>Current logo</span>
+                <?= uploaded_image((string) $settings['site_logo_path'], 'site-logo-preview', (string) (($settings['site_title'] ?? '') ?: 'Website logo')) ?>
+            </div>
+        <?php endif; ?>
         <label>Website URL <input name="site_url" type="url" value="<?= h(($settings['site_url'] ?? '') !== '' ? (string) $settings['site_url'] : site_url()) ?>" maxlength="255" placeholder="https://example.com"></label>
         <p class="meta">Used for canonical URLs, sitemap URLs, robots.txt, llms.txt, structured data, and email links.</p>
         <label>Site description <textarea name="site_description" rows="3" maxlength="200"><?= h($settings['site_description'] ?? '') ?></textarea></label>
-        <h2>Trust pages</h2>
-        <label>About description <textarea name="about_description" rows="2" maxlength="240"><?= h($settings['about_description'] ?? '') ?></textarea></label>
-        <label>About body <textarea name="about_body" rows="5" maxlength="4000"><?= h($settings['about_body'] ?? '') ?></textarea></label>
-        <label>Contact description <textarea name="contact_description" rows="2" maxlength="240"><?= h($settings['contact_description'] ?? '') ?></textarea></label>
-        <label>Contact body <textarea name="contact_body" rows="5" maxlength="4000"><?= h($settings['contact_body'] ?? '') ?></textarea></label>
-        <label>Privacy description <textarea name="privacy_description" rows="2" maxlength="240"><?= h($settings['privacy_description'] ?? '') ?></textarea></label>
-        <label>Privacy body <textarea name="privacy_body" rows="5" maxlength="4000"><?= h($settings['privacy_body'] ?? '') ?></textarea></label>
-        <label>Terms description <textarea name="terms_description" rows="2" maxlength="240"><?= h($settings['terms_description'] ?? '') ?></textarea></label>
-        <label>Terms body <textarea name="terms_body" rows="5" maxlength="4000"><?= h($settings['terms_body'] ?? '') ?></textarea></label>
-        <label>Community guidelines description <textarea name="guidelines_description" rows="2" maxlength="240"><?= h($settings['guidelines_description'] ?? '') ?></textarea></label>
-        <label>Community guidelines body <textarea name="guidelines_body" rows="5" maxlength="4000"><?= h($settings['guidelines_body'] ?? '') ?></textarea></label>
         <h2>Google reCAPTCHA</h2>
         <label class="checkbox-label"><input name="recaptcha_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'recaptcha_enabled') ? 'checked' : '' ?>> Enable reCAPTCHA on account forms</label>
         <label>Site key <input name="recaptcha_site_key" value="<?= h($settings['recaptcha_site_key'] ?? '') ?>" maxlength="255" autocomplete="off"></label>

@@ -88,6 +88,7 @@ return static function (Router $router): void {
 
     $router->get('/admin', [AdminController::class, 'dashboard'], [AdminMiddleware::class]);
     $router->get('/admin/settings', [AdminController::class, 'settingsPage'], [AdminMiddleware::class]);
+    $router->get('/admin/trust-pages', [AdminController::class, 'trustPagesPage'], [AdminMiddleware::class]);
     $router->get('/admin/languages', [AdminController::class, 'languagesPage'], [AdminMiddleware::class]);
     $router->get('/admin/categories', [AdminController::class, 'categoriesPage'], [AdminMiddleware::class]);
     $router->get('/admin/levels', [AdminController::class, 'levelsPage'], [AdminMiddleware::class]);
@@ -97,6 +98,7 @@ return static function (Router $router): void {
     $router->get('/admin/reports', [AdminController::class, 'reportsPage'], [AdminMiddleware::class]);
     $router->post('/admin/users/{id}/role', [AdminController::class, 'setRole'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/settings', [AdminController::class, 'settings'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/trust-pages', [AdminController::class, 'trustPages'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages', [AdminController::class, 'createLanguage'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages/{id}/update', [AdminController::class, 'updateLanguage'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages/{id}/translations', [AdminController::class, 'saveTranslations'], [CsrfMiddleware::class, AdminMiddleware::class]);

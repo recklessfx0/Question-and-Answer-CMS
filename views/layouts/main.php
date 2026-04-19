@@ -10,6 +10,10 @@ $canonicalUrl = (string) ($canonical ?? url($requestPath));
 $ogType = (string) ($ogType ?? 'website');
 $ogImage = isset($ogImage) ? (string) $ogImage : '';
 $robotsContent = isset($robots) && is_string($robots) && trim($robots) !== '' ? trim($robots) : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+$siteLogoPath = safe_internal_path((string) (($securitySettings['site_logo_path'] ?? '') ?: ''));
+if ($siteLogoPath !== '' && !str_starts_with($siteLogoPath, '/public-assets/images/logos/')) {
+    $siteLogoPath = '';
+}
 $assetUrl = static function (string $path): string {
     $file = BASE_PATH . $path;
     $version = is_file($file) ? (string) filemtime($file) : '1';
@@ -78,7 +82,12 @@ if (isset($schemas) && is_array($schemas)) {
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/"><?= h($site) ?></a>
+    <a class="brand" href="/">
+        <?php if ($siteLogoPath !== ''): ?>
+            <?= uploaded_image($siteLogoPath, 'site-logo', (string) $site) ?>
+        <?php endif; ?>
+        <span><?= h($site) ?></span>
+    </a>
     <form class="search" action="/search" role="search">
         <label class="sr-only" for="q"><?= h(t('layout.search.label', 'Search')) ?></label>
         <input id="q" name="q" value="<?= h($query ?? '') ?>" placeholder="<?= h(t('layout.search.placeholder', 'Search questions')) ?>">

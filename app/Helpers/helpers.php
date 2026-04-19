@@ -226,6 +226,10 @@ function uploaded_image(string $path, string $class = '', string $alt = '', arra
         return $image;
     }
 
+    if ($extension === 'svg') {
+        return $image;
+    }
+
     if ($extension === 'avif') {
         $fallback = substr($pathOnly, 0, -5) . '.webp';
         return '<picture><source srcset="' . h($pathOnly) . '" type="image/avif"><source srcset="' . h($fallback) . '" type="image/webp">' . $image . '</picture>';

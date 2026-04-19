@@ -7,7 +7,11 @@
 <section class="admin-grid" aria-label="Admin areas">
     <a class="admin-card" href="/admin/settings">
         <strong>Settings</strong>
-        <span>Site details, reCAPTCHA, and Google sign-in.</span>
+        <span>Site details, logo, reCAPTCHA, email, and sign-in.</span>
+    </a>
+    <a class="admin-card" href="/admin/trust-pages">
+        <strong>Trust pages</strong>
+        <span>About, contact, privacy, terms, and guidelines.</span>
     </a>
     <a class="admin-card" href="/admin/languages">
         <strong><?= h(t('admin.nav.languages', 'Languages')) ?></strong>
