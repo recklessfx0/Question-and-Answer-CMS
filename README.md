@@ -68,6 +68,7 @@ Feature areas:
 - Administrator accounts can enable TOTP two-factor authentication from profile settings.
 - Admin settings changes are written to the audit log with secret values redacted.
 - SMTP email can be configured from the admin settings page.
+- Languages and interface translations can be managed from the admin dashboard. English is the seeded default, and visitors are served an active translation automatically when their browser language matches one.
 - Operational security runbooks live in `docs/SECURITY.md`.
 
 ## SEO

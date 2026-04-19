@@ -12,6 +12,27 @@ function csp_nonce(): string
     return is_string($GLOBALS['csp_nonce'] ?? null) ? (string) $GLOBALS['csp_nonce'] : '';
 }
 
+/** @param array<string, scalar> $replace */
+function t(string $key, string $fallback = '', array $replace = []): string
+{
+    $translator = $GLOBALS['translator'] ?? null;
+    if ($translator instanceof \App\Services\TranslationService) {
+        return $translator->get($key, $fallback, $replace);
+    }
+
+    return $fallback;
+}
+
+function current_language(): string
+{
+    $translator = $GLOBALS['translator'] ?? null;
+    if ($translator instanceof \App\Services\TranslationService) {
+        return $translator->languageCode();
+    }
+
+    return 'en';
+}
+
 function url(string $path = ''): string
 {
     return site_url() . '/' . ltrim($path, '/');

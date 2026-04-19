@@ -32,7 +32,7 @@ if (isset($schemas) && is_array($schemas)) {
 }
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="<?= h(current_language()) ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -80,28 +80,28 @@ if (isset($schemas) && is_array($schemas)) {
 <header class="site-header">
     <a class="brand" href="/"><?= h($site) ?></a>
     <form class="search" action="/search" role="search">
-        <label class="sr-only" for="q">Search</label>
-        <input id="q" name="q" value="<?= h($query ?? '') ?>" placeholder="Search questions">
+        <label class="sr-only" for="q"><?= h(t('layout.search.label', 'Search')) ?></label>
+        <input id="q" name="q" value="<?= h($query ?? '') ?>" placeholder="<?= h(t('layout.search.placeholder', 'Search questions')) ?>">
     </form>
     <nav aria-label="Primary">
-        <a href="/ask">Ask</a>
+        <a href="/ask"><?= h(t('layout.nav.ask', 'Ask')) ?></a>
         <?php if (is_array($authUser)): ?>
             <a href="/user/<?= h((string) $authUser['username']) ?>"><?= h((string) $authUser['username']) ?></a>
-            <a href="/notifications">Notifications</a>
-            <a href="/settings/profile">Settings</a>
+            <a href="/notifications"><?= h(t('layout.nav.notifications', 'Notifications')) ?></a>
+            <a href="/settings/profile"><?= h(t('layout.nav.settings', 'Settings')) ?></a>
             <?php if (in_array(active_role($authUser), ['moderator', 'administrator'], true)): ?>
-                <a href="/moderator">Moderate</a>
+                <a href="/moderator"><?= h(t('layout.nav.moderate', 'Moderate')) ?></a>
             <?php endif; ?>
             <?php if (active_role($authUser) === 'administrator'): ?>
-                <a href="/admin">Admin</a>
+                <a href="/admin"><?= h(t('layout.nav.admin', 'Admin')) ?></a>
             <?php endif; ?>
             <form method="post" action="/logout" class="inline">
                 <?= $csrf->field('/logout') ?>
-                <button type="submit">Sign out</button>
+                <button type="submit"><?= h(t('layout.nav.sign_out', 'Sign out')) ?></button>
             </form>
         <?php else: ?>
-            <a href="/login">Sign in</a>
-            <a href="/register">Register</a>
+            <a href="/login"><?= h(t('layout.nav.sign_in', 'Sign in')) ?></a>
+            <a href="/register"><?= h(t('layout.nav.register', 'Register')) ?></a>
         <?php endif; ?>
     </nav>
 </header>
@@ -114,20 +114,20 @@ if (isset($schemas) && is_array($schemas)) {
     <?= $content ?>
 </main>
 <footer class="site-footer">
-    <nav class="footer-links" aria-label="Discovery links">
-        <a href="/sitemap.xml">Sitemap</a>
-        <a href="/robots.txt">Robots</a>
+    <nav class="footer-links" aria-label="<?= h(t('layout.footer.discovery', 'Discovery links')) ?>">
+        <a href="/sitemap.xml"><?= h(t('layout.footer.sitemap', 'Sitemap')) ?></a>
+        <a href="/robots.txt"><?= h(t('layout.footer.robots', 'Robots')) ?></a>
         <a href="/llms.txt">llms.txt</a>
         <a href="/llms-full.txt">llms-full.txt</a>
     </nav>
-    <nav class="footer-links" aria-label="Site information">
-        <a href="/about">About</a>
-        <a href="/contact">Contact</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/community-guidelines">Guidelines</a>
+    <nav class="footer-links" aria-label="<?= h(t('layout.footer.info', 'Site information')) ?>">
+        <a href="/about"><?= h(t('layout.footer.about', 'About')) ?></a>
+        <a href="/contact"><?= h(t('layout.footer.contact', 'Contact')) ?></a>
+        <a href="/privacy"><?= h(t('layout.footer.privacy', 'Privacy')) ?></a>
+        <a href="/terms"><?= h(t('layout.footer.terms', 'Terms')) ?></a>
+        <a href="/community-guidelines"><?= h(t('layout.footer.guidelines', 'Guidelines')) ?></a>
     </nav>
-    <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. All rights reserved.</p>
+    <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. <?= h(t('layout.footer.copyright', 'All rights reserved.')) ?></p>
 </footer>
 <script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" nonce="<?= h(csp_nonce()) ?>" defer></script>
 </body>

@@ -8,6 +8,7 @@ use App\Models\QuestionModel;
 use App\Models\AuditLogModel;
 use App\Models\CategoryModel;
 use App\Models\GamificationLevelModel;
+use App\Models\LanguageModel;
 use App\Models\ReactionModel;
 use App\Models\SettingsModel;
 use App\Models\UserModel;
@@ -21,6 +22,7 @@ final readonly class AdminService
         private QuestionModel $questions,
         private CategoryModel $categories,
         private GamificationLevelModel $levels,
+        private LanguageModel $languages,
         private GamificationService $gamification,
         private ReactionModel $reactions,
         private SettingsModel $settings,
@@ -29,7 +31,7 @@ final readonly class AdminService
         private Slugger $slugger,
     ) {}
 
-    /** @return array{users: array<int, array<string, mixed>>, stats: array<string, int>, settings: array<string, string>, categories: array<int, array<string, mixed>>, tags: array<int, array<string, mixed>>, gamificationLevels: array<int, array<string, mixed>>, reactions: array<int, array<string, mixed>>, reports: array<int, array<string, mixed>>} */
+    /** @return array{users: array<int, array<string, mixed>>, stats: array<string, int>, settings: array<string, string>, categories: array<int, array<string, mixed>>, tags: array<int, array<string, mixed>>, gamificationLevels: array<int, array<string, mixed>>, languages: array<int, array<string, mixed>>, reactions: array<int, array<string, mixed>>, reports: array<int, array<string, mixed>>} */
     public function dashboard(): array
     {
         return [
@@ -39,9 +41,53 @@ final readonly class AdminService
             'categories' => $this->categories->all(),
             'tags' => $this->questions->popularTags(200),
             'gamificationLevels' => $this->levels->all(),
+            'languages' => $this->languages->all(),
             'reactions' => $this->reactions->allTypes(),
             'reports' => $this->questions->openFlags(),
         ];
+    }
+
+    /** @return array{languages: array<int, array<string, mixed>>, defaults: array<string, string>, selectedLanguage: array<string, mixed>|null, translations: array<string, string>} */
+    public function languageEditor(string $code = ''): array
+    {
+        $defaults = require BASE_PATH . '/config/translations.php';
+        $defaults = is_array($defaults) ? array_map('strval', $defaults) : [];
+        $languages = $this->languages->all();
+        $selectedLanguage = $code !== '' ? $this->languages->findByCode($code) : ($languages[0] ?? null);
+
+        return [
+            'languages' => $languages,
+            'defaults' => $defaults,
+            'selectedLanguage' => $selectedLanguage,
+            'translations' => is_array($selectedLanguage) ? $this->languages->translationsForLanguage((int) $selectedLanguage['id']) : [],
+        ];
+    }
+
+    public function createLanguage(string $code, string $name, bool $active, bool $default, int $actorId): bool
+    {
+        $created = $this->languages->create($code, $name, $active, $default);
+        if ($created) {
+            $this->audit->record($actorId, 'language_create', 'language', 0, ['code' => strtolower(str_replace('_', '-', trim($code)))]);
+        }
+
+        return $created;
+    }
+
+    public function updateLanguage(int $id, string $name, bool $active, bool $default, int $actorId): bool
+    {
+        $updated = $this->languages->update($id, $name, $active, $default);
+        if ($updated) {
+            $this->audit->record($actorId, 'language_update', 'language', $id);
+        }
+
+        return $updated;
+    }
+
+    /** @param array<string, string> $translations */
+    public function saveTranslations(int $languageId, array $translations, int $actorId): void
+    {
+        $this->languages->saveTranslations($languageId, $translations);
+        $this->audit->record($actorId, 'translations_update', 'language', $languageId, ['keys' => array_keys($translations)]);
     }
 
     public function setRole(int $userId, string $role): bool

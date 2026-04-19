@@ -4,6 +4,7 @@ $adminPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/admin'), PHP_URL_P
 $adminItems = [
     '/admin' => 'Overview',
     '/admin/settings' => 'Settings',
+    '/admin/languages' => 'Languages',
     '/admin/categories' => 'Categories',
     '/admin/tags' => 'Tags',
     '/admin/levels' => 'Levels',
@@ -14,6 +15,6 @@ $adminItems = [
 ?>
 <nav class="admin-nav" aria-label="Admin sections">
     <?php foreach ($adminItems as $href => $label): ?>
-        <a href="<?= h($href) ?>" class="<?= $adminPath === $href ? 'active' : '' ?>"><?= h($label) ?></a>
+        <a href="<?= h($href) ?>" class="<?= $adminPath === $href ? 'active' : '' ?>"><?= h(t('admin.nav.' . strtolower($label), $label)) ?></a>
     <?php endforeach; ?>
 </nav>

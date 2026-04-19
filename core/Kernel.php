@@ -6,6 +6,7 @@ namespace Core;
 
 use App\Models\UserModel;
 use App\Middleware\SecurityHeadersMiddleware;
+use App\Services\TranslationService;
 use Throwable;
 
 final readonly class Kernel
@@ -20,10 +21,13 @@ final readonly class Kernel
         try {
             $this->container->get(Session::class)->start();
             $this->syncAuthenticatedUser();
+            $this->container->get(TranslationService::class)->boot($request);
 
             $cached = $this->pageCacheLookup($request);
             if ($cached !== null) {
                 $response = (new Response($cached, 200, ['Content-Type' => 'text/html; charset=utf-8']))->withHeader('X-Page-Cache', 'HIT');
+                $response->withHeader('Content-Language', current_language());
+                $response->withHeader('Vary', 'Accept-Language');
                 return $this->container->get(SecurityHeadersMiddleware::class)->handle($request, static fn (): Response => $response);
             }
 
@@ -47,9 +51,11 @@ final readonly class Kernel
 
             $response = $handler($request);
             if ($this->canPageCache($request, $response)) {
-                $this->container->get(PageCache::class)->put($request->uri, $response->body(), 120);
+                $this->container->get(PageCache::class)->put($this->pageCacheKey($request), $response->body(), 120);
                 $response->withHeader('X-Page-Cache', 'MISS');
             }
+            $response->withHeader('Content-Language', current_language());
+            $response->withHeader('Vary', 'Accept-Language');
 
             return $response;
         } catch (Throwable $e) {
@@ -60,7 +66,12 @@ final readonly class Kernel
 
     private function pageCacheLookup(Request $request): ?string
     {
-        return $this->canAttemptPageCache($request) ? $this->container->get(PageCache::class)->get($request->uri) : null;
+        return $this->canAttemptPageCache($request) ? $this->container->get(PageCache::class)->get($this->pageCacheKey($request)) : null;
+    }
+
+    private function pageCacheKey(Request $request): string
+    {
+        return current_language() . ':' . $request->uri;
     }
 
     private function syncAuthenticatedUser(): void

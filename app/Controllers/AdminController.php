@@ -29,6 +29,14 @@ final class AdminController extends Controller
         return $this->adminView('admin/settings', 'Admin Settings', 'Manage site, SEO, and security settings.');
     }
 
+    public function languagesPage(Request $request): Response
+    {
+        return $this->view('admin/languages', array_merge([
+            'title' => t('admin.languages.title', 'Languages'),
+            'metaDescription' => t('admin.languages.description', 'Translate interface text and control which languages are available to visitors.'),
+        ], $this->admin->dashboard(), $this->admin->languageEditor($request->string('code', 20))));
+    }
+
     public function categoriesPage(): Response
     {
         return $this->adminView('admin/categories', 'Admin Categories', 'Manage categories and subcategories.');
@@ -107,6 +115,53 @@ final class AdminController extends Controller
             'smtp_from_name' => $request->string('smtp_from_name', 120),
         ], (int) $this->session->get('user_id', 0));
         return Response::redirect('/admin/settings');
+    }
+
+    public function createLanguage(Request $request): Response
+    {
+        $created = $this->admin->createLanguage(
+            $request->string('code', 20),
+            $request->string('name', 80),
+            $request->int('is_active', 0, 0, 1) === 1,
+            $request->int('is_default', 0, 0, 1) === 1,
+            (int) $this->session->get('user_id', 0)
+        );
+        $this->flash($created ? 'success' : 'error', $created ? 'Language saved.' : 'Language could not be saved.');
+
+        return Response::redirect('/admin/languages');
+    }
+
+    /** @param array<string, string> $params */
+    public function updateLanguage(Request $request, array $params): Response
+    {
+        $updated = $this->admin->updateLanguage(
+            (int) ($params['id'] ?? 0),
+            $request->string('name', 80),
+            $request->int('is_active', 0, 0, 1) === 1,
+            $request->int('is_default', 0, 0, 1) === 1,
+            (int) $this->session->get('user_id', 0)
+        );
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Language updated.' : 'Language could not be updated.');
+
+        return Response::redirect('/admin/languages?code=' . rawurlencode($request->string('code', 20)));
+    }
+
+    /** @param array<string, string> $params */
+    public function saveTranslations(Request $request, array $params): Response
+    {
+        $translations = is_array($request->post['translations'] ?? null) ? $request->post['translations'] : [];
+        $clean = [];
+        foreach ($translations as $key => $value) {
+            if (is_string($key) && is_scalar($value)) {
+                $text = trim(str_replace("\0", '', (string) $value));
+                $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? '';
+                $clean[$key] = mb_substr($text, 0, 4000);
+            }
+        }
+        $this->admin->saveTranslations((int) ($params['id'] ?? 0), $clean, (int) $this->session->get('user_id', 0));
+        $this->flash('success', 'Translations updated.');
+
+        return Response::redirect('/admin/languages?code=' . rawurlencode($request->string('code', 20)));
     }
 
     public function createCategory(Request $request): Response

@@ -9,6 +9,10 @@
         <strong>Settings</strong>
         <span>Site details, reCAPTCHA, and Google sign-in.</span>
     </a>
+    <a class="admin-card" href="/admin/languages">
+        <strong><?= h(t('admin.nav.languages', 'Languages')) ?></strong>
+        <span><?= count($languages) ?> language<?= count($languages) === 1 ? '' : 's' ?> configured.</span>
+    </a>
     <a class="admin-card" href="/admin/categories">
         <strong>Categories</strong>
         <span><?= count($categories) ?> categories and subcategories.</span>
