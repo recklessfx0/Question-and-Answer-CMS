@@ -291,6 +291,7 @@ final readonly class AdminService
         $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 200));
         $this->settings->set('default_meta_title', excerpt($input['default_meta_title'] ?? '', 120));
         $this->settings->set('default_meta_description', excerpt($input['default_meta_description'] ?? '', 200));
+        $this->settings->set('landing_questions_heading', excerpt($input['landing_questions_heading'] ?? '', 120));
         $this->settings->set('default_og_title', excerpt($input['default_og_title'] ?? '', 120));
         $this->settings->set('default_og_description', excerpt($input['default_og_description'] ?? '', 200));
         $this->settings->set('twitter_site', $this->socialHandle($input['twitter_site'] ?? ''));

@@ -21,6 +21,8 @@
         <p class="meta">Used for canonical URLs, sitemap URLs, robots.txt, llms.txt, structured data, and email links.</p>
         <label>Site description <textarea name="site_description" rows="3" maxlength="200"><?= h($settings['site_description'] ?? '') ?></textarea></label>
         <label>Default meta description <textarea name="default_meta_description" rows="3" maxlength="200" placeholder="Used when a page does not provide its own meta description."><?= h($settings['default_meta_description'] ?? '') ?></textarea></label>
+        <label>Landing page question heading <input name="landing_questions_heading" value="<?= h($settings['landing_questions_heading'] ?? '') ?>" maxlength="120" placeholder="Latest Questions"></label>
+        <p class="meta">Used as the main heading on the first landing page question list.</p>
         <h2>Social sharing</h2>
         <label>Default Open Graph title <input name="default_og_title" value="<?= h($settings['default_og_title'] ?? '') ?>" maxlength="120" placeholder="Shared page title"></label>
         <label>Default Open Graph description <textarea name="default_og_description" rows="3" maxlength="200" placeholder="Shared page description"><?= h($settings['default_og_description'] ?? '') ?></textarea></label>

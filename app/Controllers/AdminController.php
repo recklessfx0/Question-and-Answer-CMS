@@ -132,6 +132,7 @@ final class AdminController extends Controller
             'site_description' => $request->string('site_description', 200),
             'default_meta_title' => $request->string('default_meta_title', 120),
             'default_meta_description' => $request->string('default_meta_description', 200),
+            'landing_questions_heading' => $request->string('landing_questions_heading', 120),
             'default_og_title' => $request->string('default_og_title', 120),
             'default_og_description' => $request->string('default_og_description', 200),
             'twitter_site' => $request->string('twitter_site', 80),

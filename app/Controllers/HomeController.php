@@ -37,13 +37,15 @@ final class HomeController extends Controller
         $canonical = $page > 1 ? url('/questions/page/' . $page) : url('/');
         $pagination = $this->pagination('/questions', $page, $total);
         $baseDescription = $this->siteDescription('Fresh community questions and expert answers.');
+        $landingHeading = $this->setting('landing_questions_heading', 'Latest Questions');
+        $pageHeading = $page > 1 ? $landingHeading . ' - Page ' . $page : $landingHeading;
 
         return $this->view('home/index', [
-            'title' => $page > 1 ? 'Latest Questions - Page ' . $page : null,
-            'heading' => $page > 1 ? 'Latest Questions - Page ' . $page : 'Latest Questions',
+            'title' => $page > 1 ? $pageHeading : null,
+            'heading' => $pageHeading,
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $canonical,
-            'schema' => $this->seo->itemListSchema('Latest Questions', $canonical, $questions, $baseDescription, [], 'Community questions'),
+            'schema' => $this->seo->itemListSchema($landingHeading, $canonical, $questions, $baseDescription, [], 'Community questions'),
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -246,13 +248,18 @@ final class HomeController extends Controller
 
     private function siteDescription(string $fallback): string
     {
+        return $this->setting('site_description', $fallback);
+    }
+
+    private function setting(string $key, string $fallback): string
+    {
         try {
-            $description = trim($this->settings->get('site_description'));
+            $value = trim($this->settings->get($key));
         } catch (\Throwable) {
             return $fallback;
         }
 
-        return $description !== '' ? $description : $fallback;
+        return $value !== '' ? $value : $fallback;
     }
 
     private function pageOutOfRange(int $page, int $total, int $perPage = self::PAGE_SIZE): bool
