@@ -4,17 +4,43 @@ declare(strict_types=1);
 
 $appConfig = require BASE_PATH . '/config/app.php';
 $site = trim((string) ($securitySettings['site_title'] ?? '')) ?: (string) $appConfig['name'];
-$pageTitle = isset($title) ? (string) $title . ' | ' . $site : $site;
-$defaultDescription = trim((string) ($securitySettings['site_description'] ?? '')) ?: 'A fast, secure community question and answer platform.';
+$defaultTitle = trim((string) ($securitySettings['default_meta_title'] ?? '')) ?: $site;
+$pageTitle = isset($title) ? (string) $title . ' | ' . $site : $defaultTitle;
+$defaultDescription = trim((string) ($securitySettings['default_meta_description'] ?? '')) ?: (trim((string) ($securitySettings['site_description'] ?? '')) ?: 'A fast, secure community question and answer platform.');
 $description = (string) ($metaDescription ?? $defaultDescription);
 $requestPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
 $canonicalUrl = (string) ($canonical ?? url($requestPath));
 $ogType = (string) ($ogType ?? 'website');
-$ogImage = isset($ogImage) ? (string) $ogImage : '';
+$defaultOgTitle = trim((string) ($securitySettings['default_og_title'] ?? ''));
+$defaultOgDescription = trim((string) ($securitySettings['default_og_description'] ?? ''));
+$hasPageTitle = isset($title) && trim((string) $title) !== '';
+$hasMetaDescription = isset($metaDescription) && trim((string) $metaDescription) !== '';
+$ogTitleContent = isset($ogTitle) ? (string) $ogTitle : ($hasPageTitle ? $pageTitle : ($defaultOgTitle !== '' ? $defaultOgTitle : $pageTitle));
+$ogDescriptionContent = isset($ogDescription) ? (string) $ogDescription : ($hasMetaDescription ? $description : ($defaultOgDescription !== '' ? $defaultOgDescription : $description));
+$defaultOgImagePath = safe_internal_path((string) (($securitySettings['default_og_image_path'] ?? '') ?: ''));
+if ($defaultOgImagePath !== '' && !str_starts_with($defaultOgImagePath, '/public-assets/images/social/')) {
+    $defaultOgImagePath = '';
+}
+$ogImage = isset($ogImage) ? (string) $ogImage : ($defaultOgImagePath !== '' ? url($defaultOgImagePath) : '');
+$ogImageWidth = 0;
+$ogImageHeight = 0;
+$ogImagePath = $ogImage !== '' ? safe_internal_path((string) (parse_url($ogImage, PHP_URL_PATH) ?: '')) : '';
+if ($ogImagePath !== '' && str_starts_with($ogImagePath, '/public-assets/images/')) {
+    $ogImageSize = is_file(BASE_PATH . $ogImagePath) ? @getimagesize(BASE_PATH . $ogImagePath) : false;
+    if (is_array($ogImageSize)) {
+        $ogImageWidth = (int) ($ogImageSize[0] ?? 0);
+        $ogImageHeight = (int) ($ogImageSize[1] ?? 0);
+    }
+}
+$ogImageAlt = trim((string) ($ogImageAlt ?? '')) ?: $ogTitleContent;
 $robotsContent = isset($robots) && is_string($robots) && trim($robots) !== '' ? trim($robots) : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
 $siteLogoPath = safe_internal_path((string) (($securitySettings['site_logo_path'] ?? '') ?: ''));
 if ($siteLogoPath !== '' && !str_starts_with($siteLogoPath, '/public-assets/images/logos/')) {
     $siteLogoPath = '';
+}
+$faviconPath = safe_internal_path((string) (($securitySettings['site_favicon_path'] ?? '') ?: ''));
+if ($faviconPath !== '' && !str_starts_with($faviconPath, '/public-assets/images/favicons/')) {
+    $faviconPath = '';
 }
 $assetUrl = static function (string $path): string {
     $file = BASE_PATH . $path;
@@ -50,16 +76,24 @@ if (isset($schemas) && is_array($schemas)) {
     <?php if (!empty($pagination['next'])): ?><link rel="next" href="<?= h(url((string) $pagination['next'])) ?>"><?php endif; ?>
     <?php if (isset($authorName) && is_string($authorName) && trim($authorName) !== ''): ?><meta name="author" content="<?= h($authorName) ?>"><?php endif; ?>
     <?php if (isset($keywords) && is_string($keywords) && trim($keywords) !== ''): ?><meta name="keywords" content="<?= h($keywords) ?>"><?php endif; ?>
-    <meta property="og:title" content="<?= h($pageTitle) ?>">
-    <meta property="og:description" content="<?= h($description) ?>">
+    <meta property="og:title" content="<?= h($ogTitleContent) ?>">
+    <meta property="og:description" content="<?= h($ogDescriptionContent) ?>">
     <meta property="og:type" content="<?= h($ogType) ?>">
     <meta property="og:url" content="<?= h($canonicalUrl) ?>">
     <meta property="og:site_name" content="<?= h((string) $site) ?>">
-    <meta name="twitter:title" content="<?= h($pageTitle) ?>">
-    <meta name="twitter:description" content="<?= h($description) ?>">
+    <meta name="twitter:title" content="<?= h($ogTitleContent) ?>">
+    <meta name="twitter:description" content="<?= h($ogDescriptionContent) ?>">
+    <?php if (trim((string) ($securitySettings['twitter_site'] ?? '')) !== ''): ?><meta name="twitter:site" content="<?= h((string) $securitySettings['twitter_site']) ?>"><?php endif; ?>
+    <?php if (trim((string) ($securitySettings['twitter_creator'] ?? '')) !== ''): ?><meta name="twitter:creator" content="<?= h((string) $securitySettings['twitter_creator']) ?>"><?php endif; ?>
     <?php if ($ogImage !== ''): ?>
         <meta property="og:image" content="<?= h($ogImage) ?>">
+        <?php if ($ogImageWidth > 0 && $ogImageHeight > 0): ?>
+            <meta property="og:image:width" content="<?= $ogImageWidth ?>">
+            <meta property="og:image:height" content="<?= $ogImageHeight ?>">
+        <?php endif; ?>
+        <meta property="og:image:alt" content="<?= h($ogImageAlt) ?>">
         <meta name="twitter:image" content="<?= h($ogImage) ?>">
+        <meta name="twitter:image:alt" content="<?= h($ogImageAlt) ?>">
     <?php endif; ?>
     <?php if ($ogType === 'article' && isset($publishedAt) && is_string($publishedAt) && strtotime($publishedAt) !== false): ?>
         <meta property="article:published_time" content="<?= h(date(DATE_ATOM, strtotime($publishedAt))) ?>">
@@ -71,6 +105,7 @@ if (isset($schemas) && is_array($schemas)) {
         <meta property="article:section" content="<?= h($sectionName) ?>">
     <?php endif; ?>
     <meta name="twitter:card" content="<?= $ogImage !== '' ? 'summary_large_image' : 'summary' ?>">
+    <?php if ($faviconPath !== ''): ?><link rel="icon" href="<?= h($faviconPath) ?>"><?php endif; ?>
     <link rel="preload" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>" as="style">
     <link rel="stylesheet" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>">
     <?php foreach ($schemaBlocks as $schemaBlock): ?>

@@ -64,7 +64,7 @@ return static function (Router $router): void {
     $router->post('/question/{slug}/comment', [QuestionController::class, 'commentQuestion'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/answer/{id}/comment', [QuestionController::class, 'commentAnswer'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/post/{type}/{id}/vote', [QuestionController::class, 'vote'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
-    $router->post('/post/{type}/{id}/react', [QuestionController::class, 'react'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
+    $router->post('/post/{type}/{id}/react', [QuestionController::class, 'react'], [AuthMiddleware::class, CsrfMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/answer/{id}/accept', [QuestionController::class, 'accept'], [CsrfMiddleware::class, AuthMiddleware::class]);
     $router->post('/flag/{type}/{id}', [QuestionController::class, 'flag'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
 

@@ -158,6 +158,10 @@ final readonly class SeoService
             'name' => $siteName,
             'url' => url('/'),
         ];
+        $logo = $this->internalSettingPath('site_logo_path', '/public-assets/images/logos/');
+        if ($logo !== '') {
+            $publisher['logo'] = url($logo);
+        }
 
         return $this->jsonLd([
             '@context' => 'https://schema.org',
@@ -787,7 +791,7 @@ final readonly class SeoService
     private function siteDescription(): string
     {
         try {
-            $configured = trim($this->settings->get('site_description'));
+            $configured = trim($this->settings->get('default_meta_description')) ?: trim($this->settings->get('site_description'));
             if ($configured !== '') {
                 return $configured;
             }
@@ -796,5 +800,16 @@ final readonly class SeoService
         }
 
         return 'A fast, secure community question and answer platform.';
+    }
+
+    private function internalSettingPath(string $key, string $prefix): string
+    {
+        try {
+            $path = safe_internal_path($this->settings->get($key));
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return $path !== '' && str_starts_with($path, $prefix) ? $path : '';
     }
 }

@@ -50,6 +50,23 @@ final readonly class UploadService
     }
 
     /** @param array<string, mixed> $file */
+    public function storeSocialImage(array $file, string $directory = 'public-assets/images/social'): string
+    {
+        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 2_000_000);
+        if (!isset($extensions[$mime])) {
+            throw new RuntimeException('Social sharing images must be JPG, PNG, WEBP, or GIF.');
+        }
+
+        $this->assertSafeImage($tmp, $mime);
+        $targetDir = $this->targetDirectory($directory);
+        $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
+        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
+
+        return '/' . trim($directory, '/') . '/' . $name;
+    }
+
+    /** @param array<string, mixed> $file */
     public function storeMedia(array $file, string $directory = 'public-assets/images/uploads'): string
     {
         ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 12_000_000);

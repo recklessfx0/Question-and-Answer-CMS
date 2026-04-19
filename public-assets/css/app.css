@@ -578,19 +578,43 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     margin: 0;
 }
 .admin-search-actions,
-.admin-user-danger-zone,
+.admin-user-controls {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
+    gap: 12px;
+    align-items: stretch;
+}
+.admin-user-control-panel {
+    display: grid;
+    gap: 10px;
+    align-content: space-between;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+}
+.admin-user-control-panel strong {
+    display: block;
+    margin-bottom: 2px;
+}
+.admin-user-control-panel form {
+    margin: 0;
+}
+.admin-user-control-panel button {
+    width: 100%;
+}
 .admin-delete-user-form {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(160px, auto) auto;
     gap: 8px;
     align-items: end;
-    flex-wrap: wrap;
-}
-.admin-delete-user-form {
-    margin: 0;
 }
 .admin-delete-user-form label {
-    min-width: min(100%, 220px);
     margin: 0;
+}
+.admin-delete-user-form .checkbox-label {
+    min-height: 42px;
+    align-content: center;
 }
 .ask-form {
     display: grid;
@@ -1357,7 +1381,8 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     font-size: 0.82rem;
 }
 .reaction-pill {
-    cursor: default;
+    cursor: pointer;
+    text-decoration: none;
 }
 .reaction-icon,
 .reaction-icon-admin,
@@ -2225,10 +2250,15 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .admin-record-actions,
     .admin-delete-form,
     .admin-action-row,
+    .admin-user-controls,
     .admin-search-actions,
     .admin-delete-user-form {
         align-items: stretch;
         flex-direction: column;
+    }
+    .admin-user-controls,
+    .admin-delete-user-form {
+        grid-template-columns: 1fr;
     }
     .admin-form-actions button,
     .admin-record-actions button,

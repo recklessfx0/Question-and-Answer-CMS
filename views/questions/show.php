@@ -62,7 +62,7 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
                     </button>
                 </form>
             <?php else: ?>
-                <span class="reaction-button reaction-pill" title="<?= h($name) ?>">
+                <a class="reaction-button reaction-pill" href="/register" title="<?= h($name) ?>">
                     <?php if ($iconPath !== ''): ?>
                         <?= uploaded_image($iconPath, 'reaction-icon', $name . ' reaction icon') ?>
                     <?php else: ?>
@@ -70,7 +70,7 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
                     <?php endif; ?>
                     <span><?= h($name) ?></span>
                     <strong><?= (int) ($reaction['count'] ?? 0) ?></strong>
-                </span>
+                </a>
             <?php endif; ?>
         <?php endforeach; ?>
     </div>

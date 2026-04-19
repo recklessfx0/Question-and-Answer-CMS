@@ -67,33 +67,45 @@ $authUserId = is_array($authUser ?? null) ? (int) ($authUser['id'] ?? 0) : 0;
                         </label>
                         <div class="admin-record-actions"><button type="submit">Set Role</button></div>
                     </form>
-                    <div class="admin-action-row admin-user-danger-zone">
+                    <div class="admin-user-controls">
                         <?php if (!$isSelf): ?>
-                            <?php if ($isBanned): ?>
-                                <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/unban">
-                                    <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/unban') ?>
+                            <div class="admin-user-control-panel">
+                                <div>
+                                    <strong><?= $isBanned ? 'Account banned' : 'Account active' ?></strong>
+                                    <p class="meta"><?= $isBanned ? 'Restore login access for this user.' : 'Block login access without deleting content.' ?></p>
+                                </div>
+                                <?php if ($isBanned): ?>
+                                    <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/unban">
+                                        <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/unban') ?>
+                                        <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
+                                        <button type="submit" class="button-secondary">Unban User</button>
+                                    </form>
+                                <?php else: ?>
+                                    <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/ban">
+                                        <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/ban') ?>
+                                        <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
+                                        <button type="submit" class="button-secondary">Ban User</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                            <div class="admin-user-control-panel admin-user-delete-panel">
+                                <div>
+                                    <strong>Delete account</strong>
+                                    <p class="meta">Choose whether to keep anonymized content or hide the user's posts.</p>
+                                </div>
+                                <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/delete" class="admin-delete-user-form">
+                                    <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/delete') ?>
                                     <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
-                                    <button type="submit" class="button-secondary">Unban User</button>
+                                    <label>Delete Mode
+                                        <select name="content_mode">
+                                            <option value="keep">Keep Content & Anonymize</option>
+                                            <option value="remove">Hide User Content</option>
+                                        </select>
+                                    </label>
+                                    <label class="checkbox-label"><input name="confirm_delete" type="checkbox" value="1" required> Confirm Delete</label>
+                                    <button type="submit" class="button-danger">Delete User</button>
                                 </form>
-                            <?php else: ?>
-                                <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/ban">
-                                    <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/ban') ?>
-                                    <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
-                                    <button type="submit" class="button-secondary">Ban User</button>
-                                </form>
-                            <?php endif; ?>
-                            <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/delete" class="admin-delete-user-form">
-                                <?= $csrf->field('/admin/users/' . (int) $user['id'] . '/delete') ?>
-                                <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
-                                <label>Delete Mode
-                                    <select name="content_mode">
-                                        <option value="keep">Keep Content & Anonymize</option>
-                                        <option value="remove">Hide User Content</option>
-                                    </select>
-                                </label>
-                                <label class="checkbox-label"><input name="confirm_delete" type="checkbox" value="1" required> Confirm Delete</label>
-                                <button type="submit" class="button-danger">Delete User</button>
-                            </form>
+                            </div>
                         <?php else: ?>
                             <p class="meta">You cannot ban or delete your own account.</p>
                         <?php endif; ?>

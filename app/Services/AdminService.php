@@ -282,16 +282,30 @@ final readonly class AdminService
         return $deleted !== null;
     }
 
-    /** @param array<string, string> $input */
-    /** @param array<string, mixed>|null $logo */
-    public function saveSettings(array $input, int $actorId, ?array $logo = null): void
+    /** @param array<string, string> $input @param array<string, array<string, mixed>|null> $uploads */
+    public function saveSettings(array $input, int $actorId, array $uploads = []): void
     {
         $before = $this->settings->all();
         $this->settings->set('site_title', excerpt($input['site_title'] ?? '', 80));
         $this->settings->set('site_url', normalize_site_url($input['site_url'] ?? ''));
-        $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 160));
-        if ($logo !== null && (int) ($logo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 200));
+        $this->settings->set('default_meta_title', excerpt($input['default_meta_title'] ?? '', 120));
+        $this->settings->set('default_meta_description', excerpt($input['default_meta_description'] ?? '', 200));
+        $this->settings->set('default_og_title', excerpt($input['default_og_title'] ?? '', 120));
+        $this->settings->set('default_og_description', excerpt($input['default_og_description'] ?? '', 200));
+        $this->settings->set('twitter_site', $this->socialHandle($input['twitter_site'] ?? ''));
+        $this->settings->set('twitter_creator', $this->socialHandle($input['twitter_creator'] ?? ''));
+        $logo = $uploads['site_logo'] ?? null;
+        if (is_array($logo) && (int) ($logo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $this->settings->set('site_logo_path', $this->uploads->storeLogo($logo));
+        }
+        $favicon = $uploads['site_favicon'] ?? null;
+        if (is_array($favicon) && (int) ($favicon['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $this->settings->set('site_favicon_path', $this->uploads->storeLogo($favicon, 'public-assets/images/favicons'));
+        }
+        $ogImage = $uploads['default_og_image'] ?? null;
+        if (is_array($ogImage) && (int) ($ogImage['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $this->settings->set('default_og_image_path', $this->uploads->storeSocialImage($ogImage));
         }
         $this->settings->set('recaptcha_enabled', ($input['recaptcha_enabled'] ?? '0') === '1' ? '1' : '0');
         $this->settings->set('recaptcha_site_key', excerpt($input['recaptcha_site_key'] ?? '', 255));
@@ -525,6 +539,20 @@ final readonly class AdminService
         $value = (string) preg_replace('/[^\P{C}\r\n\t]+/u', '', $value);
 
         return mb_strlen($value) <= $length ? $value : rtrim(mb_substr($value, 0, $length - 1)) . '...';
+    }
+
+    private function socialHandle(string $value): string
+    {
+        $value = trim(str_replace(["\0", "\r", "\n"], '', $value));
+        if ($value === '') {
+            return '';
+        }
+        $value = ltrim($value, '@');
+        if (!preg_match('/^[A-Za-z0-9_]{1,30}$/', $value)) {
+            return '';
+        }
+
+        return '@' . $value;
     }
 
     /** @param array<int, string> $keys @return array<int, string> */

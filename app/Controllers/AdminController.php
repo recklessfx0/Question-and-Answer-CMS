@@ -130,6 +130,12 @@ final class AdminController extends Controller
             'site_title' => $request->string('site_title', 100),
             'site_url' => $request->string('site_url', 255),
             'site_description' => $request->string('site_description', 200),
+            'default_meta_title' => $request->string('default_meta_title', 120),
+            'default_meta_description' => $request->string('default_meta_description', 200),
+            'default_og_title' => $request->string('default_og_title', 120),
+            'default_og_description' => $request->string('default_og_description', 200),
+            'twitter_site' => $request->string('twitter_site', 80),
+            'twitter_creator' => $request->string('twitter_creator', 80),
             'recaptcha_enabled' => (string) $request->int('recaptcha_enabled', 0, 0, 1),
             'recaptcha_site_key' => $request->string('recaptcha_site_key', 255),
             'recaptcha_secret_key' => $request->string('recaptcha_secret_key', 255),
@@ -144,7 +150,11 @@ final class AdminController extends Controller
             'smtp_password' => $request->string('smtp_password', 255),
             'smtp_from_email' => $request->string('smtp_from_email', 255),
             'smtp_from_name' => $request->string('smtp_from_name', 120),
-        ], (int) $this->session->get('user_id', 0), is_array($request->files['site_logo'] ?? null) ? $request->files['site_logo'] : null);
+        ], (int) $this->session->get('user_id', 0), [
+            'site_logo' => is_array($request->files['site_logo'] ?? null) ? $request->files['site_logo'] : null,
+            'site_favicon' => is_array($request->files['site_favicon'] ?? null) ? $request->files['site_favicon'] : null,
+            'default_og_image' => is_array($request->files['default_og_image'] ?? null) ? $request->files['default_og_image'] : null,
+        ]);
         return Response::redirect('/admin/settings');
     }
 
