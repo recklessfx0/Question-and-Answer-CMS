@@ -135,6 +135,36 @@ final readonly class LanguageModel
     }
 
     /** @param array<string, string> $defaults */
+    public function defaultTranslationsSeeded(array $defaults): bool
+    {
+        if ($defaults === []) {
+            return true;
+        }
+
+        $english = $this->findByCode('en');
+        if ($english === null) {
+            return false;
+        }
+
+        $params = [':language' => (int) $english['id']];
+        $placeholders = [];
+        foreach (array_keys($defaults) as $index => $key) {
+            $placeholder = ':translation_key_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = (string) $key;
+        }
+
+        $row = $this->db->fetch(
+            'SELECT COUNT(DISTINCT translation_key) AS total
+             FROM translations
+             WHERE language_id = :language AND translation_key IN (' . implode(',', $placeholders) . ')',
+            $params
+        );
+
+        return (int) ($row['total'] ?? 0) >= count($defaults);
+    }
+
+    /** @param array<string, string> $defaults */
     public function seedDefaults(array $defaults): void
     {
         $hasDefault = $this->db->fetch('SELECT id FROM languages WHERE is_default = 1 LIMIT 1') !== null;

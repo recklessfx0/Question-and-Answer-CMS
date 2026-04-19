@@ -227,9 +227,27 @@ final readonly class AdminService
         return $clean;
     }
 
-    public function setRole(int $userId, string $role): bool
+    public function setRole(int $userId, string $role, int $actorId): bool
     {
-        return $this->users->setRole($userId, $role);
+        if ($userId < 1) {
+            return false;
+        }
+
+        $target = $this->users->findById($userId);
+        if ($target === null || !empty($target['deleted_at'])) {
+            return false;
+        }
+
+        $oldRole = (string) ($target['role'] ?? '');
+        $updated = $this->users->setRole($userId, $role);
+        if ($updated && $oldRole !== $role) {
+            $this->audit->record($actorId, 'user_role_update', 'user', $userId, [
+                'old_role' => $oldRole,
+                'new_role' => $role,
+            ]);
+        }
+
+        return $updated;
     }
 
     public function setUserBan(int $userId, bool $banned, int $actorId): bool

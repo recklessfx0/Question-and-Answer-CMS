@@ -115,13 +115,58 @@ final readonly class QuestionService
 
         $userId = (int) $this->session->get('user_id');
         $id = $this->questions->comment($type, $postId, $userId, $body, $parentId);
+        $notifiedUserIds = [];
         if ($type === 'question') {
             $question = $this->questions->findSummaryById($postId);
             if ($question !== null) {
-                $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) $question['title'], '/question/' . (string) $question['slug'] . '#comment-' . $id);
+                $url = '/question/' . (string) $question['slug'] . '#comment-' . $id;
+                $notifiedUserIds = $this->notifyUser(
+                    (int) $question['user_id'],
+                    $userId,
+                    'Clarification',
+                    'A new clarification was posted on ' . (string) $question['title'],
+                    $url,
+                    $notifiedUserIds
+                );
+                if ($parentId !== null) {
+                    $parent = $this->questions->findComment($parentId);
+                    if ($parent !== null) {
+                        $notifiedUserIds = $this->notifyUser(
+                            (int) $parent['user_id'],
+                            $userId,
+                            'Clarification reply',
+                            'A new reply was posted in a clarification thread on ' . (string) $question['title'],
+                            $url,
+                            $notifiedUserIds
+                        );
+                    }
+                }
+                $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) $question['title'], $url, $notifiedUserIds);
             }
         } elseif (isset($answer) && is_array($answer)) {
-            $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) ($answer['question_title'] ?? 'a question'), '/question/' . (string) $answer['question_slug'] . '#comment-' . $id);
+            $url = '/question/' . (string) $answer['question_slug'] . '#comment-' . $id;
+            $notifiedUserIds = $this->notifyUser(
+                (int) $answer['user_id'],
+                $userId,
+                'Clarification',
+                'A new clarification was posted on your answer to ' . (string) ($answer['question_title'] ?? 'a question'),
+                $url,
+                $notifiedUserIds
+            );
+            if ($parentId !== null) {
+                $parent = $this->questions->findComment($parentId);
+                if ($parent !== null) {
+                    $notifiedUserIds = $this->notifyUser(
+                        (int) $parent['user_id'],
+                        $userId,
+                        'Clarification reply',
+                        'A new reply was posted in a clarification thread on ' . (string) ($answer['question_title'] ?? 'a question'),
+                        $url,
+                        $notifiedUserIds
+                    );
+                }
+            }
+            $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) ($answer['question_title'] ?? 'a question'), $url, $notifiedUserIds);
         }
         $this->gamification->award($userId, 1, 'clarification_created', 'comment', $id);
         return true;
@@ -146,6 +191,17 @@ final readonly class QuestionService
 
         if ((int) ($result['reputation_delta'] ?? 0) !== 0) {
             $this->gamification->award((int) $result['user_id'], (int) $result['reputation_delta'], $type . '_vote', $type, $postId);
+        }
+        $voteLabel = (int) ($result['current_vote'] ?? 0) > 0 ? 'upvote' : 'downvote';
+        $url = $this->postUrl($type, $postId);
+        if ($url !== '') {
+            $this->notifyUser(
+                (int) $result['user_id'],
+                $userId,
+                'Vote',
+                'Your ' . $type . ' received an ' . $voteLabel . '.',
+                $url
+            );
         }
 
         return [
@@ -305,9 +361,13 @@ final readonly class QuestionService
         return false;
     }
 
-    private function notifyMentions(string $body, int $authorId, string $type, string $message, string $url): void
+    /** @param array<int, bool> $skipUserIds */
+    private function notifyMentions(string $body, int $authorId, string $type, string $message, string $url, array $skipUserIds = []): void
     {
         foreach ($this->mentionedUsers($body, $authorId) as $user) {
+            if (isset($skipUserIds[(int) $user['id']])) {
+                continue;
+            }
             $this->queue->push('MentionNotification', [
                 'user_id' => (int) $user['id'],
                 'type' => $type,
@@ -341,6 +401,49 @@ final readonly class QuestionService
         }
 
         return array_values($users);
+    }
+
+    /** @param array<int, bool> $alreadyNotified @return array<int, bool> */
+    private function notifyUser(int $targetUserId, int $actorUserId, string $type, string $message, string $url, array $alreadyNotified = []): array
+    {
+        if ($targetUserId < 1 || $targetUserId === $actorUserId || isset($alreadyNotified[$targetUserId])) {
+            return $alreadyNotified;
+        }
+
+        $this->queue->push('MentionNotification', [
+            'user_id' => $targetUserId,
+            'type' => $type,
+            'message' => $message,
+            'url' => $url,
+        ]);
+        $alreadyNotified[$targetUserId] = true;
+
+        return $alreadyNotified;
+    }
+
+    private function postUrl(string $type, int $postId): string
+    {
+        if ($type === 'question') {
+            $question = $this->questions->findSummaryById($postId);
+            return $question === null ? '' : '/question/' . (string) $question['slug'];
+        }
+
+        if ($type === 'answer') {
+            $answer = $this->questions->findAnswer($postId);
+            return $answer === null ? '' : '/question/' . (string) $answer['question_slug'] . '#answer-' . $postId;
+        }
+
+        if ($type === 'comment') {
+            $comment = $this->questions->findComment($postId);
+            if ($comment === null) {
+                return '';
+            }
+            $slug = (string) ($comment['question_slug'] ?: $comment['answer_question_slug']);
+
+            return $slug === '' ? '' : '/question/' . $slug . '#comment-' . $postId;
+        }
+
+        return '';
     }
 
     private function mentionSearchText(string $body): string

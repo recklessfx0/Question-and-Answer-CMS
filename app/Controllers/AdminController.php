@@ -92,7 +92,7 @@ final class AdminController extends Controller
     /** @param array<string, string> $params */
     public function setRole(Request $request, array $params): Response
     {
-        $updated = $this->admin->setRole((int) ($params['id'] ?? 0), $request->string('role', 30));
+        $updated = $this->admin->setRole((int) ($params['id'] ?? 0), $request->string('role', 30), (int) $this->session->get('user_id', 0));
         $this->flash($updated ? 'success' : 'error', $updated ? 'User role updated.' : 'At least one administrator must remain.');
         return Response::redirect($this->adminRedirect($request, '/admin/users'));
     }

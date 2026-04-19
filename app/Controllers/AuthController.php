@@ -188,7 +188,11 @@ final class AuthController extends Controller
 
     public function googleCallback(Request $request): Response
     {
-        if (!$this->googleAuth->handleCallback($request->string('code', 4096), $request->string('state', 256))) {
+        $result = $this->googleAuth->handleCallback($request->string('code', 4096), $request->string('state', 256));
+        if ($result === 'two_factor') {
+            return $this->redirect('/two-factor');
+        }
+        if ($result !== 'ok') {
             $this->flash('error', 'Google sign-in could not be completed.');
             return $this->redirect('/login');
         }

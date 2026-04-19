@@ -8,16 +8,20 @@ use RuntimeException;
 
 final class Queue
 {
+    private const MAX_ATTEMPTS = 5;
+
     private string $pendingPath;
     private string $processingPath;
+    private string $failedPath;
 
     public function __construct(private readonly string $path)
     {
         $root = rtrim($path, '/\\');
         $this->pendingPath = $root . DIRECTORY_SEPARATOR . 'pending';
         $this->processingPath = $root . DIRECTORY_SEPARATOR . 'processing';
+        $this->failedPath = $root . DIRECTORY_SEPARATOR . 'failed';
 
-        foreach ([$root, $this->pendingPath, $this->processingPath] as $directory) {
+        foreach ([$root, $this->pendingPath, $this->processingPath, $this->failedPath] as $directory) {
             if (!is_dir($directory)) {
                 mkdir($directory, 0750, true);
             }
@@ -80,7 +84,11 @@ final class Queue
     {
         $file = (string) ($job['__queue_file'] ?? '');
         if ($file !== '' && is_file($file)) {
-            unlink($file);
+            if (@unlink($file)) {
+                return;
+            }
+
+            @rename($file, $this->failedPath . DIRECTORY_SEPARATOR . 'completed-' . basename($file));
         }
     }
 
@@ -94,17 +102,24 @@ final class Queue
 
         $payload = json_decode((string) file_get_contents($file), true);
         if (!is_array($payload)) {
-            unlink($file);
+            @unlink($file);
             return;
         }
 
         $attempts = (int) ($payload['attempts'] ?? 0) + 1;
         $payload['attempts'] = $attempts;
-        $payload['available_at'] = time() + ($delaySeconds ?? min(300, 5 * (2 ** min(6, $attempts - 1))));
         if ($error !== null && $error !== '') {
-            $payload['last_error'] = mb_substr(str_replace("\0", '', $error), 0, 500);
+            $payload['last_error'] = substr(str_replace("\0", '', $error), 0, 500);
         }
 
+        if ($attempts >= self::MAX_ATTEMPTS) {
+            $payload['failed_at'] = date(DATE_ATOM);
+            file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR), LOCK_EX);
+            @rename($file, $this->failedPath . DIRECTORY_SEPARATOR . basename($file));
+            return;
+        }
+
+        $payload['available_at'] = time() + ($delaySeconds ?? min(300, 5 * (2 ** min(6, $attempts - 1))));
         file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR), LOCK_EX);
         @rename($file, $this->pendingPath . DIRECTORY_SEPARATOR . basename($file));
     }

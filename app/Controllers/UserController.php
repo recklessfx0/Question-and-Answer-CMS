@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Models\AuditLogModel;
 use App\Models\QuestionModel;
 use App\Models\UserModel;
 use App\Services\GamificationService;
@@ -34,6 +35,7 @@ final class UserController extends Controller
         private readonly GamificationService $gamification,
         private readonly SeoService $seo,
         private readonly TwoFactorService $twoFactor,
+        private readonly AuditLogModel $audit,
     )
     {
         parent::__construct($view, $session, $csrf);
@@ -181,6 +183,7 @@ final class UserController extends Controller
         }
 
         $this->users->enableTwoFactor((int) $user['id']);
+        $this->audit->record((int) $user['id'], 'two_factor_enable', 'user', (int) $user['id']);
         $this->flash('success', 'Two-factor authentication enabled.');
 
         return $this->redirect('/settings/profile');
@@ -199,6 +202,7 @@ final class UserController extends Controller
         }
 
         $this->users->disableTwoFactor((int) $user['id']);
+        $this->audit->record((int) $user['id'], 'two_factor_disable', 'user', (int) $user['id']);
         $this->flash('success', 'Two-factor authentication disabled.');
 
         return $this->redirect('/settings/profile');

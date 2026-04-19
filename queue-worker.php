@@ -32,6 +32,30 @@ $redactedJob = static function (array $job): array {
     return $copy;
 };
 
+$isStaleNotification = static function (array $job): bool {
+    $name = (string) ($job['job'] ?? '');
+    if (!in_array($name, ['AnswerPostedNotification', 'NotifyModerators', 'MentionNotification'], true)) {
+        return false;
+    }
+
+    $createdAt = strtotime((string) ($job['created_at'] ?? ''));
+    if ($createdAt === false) {
+        return false;
+    }
+
+    return $createdAt < time() - 604800;
+};
+
+$logProcessed = static function (array $job) use ($redactedJob): void {
+    try {
+        $encoded = json_encode($redactedJob($job), JSON_THROW_ON_ERROR);
+    } catch (\Throwable) {
+        $encoded = '{"job":"log_encoding_failed"}';
+    }
+
+    @file_put_contents(STORAGE_PATH . '/logs/queue.log', '[' . date(DATE_ATOM) . '] processed ' . $encoded . PHP_EOL, FILE_APPEND | LOCK_EX);
+};
+
 while (true) {
     $job = $queue->pop();
     if ($job === null) {
@@ -48,6 +72,12 @@ while (true) {
         $knownJobs = ['SendEmailVerification', 'SendPasswordReset', 'AnswerPostedNotification', 'NotifyModerators', 'MentionNotification'];
         if (!in_array($name, $knownJobs, true)) {
             throw new RuntimeException("Unknown job name: {$name}");
+        }
+
+        if ($isStaleNotification($job)) {
+            $queue->complete($job);
+            $logProcessed($job + ['skipped' => 'stale_notification']);
+            continue;
         }
 
         if ($name === 'SendEmailVerification') {
@@ -68,9 +98,10 @@ while (true) {
         }
 
         if ($name === 'AnswerPostedNotification') {
-            $question = $database->fetch('SELECT user_id, slug, title FROM questions WHERE id = :id LIMIT 1', [':id' => (int) $payload['question_id']]);
-            if ($question !== null) {
-                $notifications->create((int) $question['user_id'], 'New answer', ['message' => 'A new answer was posted on ' . (string) $question['title'], 'url' => '/question/' . (string) $question['slug']]);
+            $question = $database->fetch('SELECT user_id, slug, title FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => (int) $payload['question_id']]);
+            $answer = $database->fetch('SELECT id, question_id, user_id FROM answers WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => (int) ($payload['answer_id'] ?? 0)]);
+            if ($question !== null && $answer !== null && (int) $answer['question_id'] === (int) $payload['question_id'] && (int) $answer['user_id'] !== (int) $question['user_id']) {
+                $notifications->create((int) $question['user_id'], 'New answer', ['message' => 'A new answer was posted on ' . (string) $question['title'], 'url' => '/question/' . (string) $question['slug'] . '#answer-' . (int) $answer['id']]);
             }
         }
 
@@ -91,9 +122,8 @@ while (true) {
             );
         }
 
-        // Log before completing so a log-write failure surfaces as a retry rather than silent loss
-        file_put_contents(STORAGE_PATH . '/logs/queue.log', '[' . date(DATE_ATOM) . '] processed ' . json_encode($redactedJob($job), JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
         $queue->complete($job);
+        $logProcessed($job);
     } catch (\Throwable $e) {
         $queue->release($job, $e->getMessage());
         $logger->error($e);

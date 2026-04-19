@@ -324,16 +324,171 @@ final readonly class UploadService
         }
 
         $lower = strtolower($contents);
-        foreach (['<script', 'javascript:', 'data:text/html', 'data:application', 'onload=', 'onerror=', 'onclick=', 'onmouseover=', '<foreignobject', '<iframe', '<object', '<embed'] as $needle) {
+        foreach (['<script', '<!doctype', '<!entity', 'javascript:', 'vbscript:', 'data:', '<foreignobject', '<iframe', '<object', '<embed'] as $needle) {
             if (str_contains($lower, $needle)) {
                 throw new RuntimeException('SVG contains unsafe content.');
             }
         }
+        if (preg_match('/\son[a-z0-9_-]+\s*=/i', $contents) === 1) {
+            throw new RuntimeException('SVG contains unsafe content.');
+        }
 
-        $xml = simplexml_load_string($contents);
+        $previous = libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($contents, \SimpleXMLElement::class, LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
         if (!$xml instanceof \SimpleXMLElement || strtolower((string) $xml->getName()) !== 'svg') {
             throw new RuntimeException('Upload is not a valid SVG.');
         }
+
+        $this->assertSafeSvgElement($xml);
+    }
+
+    private function assertSafeSvgElement(\SimpleXMLElement $element): void
+    {
+        $allowedElements = [
+            'svg' => true,
+            'g' => true,
+            'path' => true,
+            'rect' => true,
+            'circle' => true,
+            'ellipse' => true,
+            'line' => true,
+            'polyline' => true,
+            'polygon' => true,
+            'text' => true,
+            'tspan' => true,
+            'defs' => true,
+            'lineargradient' => true,
+            'radialgradient' => true,
+            'stop' => true,
+            'clippath' => true,
+            'mask' => true,
+            'title' => true,
+            'desc' => true,
+        ];
+        $name = $this->svgLocalName((string) $element->getName());
+        if (!isset($allowedElements[$name])) {
+            throw new RuntimeException('SVG contains unsupported content.');
+        }
+
+        foreach ($this->svgAttributes($element) as $attribute => $value) {
+            $this->assertSafeSvgAttribute($attribute, $value);
+        }
+
+        foreach ($element->children() as $child) {
+            $this->assertSafeSvgElement($child);
+        }
+        foreach ($element->getDocNamespaces(true) as $namespace) {
+            foreach ($element->children($namespace, true) as $child) {
+                $this->assertSafeSvgElement($child);
+            }
+        }
+    }
+
+    /** @return array<string, string> */
+    private function svgAttributes(\SimpleXMLElement $element): array
+    {
+        $attributes = [];
+        foreach ($element->attributes() as $name => $value) {
+            $attributes[$this->svgLocalName((string) $name)] = (string) $value;
+        }
+        foreach ($element->getDocNamespaces(true) as $namespace) {
+            foreach ($element->attributes($namespace, true) as $name => $value) {
+                $attributes[$this->svgLocalName((string) $name)] = (string) $value;
+            }
+        }
+
+        return $attributes;
+    }
+
+    private function assertSafeSvgAttribute(string $attribute, string $value): void
+    {
+        $allowedAttributes = [
+            'id' => true,
+            'class' => true,
+            'version' => true,
+            'xmlns' => true,
+            'viewbox' => true,
+            'preserveaspectratio' => true,
+            'width' => true,
+            'height' => true,
+            'x' => true,
+            'y' => true,
+            'x1' => true,
+            'y1' => true,
+            'x2' => true,
+            'y2' => true,
+            'cx' => true,
+            'cy' => true,
+            'r' => true,
+            'rx' => true,
+            'ry' => true,
+            'd' => true,
+            'points' => true,
+            'fill' => true,
+            'stroke' => true,
+            'stroke-width' => true,
+            'stroke-linecap' => true,
+            'stroke-linejoin' => true,
+            'stroke-miterlimit' => true,
+            'stroke-dasharray' => true,
+            'stroke-dashoffset' => true,
+            'opacity' => true,
+            'fill-opacity' => true,
+            'stroke-opacity' => true,
+            'transform' => true,
+            'aria-label' => true,
+            'role' => true,
+            'focusable' => true,
+            'space' => true,
+            'fill-rule' => true,
+            'clip-rule' => true,
+            'offset' => true,
+            'stop-color' => true,
+            'stop-opacity' => true,
+            'gradientunits' => true,
+            'gradienttransform' => true,
+            'clip-path' => true,
+            'mask' => true,
+            'href' => true,
+        ];
+        if (!isset($allowedAttributes[$attribute]) || str_starts_with($attribute, 'on')) {
+            throw new RuntimeException('SVG contains unsupported attributes.');
+        }
+
+        $decoded = strtolower(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if (
+            preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $decoded) === 1
+            || str_contains($decoded, 'javascript:')
+            || str_contains($decoded, 'vbscript:')
+            || str_contains($decoded, 'data:')
+            || str_contains($decoded, 'http://')
+            || str_contains($decoded, 'https://')
+            || str_contains($decoded, '//')
+        ) {
+            throw new RuntimeException('SVG contains unsafe attributes.');
+        }
+
+        if ($attribute === 'href' && !str_starts_with(trim($decoded), '#')) {
+            throw new RuntimeException('SVG contains unsafe references.');
+        }
+        if (preg_match_all('/url\s*\(([^)]*)\)/i', $decoded, $matches) > 0) {
+            foreach ($matches[1] as $reference) {
+                $reference = trim((string) $reference, " \t\n\r\0\x0B'\"");
+                if (!str_starts_with($reference, '#')) {
+                    throw new RuntimeException('SVG contains unsafe references.');
+                }
+            }
+        }
+    }
+
+    private function svgLocalName(string $name): string
+    {
+        $name = strtolower($name);
+        $parts = explode(':', $name);
+
+        return (string) end($parts);
     }
 
     private function targetDirectory(string $directory): string

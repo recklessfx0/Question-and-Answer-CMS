@@ -48,24 +48,24 @@ final readonly class GoogleAuthService
         ]);
     }
 
-    public function handleCallback(string $code, string $state): bool
+    public function handleCallback(string $code, string $state): string
     {
         if (!$this->enabled() || $code === '' || $state === '') {
-            return false;
+            return 'failed';
         }
 
         if (!$this->consumeOauthState($state)) {
-            return false;
+            return 'failed';
         }
 
         $token = $this->token($code);
         if ($token === null || !isset($token['access_token'])) {
-            return false;
+            return 'failed';
         }
 
         $profile = $this->profile((string) $token['access_token']);
         if ($profile === null || ($profile['email_verified'] ?? false) !== true || empty($profile['email'])) {
-            return false;
+            return 'failed';
         }
 
         $email = mb_strtolower((string) $profile['email']);
@@ -79,20 +79,31 @@ final readonly class GoogleAuthService
             $hash = password_hash(bin2hex(random_bytes(32)), PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1]);
             $id = $this->createGoogleUser($name, $email, $hash);
             if ($id === null) {
-                return false;
+                return 'failed';
             }
             $this->users->markEmailVerified($id);
             $user = $this->users->findSessionStateById($id);
         } else {
             if (!empty($user['deleted_at']) || !empty($user['banned_at'])) {
-                return false;
+                return 'failed';
             }
             $this->users->markEmailVerified((int) $user['id']);
             $user = $this->users->findSessionStateById((int) $user['id']);
         }
 
         if ($user === null || !empty($user['deleted_at']) || !empty($user['banned_at'])) {
-            return false;
+            return 'failed';
+        }
+
+        if (($user['role'] ?? '') === 'administrator') {
+            $secureUser = $this->users->findByIdWithSecurity((int) $user['id']);
+            if ($secureUser !== null && !empty($secureUser['two_factor_enabled_at']) && !empty($secureUser['two_factor_secret'])) {
+                $this->session->regenerate();
+                $this->session->set('two_factor_user_id', (int) $secureUser['id']);
+                $this->session->set('two_factor_started_at', time());
+
+                return 'two_factor';
+            }
         }
 
         $this->users->updateLastLogin((int) $user['id']);
@@ -104,7 +115,7 @@ final readonly class GoogleAuthService
         }
         $this->session->set('user', $user);
 
-        return true;
+        return 'ok';
     }
 
     private function redirectUri(): string

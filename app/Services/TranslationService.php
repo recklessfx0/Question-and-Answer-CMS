@@ -27,7 +27,9 @@ final class TranslationService
     public function boot(Request $request): void
     {
         try {
-            $this->languages->seedDefaults($this->defaults);
+            if (!$this->languages->defaultTranslationsSeeded($this->defaults)) {
+                $this->languages->seedDefaults($this->defaults);
+            }
             $active = $this->languages->all(true);
             $default = $this->languages->defaultLanguage();
             $this->languageCode = $this->chooseLanguage($request, $active, is_array($default) ? (string) $default['code'] : 'en');

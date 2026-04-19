@@ -30,6 +30,24 @@ $assert(str_contains($imageHtml, '<img src="/public-assets/images/uploads/demo.w
 $mentionAltHtml = $markdown->toHtml('![hi @alice](/public-assets/images/uploads/demo.webp)');
 $assert(str_contains($mentionAltHtml, 'alt="hi @alice"'), 'Markdown should not render mentions inside image alt text.');
 
+$uploadService = new \App\Services\UploadService();
+$svgGuard = new ReflectionMethod($uploadService, 'assertSafeSvg');
+$safeSvg = tempnam(sys_get_temp_dir(), 'safe-svg-');
+file_put_contents((string) $safeSvg, '<svg viewBox="0 0 10 10"><path d="M1 1L9 9" stroke="currentColor"/></svg>');
+$svgGuard->invoke($uploadService, (string) $safeSvg);
+$assert(true, 'Safe SVG uploads should be accepted.');
+@unlink((string) $safeSvg);
+$unsafeSvg = tempnam(sys_get_temp_dir(), 'unsafe-svg-');
+file_put_contents((string) $unsafeSvg, '<svg viewBox="0 0 10 10"><path onload = "alert(1)" d="M1 1L9 9"/></svg>');
+$svgRejected = false;
+try {
+    $svgGuard->invoke($uploadService, (string) $unsafeSvg);
+} catch (Throwable) {
+    $svgRejected = true;
+}
+$assert($svgRejected, 'SVG uploads should reject spaced event handlers.');
+@unlink((string) $unsafeSvg);
+
 $validator = (new \Core\Validator())->email('email', 'not-an-email');
 $assert(!$validator->passes(), 'Validator should reject invalid email.');
 
@@ -58,6 +76,13 @@ if (is_array($retried)) {
     $queue->complete($retried);
 }
 $assert($queue->pop() === null, 'Completed queue jobs should be removed.');
+$queue->push('PoisonJob', ['value' => 2]);
+$poison = $queue->pop();
+for ($attempt = 0; $attempt < 5; $attempt++) {
+    $queue->release(is_array($poison) ? $poison : [], 'Broken job', 0);
+    $poison = $queue->pop();
+}
+$assert($poison === null, 'Poison queue jobs should stop retrying after the max attempts.');
 
 $cleanup = static function (string $path) use (&$cleanup): void {
     if (!is_dir($path)) {

@@ -190,7 +190,7 @@ final class ReactionModel
         return $row === null ? null : (int) $row['user_id'];
     }
 
-    /** @return array{target_user_id: int, reputation_delta: int, slug: string}|null */
+    /** @return array{target_user_id: int, reputation_delta: int, slug: string, added: bool, post_title: string, question_slug: string}|null */
     public function toggleForUser(int $userId, string $postType, int $postId, int $reactionTypeId): ?array
     {
         $this->ensureSchema();
@@ -228,21 +228,26 @@ final class ReactionModel
                 [':user' => $userId, ':post_type' => $postType, ':post' => $postId, ':reaction' => $reactionTypeId]
             );
 
+            $changed = false;
             $delta = 0;
+            $added = false;
             if ($existing !== null) {
-                $delta = $this->db->query(
+                $changed = $this->db->query(
                     'DELETE FROM post_reactions WHERE id = :id',
                     [':id' => (int) $existing['id']]
-                )->rowCount() > 0 ? -1 * (int) $type['reputation_delta'] : 0;
+                )->rowCount() > 0;
+                $delta = $changed ? -1 * (int) $type['reputation_delta'] : 0;
             } else {
-                $delta = $this->db->query(
+                $changed = $this->db->query(
                     'INSERT INTO post_reactions (user_id, reaction_type_id, post_type, post_id, target_user_id, created_at, updated_at)
                      VALUES (:user, :reaction, :post_type, :post, :target_user, NOW(), NOW())',
                     [':user' => $userId, ':reaction' => $reactionTypeId, ':post_type' => $postType, ':post' => $postId, ':target_user' => $targetUserId]
-                )->rowCount() > 0 ? (int) $type['reputation_delta'] : 0;
+                )->rowCount() > 0;
+                $delta = $changed ? (int) $type['reputation_delta'] : 0;
+                $added = $changed;
             }
 
-            if ($delta === 0) {
+            if (!$changed) {
                 return null;
             }
 
@@ -250,6 +255,9 @@ final class ReactionModel
                 'target_user_id' => $targetUserId,
                 'reputation_delta' => $delta,
                 'slug' => (string) $type['slug'],
+                'added' => $added,
+                'post_title' => (string) ($target['post_title'] ?? ''),
+                'question_slug' => (string) ($target['question_slug'] ?? ''),
             ];
         });
     }
@@ -270,8 +278,8 @@ final class ReactionModel
         $lock = $forUpdate ? ' FOR UPDATE' : '';
 
         return match ($postType) {
-            'question' => $this->db->fetch('SELECT user_id FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
-            'answer' => $this->db->fetch('SELECT a.user_id FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
+            'question' => $this->db->fetch('SELECT user_id, title AS post_title, slug AS question_slug FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
+            'answer' => $this->db->fetch('SELECT a.user_id, q.title AS post_title, q.slug AS question_slug FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
             default => null,
         };
     }
