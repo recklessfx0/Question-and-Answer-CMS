@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Services\AuthService;
 use App\Services\GoogleAuthService;
 use App\Services\RecaptchaService;
+use App\Services\TwoFactorService;
 use Core\Controller;
 use Core\Csrf;
 use Core\Request;
@@ -23,6 +24,7 @@ final class AuthController extends Controller
         private readonly AuthService $auth,
         private readonly RecaptchaService $recaptcha,
         private readonly GoogleAuthService $googleAuth,
+        private readonly TwoFactorService $twoFactor,
     ) {
         parent::__construct($view, $session, $csrf);
     }
@@ -114,9 +116,36 @@ final class AuthController extends Controller
             return $this->redirect('/login');
         }
 
-        if (!$this->auth->login($request->string('email', 180), $request->string('password', 128))) {
-            $this->flash('error', 'Invalid email or password.');
+        $result = $this->auth->login($request->string('email', 180), $request->string('password', 128));
+        if ($result === 'two_factor') {
+            return $this->redirect('/two-factor');
+        }
+        if ($result !== 'ok') {
+            $this->flash('error', $result === 'locked' ? 'Too many attempts. Try again later.' : 'Invalid email or password.');
             return $this->redirect('/login');
+        }
+
+        return $this->redirect('/');
+    }
+
+    public function twoFactorForm(): Response
+    {
+        if ((int) $this->session->get('two_factor_user_id', 0) < 1) {
+            return $this->redirect('/login');
+        }
+
+        return $this->view('auth/two-factor', [
+            'title' => 'Two-Factor Verification',
+            'metaDescription' => 'Complete administrator two-factor verification.',
+            'robots' => 'noindex,follow',
+        ]);
+    }
+
+    public function twoFactor(Request $request): Response
+    {
+        if (!$this->auth->completeTwoFactor($request->string('code', 16), $this->twoFactor)) {
+            $this->flash('error', 'Verification code is invalid or expired.');
+            return $this->redirect('/two-factor');
         }
 
         return $this->redirect('/');

@@ -82,6 +82,11 @@ final readonly class RateLimiter
         }
     }
 
+    public function attemptCount(string $bucket, string $identifier, int $seconds): int
+    {
+        return count($this->hits($bucket, $identifier, $seconds));
+    }
+
     /** @return array<int, int> */
     private function hits(string $bucket, string $identifier, int $seconds): array
     {

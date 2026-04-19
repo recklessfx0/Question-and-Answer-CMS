@@ -50,8 +50,9 @@ final readonly class AdminService
     }
 
     /** @param array<string, string> $input */
-    public function saveSettings(array $input): void
+    public function saveSettings(array $input, int $actorId): void
     {
+        $before = $this->settings->all();
         $this->settings->set('site_title', excerpt($input['site_title'] ?? '', 80));
         $this->settings->set('site_url', normalize_site_url($input['site_url'] ?? ''));
         $this->settings->set('site_description', excerpt($input['site_description'] ?? '', 160));
@@ -77,6 +78,30 @@ final readonly class AdminService
         $this->settings->set('google_client_id', excerpt($input['google_client_id'] ?? '', 255));
         if (trim($input['google_client_secret'] ?? '') !== '') {
             $this->settings->set('google_client_secret', excerpt($input['google_client_secret'] ?? '', 255));
+        }
+
+        $this->settings->set('smtp_enabled', ($input['smtp_enabled'] ?? '0') === '1' ? '1' : '0');
+        $this->settings->set('smtp_host', excerpt($input['smtp_host'] ?? '', 255));
+        $this->settings->set('smtp_port', (string) max(1, min(65535, (int) ($input['smtp_port'] ?? 587))));
+        $encryption = strtolower(trim($input['smtp_encryption'] ?? 'tls'));
+        $this->settings->set('smtp_encryption', in_array($encryption, ['tls', 'ssl', 'none'], true) ? $encryption : 'tls');
+        $this->settings->set('smtp_username', excerpt($input['smtp_username'] ?? '', 255));
+        if (trim($input['smtp_password'] ?? '') !== '') {
+            $this->settings->set('smtp_password', excerpt($input['smtp_password'] ?? '', 255));
+        }
+        $fromEmail = filter_var(trim($input['smtp_from_email'] ?? ''), FILTER_VALIDATE_EMAIL);
+        $this->settings->set('smtp_from_email', is_string($fromEmail) ? $fromEmail : '');
+        $this->settings->set('smtp_from_name', excerpt($input['smtp_from_name'] ?? '', 120));
+
+        $after = $this->settings->all();
+        $changed = [];
+        foreach ($after as $key => $value) {
+            if (($before[$key] ?? null) !== $value) {
+                $changed[] = $key;
+            }
+        }
+        if ($changed !== []) {
+            $this->audit->record($actorId, 'settings_update', 'settings', 0, ['changed_keys' => $this->redactedSettingKeys($changed)]);
         }
     }
 
@@ -246,5 +271,15 @@ final readonly class AdminService
         $value = (string) preg_replace('/[^\P{C}\r\n\t]+/u', '', $value);
 
         return mb_strlen($value) <= $length ? $value : rtrim(mb_substr($value, 0, $length - 1)) . '...';
+    }
+
+    /** @param array<int, string> $keys @return array<int, string> */
+    private function redactedSettingKeys(array $keys): array
+    {
+        sort($keys);
+        return array_values(array_map(
+            static fn (string $key): string => str_contains($key, 'secret') || str_contains($key, 'password') ? $key . ':redacted' : $key,
+            array_unique($keys)
+        ));
     }
 }

@@ -97,7 +97,15 @@ final class AdminController extends Controller
             'google_auth_enabled' => (string) $request->int('google_auth_enabled', 0, 0, 1),
             'google_client_id' => $request->string('google_client_id', 255),
             'google_client_secret' => $request->string('google_client_secret', 255),
-        ]);
+            'smtp_enabled' => (string) $request->int('smtp_enabled', 0, 0, 1),
+            'smtp_host' => $request->string('smtp_host', 255),
+            'smtp_port' => (string) $request->int('smtp_port', 587, 1, 65535),
+            'smtp_encryption' => $request->string('smtp_encryption', 10),
+            'smtp_username' => $request->string('smtp_username', 255),
+            'smtp_password' => $request->string('smtp_password', 255),
+            'smtp_from_email' => $request->string('smtp_from_email', 255),
+            'smtp_from_name' => $request->string('smtp_from_name', 120),
+        ], (int) $this->session->get('user_id', 0));
         return Response::redirect('/admin/settings');
     }
 

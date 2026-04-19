@@ -68,12 +68,12 @@ if (isset($schemas) && is_array($schemas)) {
     <link rel="preload" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>" as="style">
     <link rel="stylesheet" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>">
     <?php foreach ($schemaBlocks as $schemaBlock): ?>
-        <script type="application/ld+json"><?= str_replace(['</', '<', '>'], ['\u003C/', '\u003C', '\u003E'], (string) $schemaBlock) ?></script>
+        <script type="application/ld+json" nonce="<?= h(csp_nonce()) ?>"><?= str_replace(['</', '<', '>'], ['\u003C/', '\u003C', '\u003E'], (string) $schemaBlock) ?></script>
     <?php endforeach; ?>
     <?php if (isset($securitySettings) && is_array($securitySettings) && setting_enabled($securitySettings, 'recaptcha_enabled') && trim((string) ($securitySettings['recaptcha_site_key'] ?? '')) !== ''): ?>
         <link rel="preconnect" href="https://www.google.com">
         <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+        <script src="https://www.google.com/recaptcha/api.js" nonce="<?= h(csp_nonce()) ?>" async defer></script>
     <?php endif; ?>
 </head>
 <body>
@@ -129,6 +129,6 @@ if (isset($schemas) && is_array($schemas)) {
     </nav>
     <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. All rights reserved.</p>
 </footer>
-<script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" defer></script>
+<script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" nonce="<?= h(csp_nonce()) ?>" defer></script>
 </body>
 </html>

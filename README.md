@@ -65,6 +65,10 @@ Feature areas:
 - Apache blocks direct access to `app`, `config`, `core`, `database`, `storage`, and `views`.
 - Rate limits protect login, posting, voting, commenting, and flagging.
 - Uploads validate MIME type with `finfo`, cap size, and use random filenames.
+- Administrator accounts can enable TOTP two-factor authentication from profile settings.
+- Admin settings changes are written to the audit log with secret values redacted.
+- SMTP email can be configured from the admin settings page.
+- Operational security runbooks live in `docs/SECURITY.md`.
 
 ## SEO
 

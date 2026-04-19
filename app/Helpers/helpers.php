@@ -7,6 +7,11 @@ function h(mixed $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
 }
 
+function csp_nonce(): string
+{
+    return is_string($GLOBALS['csp_nonce'] ?? null) ? (string) $GLOBALS['csp_nonce'] : '';
+}
+
 function url(string $path = ''): string
 {
     return site_url() . '/' . ltrim($path, '/');

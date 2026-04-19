@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\UserModel;
 use Core\Queue;
+use Core\RateLimiter;
 use Core\Session;
 use Core\Slugger;
 use Core\Validator;
@@ -17,6 +18,7 @@ final readonly class AuthService
         private Session $session,
         private Queue $queue,
         private Slugger $slugger,
+        private RateLimiter $limiter,
     ) {}
 
     /** @return array{ok: bool, errors: array<string, string>} */
@@ -59,19 +61,35 @@ final readonly class AuthService
         return ['ok' => true, 'errors' => []];
     }
 
-    public function login(string $email, string $password): bool
+    public function login(string $email, string $password): string
     {
+        $emailKey = $this->identityKey($email);
+        if ($this->isLocked('login-account', $emailKey)) {
+            return 'locked';
+        }
+
         $user = $this->users->findByEmail($email);
         if ($user === null) {
             // Perform a dummy verification to equalise timing regardless of whether the email exists.
             // The hash is a valid Argon2id hash of a random string so the verify path is identical.
             password_verify($password, '$argon2id$v=19$m=65536,t=4,p=1$c29tZXNhbHRzb21lc2FsdA$z6Ek4JnI2j6kxLQ5pUMjhXbJKoVkmvVqV3y/I2nXsKw');
-            return false;
+            $this->recordFailure('login-account', $emailKey);
+            return 'invalid';
         }
 
         if (!password_verify($password, (string) $user['password_hash'])) {
             usleep(random_int(100000, 250000));
-            return false;
+            $this->recordFailure('login-account', $emailKey);
+            return 'invalid';
+        }
+
+        $this->limiter->reset('login-account', $emailKey);
+
+        if (($user['role'] ?? '') === 'administrator' && !empty($user['two_factor_enabled_at']) && !empty($user['two_factor_secret'])) {
+            $this->session->regenerate();
+            $this->session->set('two_factor_user_id', (int) $user['id']);
+            $this->session->set('two_factor_started_at', time());
+            return 'two_factor';
         }
 
         $argonOptions = ['memory_cost' => 65536, 'time_cost' => 4, 'threads' => 1];
@@ -81,6 +99,41 @@ final readonly class AuthService
 
         $this->users->updateLastLogin((int) $user['id']);
         $safeUser = $this->users->findSessionStateById((int) $user['id']);
+        if ($safeUser !== null) {
+            $this->loginSession($safeUser);
+        }
+
+        return 'ok';
+    }
+
+    public function completeTwoFactor(string $code, TwoFactorService $twoFactor): bool
+    {
+        $userId = (int) $this->session->get('two_factor_user_id', 0);
+        $startedAt = (int) $this->session->get('two_factor_started_at', 0);
+        if ($userId < 1 || $startedAt < time() - 600) {
+            $this->clearPendingTwoFactor();
+            return false;
+        }
+
+        if ($this->isLocked('two-factor-account', (string) $userId)) {
+            return false;
+        }
+
+        $user = $this->users->findByIdWithSecurity($userId);
+        if (
+            $user === null
+            || ($user['role'] ?? '') !== 'administrator'
+            || empty($user['two_factor_enabled_at'])
+            || !$twoFactor->verify((string) ($user['two_factor_secret'] ?? ''), $code)
+        ) {
+            $this->recordFailure('two-factor-account', (string) $userId);
+            return false;
+        }
+
+        $this->limiter->reset('two-factor-account', (string) $userId);
+        $this->clearPendingTwoFactor();
+        $this->users->updateLastLogin($userId);
+        $safeUser = $this->users->findSessionStateById($userId);
         if ($safeUser !== null) {
             $this->loginSession($safeUser);
         }
@@ -95,6 +148,12 @@ final readonly class AuthService
 
     public function requestPasswordReset(string $email): void
     {
+        $emailKey = $this->identityKey($email);
+        if ($this->isLocked('password-reset-account', $emailKey)) {
+            return;
+        }
+
+        $this->recordFailure('password-reset-account', $emailKey);
         $user = $this->users->findByEmail($email);
         if ($user === null) {
             return;
@@ -148,5 +207,28 @@ final readonly class AuthService
             unset($user['auth_fingerprint']);
         }
         $this->session->set('user', $user);
+    }
+
+    private function clearPendingTwoFactor(): void
+    {
+        $this->session->remove('two_factor_user_id');
+        $this->session->remove('two_factor_started_at');
+    }
+
+    private function identityKey(string $email): string
+    {
+        return hash('sha256', strtolower(trim($email)));
+    }
+
+    private function isLocked(string $bucket, string $identifier): bool
+    {
+        return $this->limiter->attemptCount($bucket, $identifier, 900) >= 5
+            || $this->limiter->attemptCount($bucket, $identifier, 3600) >= 10
+            || $this->limiter->attemptCount($bucket, $identifier, 86400) >= 20;
+    }
+
+    private function recordFailure(string $bucket, string $identifier): void
+    {
+        $this->limiter->hit($bucket, $identifier, 86400);
     }
 }

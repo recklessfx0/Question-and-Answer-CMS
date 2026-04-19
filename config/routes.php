@@ -44,6 +44,8 @@ return static function (Router $router): void {
     $router->post('/register', [AuthController::class, 'register'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
     $router->get('/login', [AuthController::class, 'loginForm']);
     $router->post('/login', [AuthController::class, 'login'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
+    $router->get('/two-factor', [AuthController::class, 'twoFactorForm']);
+    $router->post('/two-factor', [AuthController::class, 'twoFactor'], [CsrfMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/logout', [AuthController::class, 'logout'], [CsrfMiddleware::class, AuthMiddleware::class]);
     $router->get('/auth/google', [AuthController::class, 'googleRedirect']);
     $router->get('/auth/google/callback', [AuthController::class, 'googleCallback']);
@@ -68,6 +70,9 @@ return static function (Router $router): void {
     $router->get('/user/{username}', [UserController::class, 'profile']);
     $router->get('/settings/profile', [UserController::class, 'editProfile'], [AuthMiddleware::class]);
     $router->post('/settings/profile', [UserController::class, 'updateProfile'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->post('/settings/two-factor/start', [UserController::class, 'startTwoFactor'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->post('/settings/two-factor/enable', [UserController::class, 'enableTwoFactor'], [CsrfMiddleware::class, AuthMiddleware::class]);
+    $router->post('/settings/two-factor/disable', [UserController::class, 'disableTwoFactor'], [CsrfMiddleware::class, AuthMiddleware::class]);
     $router->get('/notifications', [NotificationController::class, 'index'], [AuthMiddleware::class]);
     $router->post('/notifications/read', [NotificationController::class, 'markRead'], [CsrfMiddleware::class, AuthMiddleware::class]);
 

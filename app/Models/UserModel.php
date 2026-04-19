@@ -22,7 +22,13 @@ final readonly class UserModel
     /** @return array<string, mixed>|null */
     public function findById(int $id): ?array
     {
-        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, created_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
+        return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, two_factor_secret, two_factor_enabled_at, created_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function findByIdWithSecurity(int $id): ?array
+    {
+        return $this->db->fetch('SELECT id, username, email, role, password_hash, two_factor_secret, two_factor_enabled_at FROM users WHERE id = :id LIMIT 1', [':id' => $id]);
     }
 
     /** @return array<string, mixed>|null */
@@ -173,6 +179,21 @@ final readonly class UserModel
     public function updateAvatar(int $id, string $avatarPath): void
     {
         $this->db->execute('UPDATE users SET avatar_path = :avatar, updated_at = NOW() WHERE id = :id', [':avatar' => $avatarPath, ':id' => $id]);
+    }
+
+    public function saveTwoFactorSecret(int $id, string $secret): void
+    {
+        $this->db->execute('UPDATE users SET two_factor_secret = :secret, two_factor_enabled_at = NULL, updated_at = NOW() WHERE id = :id', [':secret' => $secret, ':id' => $id]);
+    }
+
+    public function enableTwoFactor(int $id): void
+    {
+        $this->db->execute('UPDATE users SET two_factor_enabled_at = NOW(), updated_at = NOW() WHERE id = :id AND two_factor_secret <> ""', [':id' => $id]);
+    }
+
+    public function disableTwoFactor(int $id): void
+    {
+        $this->db->execute('UPDATE users SET two_factor_secret = "", two_factor_enabled_at = NULL, updated_at = NOW() WHERE id = :id', [':id' => $id]);
     }
 
     public function markEmailVerified(int $id): void

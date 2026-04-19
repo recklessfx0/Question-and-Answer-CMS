@@ -8,6 +8,7 @@ use App\Models\QuestionModel;
 use App\Models\UserModel;
 use App\Services\GamificationService;
 use App\Services\SeoService;
+use App\Services\TwoFactorService;
 use App\Services\UploadService;
 use Core\Controller;
 use Core\Csrf;
@@ -32,6 +33,7 @@ final class UserController extends Controller
         private readonly UploadService $uploads,
         private readonly GamificationService $gamification,
         private readonly SeoService $seo,
+        private readonly TwoFactorService $twoFactor,
     )
     {
         parent::__construct($view, $session, $csrf);
@@ -97,6 +99,9 @@ final class UserController extends Controller
             'metaDescription' => 'Update your public profile.',
             'robots' => 'noindex,follow',
             'profile' => $user,
+            'twoFactorProvisioningUri' => !empty($user['two_factor_secret'])
+                ? $this->twoFactor->provisioningUri((string) ((require BASE_PATH . '/config/app.php')['name'] ?? 'Question And Answer Platform'), (string) $user['email'], (string) $user['two_factor_secret'])
+                : '',
         ]);
     }
 
@@ -148,5 +153,54 @@ final class UserController extends Controller
 
         $this->flash('success', 'Profile updated.');
         return $this->redirect('/user/' . rawurlencode($username));
+    }
+
+    public function startTwoFactor(): Response
+    {
+        $user = $this->users->findById((int) $this->session->get('user_id'));
+        if ($user === null || active_role($user) !== 'administrator') {
+            return $this->redirect('/settings/profile');
+        }
+
+        $this->users->saveTwoFactorSecret((int) $user['id'], $this->twoFactor->generateSecret());
+        $this->flash('success', 'Two-factor setup key generated. Add it to your authenticator app and confirm the code.');
+
+        return $this->redirect('/settings/profile');
+    }
+
+    public function enableTwoFactor(Request $request): Response
+    {
+        $user = $this->users->findById((int) $this->session->get('user_id'));
+        if ($user === null || active_role($user) !== 'administrator' || empty($user['two_factor_secret'])) {
+            return $this->redirect('/settings/profile');
+        }
+
+        if (!$this->twoFactor->verify((string) $user['two_factor_secret'], $request->string('code', 16))) {
+            $this->flash('error', 'Two-factor code is invalid.');
+            return $this->redirect('/settings/profile');
+        }
+
+        $this->users->enableTwoFactor((int) $user['id']);
+        $this->flash('success', 'Two-factor authentication enabled.');
+
+        return $this->redirect('/settings/profile');
+    }
+
+    public function disableTwoFactor(Request $request): Response
+    {
+        $user = $this->users->findById((int) $this->session->get('user_id'));
+        if ($user === null || active_role($user) !== 'administrator') {
+            return $this->redirect('/settings/profile');
+        }
+
+        if (!empty($user['two_factor_secret']) && !$this->twoFactor->verify((string) $user['two_factor_secret'], $request->string('code', 16))) {
+            $this->flash('error', 'Two-factor code is invalid.');
+            return $this->redirect('/settings/profile');
+        }
+
+        $this->users->disableTwoFactor((int) $user['id']);
+        $this->flash('success', 'Two-factor authentication disabled.');
+
+        return $this->redirect('/settings/profile');
     }
 }

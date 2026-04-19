@@ -31,6 +31,21 @@
         <label class="checkbox-label"><input name="google_auth_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'google_auth_enabled') ? 'checked' : '' ?>> Enable Google sign-in</label>
         <label>Client ID <input name="google_client_id" value="<?= h($settings['google_client_id'] ?? '') ?>" maxlength="255" autocomplete="off"></label>
         <label>Client secret <input name="google_client_secret" type="password" maxlength="255" autocomplete="new-password" placeholder="<?= empty($settings['google_client_secret'] ?? '') ? 'Paste client secret' : 'Leave blank to keep current secret' ?>"></label>
+        <h2>SMTP email</h2>
+        <label class="checkbox-label"><input name="smtp_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'smtp_enabled') ? 'checked' : '' ?>> Send email through SMTP</label>
+        <label>SMTP host <input name="smtp_host" value="<?= h($settings['smtp_host'] ?? '') ?>" maxlength="255" autocomplete="off" placeholder="smtp.example.com"></label>
+        <label>SMTP port <input name="smtp_port" type="number" min="1" max="65535" value="<?= h((string) ($settings['smtp_port'] ?? '587')) ?>"></label>
+        <label>Encryption
+            <select name="smtp_encryption">
+                <?php foreach (['tls' => 'STARTTLS', 'ssl' => 'SSL/TLS', 'none' => 'None'] as $value => $label): ?>
+                    <option value="<?= h($value) ?>" <?= ($settings['smtp_encryption'] ?? 'tls') === $value ? 'selected' : '' ?>><?= h($label) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>SMTP username <input name="smtp_username" value="<?= h($settings['smtp_username'] ?? '') ?>" maxlength="255" autocomplete="off"></label>
+        <label>SMTP password <input name="smtp_password" type="password" maxlength="255" autocomplete="new-password" placeholder="<?= empty($settings['smtp_password'] ?? '') ? 'Paste SMTP password' : 'Leave blank to keep current password' ?>"></label>
+        <label>From email <input name="smtp_from_email" type="email" value="<?= h($settings['smtp_from_email'] ?? '') ?>" maxlength="255" placeholder="no-reply@example.com"></label>
+        <label>From name <input name="smtp_from_name" value="<?= h($settings['smtp_from_name'] ?? '') ?>" maxlength="120" placeholder="<?= h((string) ($settings['site_title'] ?? 'Question And Answer Platform')) ?>"></label>
         <button type="submit">Save settings</button>
     </form>
 </section>

@@ -16,6 +16,7 @@ final readonly class SecurityHeadersMiddleware
 
     public function handle(Request $request, callable $next): Response
     {
+        $GLOBALS['csp_nonce'] = bin2hex(random_bytes(16));
         $response = $next($request);
         $settings = [];
         try {
@@ -24,7 +25,7 @@ final readonly class SecurityHeadersMiddleware
             $settings = [];
         }
 
-        $response->withHeader('Content-Security-Policy', $this->csp($settings));
+        $response->withHeader('Content-Security-Policy', $this->csp($settings, (string) $GLOBALS['csp_nonce']));
         $response->withHeader('X-Frame-Options', 'DENY');
         $response->withHeader('X-Content-Type-Options', 'nosniff');
         $response->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -35,12 +36,12 @@ final readonly class SecurityHeadersMiddleware
     }
 
     /** @param array<string, string> $settings */
-    private function csp(array $settings): string
+    private function csp(array $settings, string $nonce): string
     {
         $recaptcha = in_array(strtolower((string) ($settings['recaptcha_enabled'] ?? '')), ['1', 'true', 'yes', 'on'], true)
             && trim((string) ($settings['recaptcha_site_key'] ?? '')) !== '';
 
-        $script = ["'self'"];
+        $script = ["'self'", "'nonce-" . $nonce . "'"];
         $connect = ["'self'"];
         $frame = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com'];
         if ($recaptcha) {
@@ -56,6 +57,7 @@ final readonly class SecurityHeadersMiddleware
             "style-src 'self'",
             "img-src 'self' data: https:",
             "font-src 'self'",
+            "object-src 'none'",
             'connect-src ' . implode(' ', $connect),
             'frame-src ' . implode(' ', $frame),
             "base-uri 'self'",
