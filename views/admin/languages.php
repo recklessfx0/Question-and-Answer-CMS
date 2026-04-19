@@ -36,7 +36,19 @@
 
 <?php if (is_array($selectedLanguage)): ?>
     <section class="admin-panel translation-editor">
-        <h2><?= h(t('admin.languages.translations', 'Translations')) ?>: <?= h((string) $selectedLanguage['name']) ?></h2>
+        <div class="admin-section-head">
+            <div>
+                <h2><?= h(t('admin.languages.translations', 'Translations')) ?>: <?= h((string) $selectedLanguage['name']) ?></h2>
+                <p class="meta"><?= h(t('admin.languages.json_help', 'Upload or export JSON translation files so communities can share language packs.')) ?></p>
+            </div>
+            <a class="button button-secondary" href="/admin/languages/<?= (int) $selectedLanguage['id'] ?>/export"><?= h(t('admin.languages.export_json', 'Export JSON')) ?></a>
+        </div>
+        <form method="post" action="/admin/languages/<?= (int) $selectedLanguage['id'] ?>/import" enctype="multipart/form-data" class="language-import-form">
+            <?= $csrf->field('/admin/languages/' . (int) $selectedLanguage['id'] . '/import') ?>
+            <input type="hidden" name="code" value="<?= h((string) $selectedLanguage['code']) ?>">
+            <label><?= h(t('admin.languages.import_json', 'Import JSON')) ?> <input name="translations_json" type="file" accept="application/json,.json" required></label>
+            <button type="submit"><?= h(t('admin.languages.upload_json', 'Upload JSON')) ?></button>
+        </form>
         <form method="post" action="/admin/languages/<?= (int) $selectedLanguage['id'] ?>/translations">
             <?= $csrf->field('/admin/languages/' . (int) $selectedLanguage['id'] . '/translations') ?>
             <input type="hidden" name="code" value="<?= h((string) $selectedLanguage['code']) ?>">

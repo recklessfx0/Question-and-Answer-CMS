@@ -213,6 +213,32 @@ final class AdminController extends Controller
         return Response::redirect('/admin/languages?code=' . rawurlencode($request->string('code', 20)));
     }
 
+    /** @param array<string, string> $params */
+    public function importTranslations(Request $request, array $params): Response
+    {
+        $result = $this->admin->importTranslations(
+            (int) ($params['id'] ?? 0),
+            is_array($request->files['translations_json'] ?? null) ? $request->files['translations_json'] : [],
+            (int) $this->session->get('user_id', 0)
+        );
+        $this->flash($result['ok'] ? 'success' : 'error', $result['message']);
+
+        return Response::redirect('/admin/languages?code=' . rawurlencode($result['code'] !== '' ? $result['code'] : $request->string('code', 20)));
+    }
+
+    /** @param array<string, string> $params */
+    public function exportTranslations(Request $request, array $params): Response
+    {
+        $json = $this->admin->exportTranslations((int) ($params['id'] ?? 0));
+        if ($json === null) {
+            $this->flash('error', 'Language could not be exported.');
+            return Response::redirect('/admin/languages');
+        }
+
+        return Response::text($json . "\n", 'application/json; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="translations-' . date('Ymd-His') . '.json"');
+    }
+
     public function createCategory(Request $request): Response
     {
         $created = $this->admin->createCategory($request->int('parent_id', 0, 0), $request->string('name', 80), $request->string('description', 240), $request->string('seo_title', 120), $request->string('seo_description', 180), $request->string('intro', 4000));

@@ -795,6 +795,87 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     background: var(--accent);
     color: #fff;
 }
+
+.notifications-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+.notifications-head form {
+    margin: 0;
+    flex: 0 0 auto;
+}
+.notifications-list {
+    display: grid;
+    gap: 10px;
+}
+.notification-item {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+}
+.notification-item.is-unread {
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+}
+.notification-status span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 58px;
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+.notification-item.is-unread .notification-status span {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent), var(--line) 45%);
+    background: color-mix(in srgb, var(--accent), transparent 92%);
+}
+.notification-body {
+    min-width: 0;
+}
+.notification-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+.notification-title-row h2 {
+    margin: 0;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+}
+.notification-title-row time {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+}
+.notification-body p {
+    margin: 4px 0 0;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+.notification-open {
+    white-space: nowrap;
+}
+.notifications-empty {
+    padding: 28px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+.notifications-empty h2 {
+    margin-top: 0;
+}
 .question-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; }
 .question-card {
     grid-template-columns: 140px minmax(0, 1fr);
@@ -3255,9 +3336,18 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
 
 .language-create-form,
 .language-row,
+.language-import-form,
 .translation-editor form {
     display: grid;
     gap: 12px;
+}
+
+.language-import-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    margin: 0 0 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
 }
 
 .language-list {
@@ -3317,10 +3407,35 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .language-row button {
         grid-column: 1 / -1;
     }
+
+    .language-import-form {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 560px) {
     .language-row {
         grid-template-columns: 1fr;
+    }
+
+    .notifications-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .notifications-head button,
+    .notification-open {
+        width: 100%;
+    }
+
+    .notification-item {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .notification-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
     }
 }

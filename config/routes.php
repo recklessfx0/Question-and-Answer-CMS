@@ -106,6 +106,8 @@ return static function (Router $router): void {
     $router->post('/admin/languages', [AdminController::class, 'createLanguage'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages/{id}/update', [AdminController::class, 'updateLanguage'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/languages/{id}/translations', [AdminController::class, 'saveTranslations'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->post('/admin/languages/{id}/import', [AdminController::class, 'importTranslations'], [CsrfMiddleware::class, AdminMiddleware::class]);
+    $router->get('/admin/languages/{id}/export', [AdminController::class, 'exportTranslations'], [AdminMiddleware::class]);
     $router->post('/admin/categories', [AdminController::class, 'createCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/categories/{id}/update', [AdminController::class, 'updateCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);
     $router->post('/admin/categories/{id}/delete', [AdminController::class, 'deleteCategory'], [CsrfMiddleware::class, AdminMiddleware::class]);

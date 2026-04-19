@@ -28,12 +28,32 @@ final readonly class NotificationModel
         ));
     }
 
+    public function countForUser(int $userId): int
+    {
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS total FROM notifications WHERE user_id = :user',
+            [':user' => $userId]
+        );
+
+        return (int) ($row['total'] ?? 0);
+    }
+
+    public function countUnreadForUser(int $userId): int
+    {
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS total FROM notifications WHERE user_id = :user AND read_at IS NULL',
+            [':user' => $userId]
+        );
+
+        return (int) ($row['total'] ?? 0);
+    }
+
     /** @return array<int, array<string, mixed>> */
-    public function forUser(int $userId, int $limit = 50): array
+    public function forUser(int $userId, int $limit = 50, int $offset = 0): array
     {
         return $this->normalizeRows($this->db->fetchAll(
-            'SELECT * FROM notifications WHERE user_id = :user ORDER BY created_at DESC LIMIT :limit',
-            [':user' => $userId, ':limit' => $limit]
+            'SELECT * FROM notifications WHERE user_id = :user ORDER BY created_at DESC LIMIT :limit OFFSET :offset',
+            [':user' => $userId, ':limit' => $limit, ':offset' => $offset]
         ));
     }
 

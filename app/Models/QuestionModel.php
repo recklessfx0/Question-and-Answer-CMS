@@ -329,9 +329,10 @@ final readonly class QuestionModel
     public function popularTags(int $limit = 100, int $offset = 0): array
     {
         return $this->db->fetchAll(
-            'SELECT t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro, COUNT(qt.question_id) AS question_count
+            'SELECT t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro, COUNT(DISTINCT q.id) AS question_count
              FROM tags t
              LEFT JOIN question_tags qt ON qt.tag_id = t.id
+             LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL
              GROUP BY t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro
              ORDER BY question_count DESC, t.name ASC LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]
@@ -405,7 +406,7 @@ final readonly class QuestionModel
 
         try {
             $this->db->execute(
-                'UPDATE tags SET name = :name, slug = :slug, description = :description, seo_title = :seo_title, seo_description = :seo_description, intro = :intro WHERE id = :id',
+                'UPDATE tags SET name = :name, slug = :slug, description = :description, seo_title = :seo_title, seo_description = :seo_description, intro = :intro, updated_at = NOW() WHERE id = :id',
                 [':name' => $name, ':slug' => $slug, ':description' => $description, ':seo_title' => $seoTitle, ':seo_description' => $seoDescription, ':intro' => $intro, ':id' => $id]
             );
             return true;

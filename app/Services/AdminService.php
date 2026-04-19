@@ -93,12 +93,20 @@ final readonly class AdminService
         $defaults = is_array($defaults) ? array_map('strval', $defaults) : [];
         $languages = $this->languages->all();
         $selectedLanguage = $code !== '' ? $this->languages->findByCode($code) : ($languages[0] ?? null);
+        $translations = is_array($selectedLanguage) ? $this->languages->translationsForLanguage((int) $selectedLanguage['id']) : [];
+        foreach ($this->languages->knownTranslationKeys() as $key) {
+            $defaults[$key] ??= '';
+        }
+        foreach ($translations as $key => $value) {
+            $defaults[$key] ??= '';
+        }
+        ksort($defaults);
 
         return [
             'languages' => $languages,
             'defaults' => $defaults,
             'selectedLanguage' => $selectedLanguage,
-            'translations' => is_array($selectedLanguage) ? $this->languages->translationsForLanguage((int) $selectedLanguage['id']) : [],
+            'translations' => $translations,
         ];
     }
 
@@ -127,6 +135,96 @@ final readonly class AdminService
     {
         $this->languages->saveTranslations($languageId, $translations);
         $this->audit->record($actorId, 'translations_update', 'language', $languageId, ['keys' => array_keys($translations)]);
+    }
+
+    /** @param array<string, mixed> $file @return array{ok: bool, message: string, code: string} */
+    public function importTranslations(int $languageId, array $file, int $actorId): array
+    {
+        $language = $this->languageById($languageId);
+        if ($language === null) {
+            return ['ok' => false, 'message' => 'Language was not found.', 'code' => ''];
+        }
+
+        if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return ['ok' => false, 'message' => 'Choose a JSON translation file to upload.', 'code' => (string) $language['code']];
+        }
+
+        if ((int) ($file['size'] ?? 0) > 1024 * 1024) {
+            return ['ok' => false, 'message' => 'Translation file must be 1 MB or smaller.', 'code' => (string) $language['code']];
+        }
+
+        $name = (string) ($file['name'] ?? '');
+        if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== 'json') {
+            return ['ok' => false, 'message' => 'Upload a .json translation file.', 'code' => (string) $language['code']];
+        }
+
+        $tmpName = (string) ($file['tmp_name'] ?? '');
+        $raw = is_uploaded_file($tmpName) || is_file($tmpName) ? file_get_contents($tmpName) : false;
+        if (!is_string($raw) || $raw === '') {
+            return ['ok' => false, 'message' => 'Translation file could not be read.', 'code' => (string) $language['code']];
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return ['ok' => false, 'message' => 'Translation file contains invalid JSON.', 'code' => (string) $language['code']];
+        }
+
+        $translations = $this->translationsFromImportPayload(is_array($decoded) ? $decoded : []);
+        if ($translations === []) {
+            return ['ok' => false, 'message' => 'Translation file does not contain valid translation keys.', 'code' => (string) $language['code']];
+        }
+
+        $this->languages->saveTranslations($languageId, $translations);
+        $this->audit->record($actorId, 'translations_import', 'language', $languageId, ['keys' => array_keys($translations)]);
+
+        return ['ok' => true, 'message' => count($translations) . ' translations imported.', 'code' => (string) $language['code']];
+    }
+
+    public function exportTranslations(int $languageId): ?string
+    {
+        $language = $this->languageById($languageId);
+        if ($language === null) {
+            return null;
+        }
+
+        $payload = [
+            'code' => (string) $language['code'],
+            'name' => (string) $language['name'],
+            'translations' => $this->languages->translationsForLanguage($languageId),
+        ];
+
+        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function languageById(int $languageId): ?array
+    {
+        foreach ($this->languages->all() as $language) {
+            if ((int) ($language['id'] ?? 0) === $languageId) {
+                return $language;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $payload @return array<string, string> */
+    private function translationsFromImportPayload(array $payload): array
+    {
+        $source = is_array($payload['translations'] ?? null) ? $payload['translations'] : $payload;
+        $clean = [];
+        $reserved = ['code' => true, 'name' => true, 'locale' => true, 'language' => true];
+        foreach ($source as $key => $value) {
+            if (!is_string($key) || isset($reserved[$key]) || !is_scalar($value) || !preg_match('/^[a-z0-9_.-]{2,120}$/', $key)) {
+                continue;
+            }
+            $text = trim(str_replace("\0", '', (string) $value));
+            $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? '';
+            $clean[$key] = mb_substr($text, 0, 4000);
+        }
+
+        return $clean;
     }
 
     public function setRole(int $userId, string $role): bool

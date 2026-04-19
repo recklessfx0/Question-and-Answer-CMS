@@ -119,6 +119,21 @@ final readonly class LanguageModel
         }
     }
 
+    /** @return array<string, string> */
+    public function knownTranslationKeys(): array
+    {
+        $rows = $this->db->fetchAll('SELECT DISTINCT translation_key FROM translations ORDER BY translation_key ASC');
+        $keys = [];
+        foreach ($rows as $row) {
+            $key = (string) ($row['translation_key'] ?? '');
+            if ($key !== '') {
+                $keys[$key] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
     /** @param array<string, string> $defaults */
     public function seedDefaults(array $defaults): void
     {
