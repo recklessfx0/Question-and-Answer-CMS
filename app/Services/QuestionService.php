@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\QuestionModel;
 use App\Models\UserModel;
 use Core\Markdown;
+use Core\Logger;
 use Core\Queue;
 use Core\Session;
 use Core\Slugger;
@@ -21,6 +22,7 @@ final class QuestionService
         private Slugger $slugger,
         private Markdown $markdown,
         private Queue $queue,
+        private Logger $logger,
         private UploadService $uploads,
         private GamificationService $gamification,
         private UserModel $users,
@@ -45,7 +47,7 @@ final class QuestionService
         $userId = (int) $this->session->get('user_id');
         [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);
-        $this->queue->push('NotifyModerators', ['question_id' => $id]);
+        $this->queueNotification('NotifyModerators', ['question_id' => $id]);
         $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . $title, '/question/' . $slug);
         $this->gamification->award($userId, 3, 'question_created', 'question', $id);
 
@@ -71,7 +73,7 @@ final class QuestionService
 
         $userId = (int) $this->session->get('user_id');
         $id = $this->questions->addAnswer($questionId, $userId, $body);
-        $this->queue->push('AnswerPostedNotification', ['question_id' => $questionId, 'answer_id' => $id]);
+        $this->queueNotification('AnswerPostedNotification', ['question_id' => $questionId, 'answer_id' => $id]);
         $question = $this->questions->findSummaryById($questionId);
         if ($question !== null) {
             $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . (string) $question['title'], '/question/' . (string) $question['slug'] . '#answer-' . $id);
@@ -368,7 +370,7 @@ final class QuestionService
             if (isset($skipUserIds[(int) $user['id']])) {
                 continue;
             }
-            $this->queue->push('MentionNotification', [
+            $this->queueNotification('MentionNotification', [
                 'user_id' => (int) $user['id'],
                 'type' => $type,
                 'message' => $message,
@@ -410,7 +412,7 @@ final class QuestionService
             return $alreadyNotified;
         }
 
-        $this->queue->push('MentionNotification', [
+        $this->queueNotification('MentionNotification', [
             'user_id' => $targetUserId,
             'type' => $type,
             'message' => $message,
@@ -419,6 +421,16 @@ final class QuestionService
         $alreadyNotified[$targetUserId] = true;
 
         return $alreadyNotified;
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function queueNotification(string $job, array $payload): void
+    {
+        try {
+            $this->queue->push($job, $payload);
+        } catch (\Throwable $e) {
+            $this->logger->error($e);
+        }
     }
 
     private function postUrl(string $type, int $postId): string

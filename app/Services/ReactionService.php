@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ReactionModel;
+use Core\Logger;
 use Core\Queue;
 use Core\Session;
 
@@ -15,6 +16,7 @@ final class ReactionService
         private Session $session,
         private GamificationService $gamification,
         private Queue $queue,
+        private Logger $logger,
     ) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -32,7 +34,7 @@ final class ReactionService
         }
         if ($result !== null && !empty($result['added'])) {
             $url = '/question/' . (string) $result['question_slug'] . ($postType === 'answer' ? '#answer-' . $postId : '');
-            $this->queue->push('MentionNotification', [
+            $this->queueNotification('MentionNotification', [
                 'user_id' => (int) $result['target_user_id'],
                 'type' => 'Reaction',
                 'message' => 'Your ' . $postType . ' received a ' . (string) $result['slug'] . ' reaction on ' . (string) $result['post_title'],
@@ -41,6 +43,16 @@ final class ReactionService
         }
 
         return $this->forTargets([['type' => $postType, 'id' => $postId]])[$postType . ':' . $postId] ?? [];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function queueNotification(string $job, array $payload): void
+    {
+        try {
+            $this->queue->push($job, $payload);
+        } catch (\Throwable $e) {
+            $this->logger->error($e);
+        }
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */

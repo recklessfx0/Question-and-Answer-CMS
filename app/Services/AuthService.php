@@ -24,7 +24,7 @@ final class AuthService
         private RateLimiter $limiter,
     ) {}
 
-    /** @return array{ok: bool, errors: array<string, string>, email_sent?: bool} */
+    /** @return array{ok: bool, errors: array<string, string>, email_sent?: bool, email_status?: string} */
     public function register(string $username, string $email, string $password): array
     {
         $username = $this->slugger->slug($username);
@@ -58,10 +58,15 @@ final class AuthService
         if ($user !== null) {
             $this->loginSession($user);
             $verifyToken = $this->users->createToken($id, 'email_verification', 86400);
-            $emailSent = $this->sendVerificationEmail($id, $email, $verifyToken);
+            $emailStatus = $this->sendVerificationEmail($id, $email, $verifyToken);
         }
 
-        return ['ok' => true, 'errors' => [], 'email_sent' => $emailSent ?? false];
+        return [
+            'ok' => true,
+            'errors' => [],
+            'email_sent' => ($emailStatus ?? 'failed') === 'sent',
+            'email_status' => $emailStatus ?? 'failed',
+        ];
     }
 
     public function login(string $email, string $password): string
@@ -198,16 +203,16 @@ final class AuthService
         return true;
     }
 
-    public function resendEmailVerification(int $userId): bool
+    public function resendEmailVerification(int $userId): string
     {
         if ($userId < 1 || $this->isLocked('email-verification-account', (string) $userId)) {
-            return false;
+            return 'unavailable';
         }
 
         $this->recordFailure('email-verification-account', (string) $userId);
         $user = $this->users->findById($userId);
         if ($user === null || !empty($user['email_verified_at']) || !empty($user['deleted_at']) || !empty($user['banned_at'])) {
-            return false;
+            return 'unavailable';
         }
 
         $token = $this->users->createToken($userId, 'email_verification', 86400);
@@ -233,7 +238,7 @@ final class AuthService
         $this->session->set('user', $user);
     }
 
-    private function sendVerificationEmail(int $userId, string $email, string $token): bool
+    private function sendVerificationEmail(int $userId, string $email, string $token): string
     {
         $link = url('/email/verify/' . rawurlencode($token));
         return $this->sendNowOrQueue(
@@ -245,7 +250,7 @@ final class AuthService
         );
     }
 
-    private function sendPasswordResetEmail(int $userId, string $email, string $token): bool
+    private function sendPasswordResetEmail(int $userId, string $email, string $token): string
     {
         $link = url('/reset-password/' . rawurlencode($token));
         return $this->sendNowOrQueue(
@@ -258,15 +263,20 @@ final class AuthService
     }
 
     /** @param array<string, mixed> $payload */
-    private function sendNowOrQueue(string $job, array $payload, string $email, string $subject, string $body): bool
+    private function sendNowOrQueue(string $job, array $payload, string $email, string $subject, string $body): string
     {
         try {
             $this->mail->send($email, $subject, $body);
-            return true;
+            return 'sent';
         } catch (\Throwable $e) {
             $this->logger->error($e);
-            $this->queue->push($job, $payload);
-            return false;
+            try {
+                $this->queue->push($job, $payload);
+                return 'queued';
+            } catch (\Throwable $queueError) {
+                $this->logger->error($queueError);
+                return 'failed';
+            }
         }
     }
 

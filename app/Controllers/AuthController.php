@@ -52,10 +52,12 @@ final class AuthController extends Controller
             return $this->redirect('/register');
         }
 
-        $this->flash('success', !empty($result['email_sent'])
-            ? 'Welcome. Your account is ready. Check your email to confirm your address.'
-            : 'Welcome. Your account is ready. Your confirmation email has been queued and will be sent shortly.'
-        );
+        $emailStatus = (string) ($result['email_status'] ?? 'failed');
+        $this->flash($emailStatus === 'failed' ? 'error' : 'success', match ($emailStatus) {
+            'sent' => 'Welcome. Your account is ready. Check your email to confirm your address.',
+            'queued' => 'Welcome. Your account is ready. Your confirmation email has been queued and will be sent shortly.',
+            default => 'Welcome. Your account is ready, but the confirmation email could not be queued. Check SMTP and queue settings.',
+        });
         return $this->redirect('/');
     }
 
@@ -114,8 +116,15 @@ final class AuthController extends Controller
 
     public function resendEmailVerification(): Response
     {
-        $sent = $this->auth->resendEmailVerification((int) $this->session->get('user_id', 0));
-        $this->flash($sent ? 'success' : 'error', $sent ? 'Verification email sent.' : 'Verification email could not be sent. Check SMTP settings and try again.');
+        $status = $this->auth->resendEmailVerification((int) $this->session->get('user_id', 0));
+        $this->flash(
+            in_array($status, ['sent', 'queued'], true) ? 'success' : 'error',
+            match ($status) {
+                'sent' => 'Verification email sent.',
+                'queued' => 'Verification email queued and will be sent shortly.',
+                default => 'Verification email could not be sent. Check SMTP settings and try again.',
+            }
+        );
 
         return $this->redirect('/settings/profile');
     }
