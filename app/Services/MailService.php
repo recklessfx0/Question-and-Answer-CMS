@@ -61,20 +61,18 @@ final class MailService
             stream_set_timeout($socket, 15);
             $this->expect($socket, [220]);
             $serverName = (string) (parse_url(site_url(), PHP_URL_HOST) ?: 'localhost');
-            $this->command($socket, 'EHLO ' . $serverName, [250]);
+            $capabilities = $this->ehlo($socket, $serverName);
 
             if ($encryption === 'tls') {
                 $this->command($socket, 'STARTTLS', [220]);
-                if (!stream_socket_enable_crypto($socket, true, $this->tlsCryptoMethod())) {
+                if (!$this->enableTls($socket)) {
                     throw new RuntimeException('SMTP STARTTLS negotiation failed.');
                 }
-                $this->command($socket, 'EHLO ' . $serverName, [250]);
+                $capabilities = $this->ehlo($socket, $serverName);
             }
 
             if ($username !== '') {
-                $this->command($socket, 'AUTH LOGIN', [334]);
-                $this->command($socket, base64_encode($username), [334]);
-                $this->command($socket, base64_encode($password), [235]);
+                $this->authenticate($socket, $capabilities, $username, $password);
             }
 
             $fromEmail = $this->fromEmail($settings);
@@ -142,16 +140,54 @@ final class MailService
         return implode("\r\n", $lines);
     }
 
-    private function tlsCryptoMethod(): int
+    /** @param array<int, string> $capabilities */
+    private function authenticate(mixed $socket, array $capabilities, string $username, string $password): void
     {
-        $method = 0;
-        foreach (['STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT', 'STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT'] as $constant) {
-            if (defined($constant)) {
-                $method |= (int) constant($constant);
+        $authLine = '';
+        foreach ($capabilities as $capability) {
+            $normalized = strtoupper($capability);
+            if (str_starts_with($normalized, 'AUTH ') || str_starts_with($normalized, 'AUTH=')) {
+                $authLine .= ' ' . strtoupper($capability);
             }
         }
 
-        return $method > 0 ? $method : STREAM_CRYPTO_METHOD_TLS_CLIENT;
+        if (str_contains($authLine, ' PLAIN')) {
+            $this->command($socket, 'AUTH PLAIN ' . base64_encode("\0" . $username . "\0" . $password), [235]);
+            return;
+        }
+
+        if ($authLine === '' || str_contains($authLine, ' LOGIN')) {
+            $this->command($socket, 'AUTH LOGIN', [334]);
+            $this->command($socket, base64_encode($username), [334]);
+            $this->command($socket, base64_encode($password), [235]);
+            return;
+        }
+
+        throw new RuntimeException('SMTP server does not support AUTH PLAIN or AUTH LOGIN.');
+    }
+
+    private function enableTls(mixed $socket): bool
+    {
+        foreach ($this->tlsCryptoMethods() as $method) {
+            if (@stream_socket_enable_crypto($socket, true, $method)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return array<int, int> */
+    private function tlsCryptoMethods(): array
+    {
+        $methods = [];
+        foreach (['STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT', 'STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT', 'STREAM_CRYPTO_METHOD_TLS_CLIENT'] as $constant) {
+            if (defined($constant)) {
+                $methods[] = (int) constant($constant);
+            }
+        }
+
+        return array_values(array_unique($methods));
     }
 
     /** @param array<int, int> $expected */
@@ -161,20 +197,34 @@ final class MailService
         $this->expect($socket, $expected);
     }
 
-    /** @param array<int, int> $expected */
-    private function expect(mixed $socket, array $expected): void
+    /** @return array<int, string> */
+    private function ehlo(mixed $socket, string $serverName): array
+    {
+        fwrite($socket, 'EHLO ' . $serverName . "\r\n");
+        return $this->expect($socket, [250]);
+    }
+
+    /** @param array<int, int> $expected @return array<int, string> */
+    private function expect(mixed $socket, array $expected): array
     {
         $line = '';
+        $lines = [];
         do {
             $line = fgets($socket);
             if (!is_string($line)) {
                 throw new RuntimeException('SMTP server closed the connection.');
             }
+            $lines[] = rtrim($line, "\r\n");
             $code = (int) substr($line, 0, 3);
         } while (isset($line[3]) && $line[3] === '-');
 
         if (!in_array($code, $expected, true)) {
             throw new RuntimeException('Unexpected SMTP response: ' . trim($line));
         }
+
+        return array_values(array_map(
+            static fn (string $responseLine): string => trim(substr($responseLine, 4)),
+            $lines
+        ));
     }
 }

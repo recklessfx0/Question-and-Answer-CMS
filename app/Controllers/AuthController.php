@@ -52,11 +52,9 @@ final class AuthController extends Controller
             return $this->redirect('/register');
         }
 
-        $this->flash(
-            !empty($result['email_sent']) ? 'success' : 'error',
-            !empty($result['email_sent'])
-                ? 'Welcome. Your account is ready. Check your email to confirm your address.'
-                : 'Welcome. Your account is ready, but the confirmation email could not be sent immediately. Check SMTP settings or run the queue worker.'
+        $this->flash('success', !empty($result['email_sent'])
+            ? 'Welcome. Your account is ready. Check your email to confirm your address.'
+            : 'Welcome. Your account is ready. Your confirmation email has been queued and will be sent shortly.'
         );
         return $this->redirect('/');
     }

@@ -31,6 +31,15 @@ $renderReportButton = static function (string $type, int $id, string $label) use
     <?php
 };
 
+$renderShareLink = static function (string $url, string $title, string $label): void {
+    ?>
+    <span class="share-action">
+        <a class="button-secondary share-link" href="<?= h($url) ?>" data-share-trigger data-share-url="<?= h($url) ?>" data-share-title="<?= h($title) ?>" data-share-copied="<?= h(t('questions.share.copied', 'Link copied')) ?>" data-share-failed="<?= h(t('questions.share.failed', 'Copy the link from your address bar')) ?>"><?= h($label) ?></a>
+        <span class="share-status" data-share-status role="status" aria-live="polite"></span>
+    </span>
+    <?php
+};
+
 $renderReactions = static function (string $type, int $id) use ($authUser, $csrf, $reactionMap): void {
     $key = $type . ':' . $id;
     $items = is_array($reactionMap[$key] ?? null) ? $reactionMap[$key] : [];
@@ -103,11 +112,13 @@ foreach ($answerComments as $commentLookup) {
     $answerCommentTrees[$answerId][$parentId][] = $commentLookup;
 }
 
-$renderComment = static function (array $comment, string $composerId, string $action, string $csrfAction, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $markdown, $allCommentsById, $canModerate, $commentsOpen): void {
+$renderComment = static function (array $comment, string $composerId, string $action, string $csrfAction, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question): void {
     $parent = isset($comment['parent_id']) ? ($allCommentsById[(int) $comment['parent_id']] ?? null) : null;
     $quoteBody = trim(excerpt((string) $comment['body'], 260));
     $replyId = 'comment-' . (int) $comment['id'] . '-reply-composer';
     $depthClass = 'comment-depth-' . min(6, max(0, $depth));
+    $commentUrl = url('/question/' . rawurlencode((string) $question['slug']) . '#comment-' . (int) $comment['id']);
+    $commentTitle = strtr(t('questions.share.clarification_title', 'Clarification by :username', ['username' => (string) ($comment['username'] ?? '')]), [':username' => (string) ($comment['username'] ?? '')]);
     ?>
     <article id="comment-<?= (int) $comment['id'] ?>" class="comment <?= $comment['parent_id'] ? 'comment-reply' : '' ?> <?= h($depthClass) ?>">
         <?php $renderVote('comment', (int) $comment['id'], (int) ($comment['votes'] ?? 0), 'clarification'); ?>
@@ -123,8 +134,9 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                 <blockquote class="comment-quote">Quoted <?= h((string) $parent['username']) ?>: <?= h(excerpt((string) $parent['body'], 140)) ?></blockquote>
             <?php endif; ?>
             <div class="comment-body"><?= $markdown((string) $comment['body']) ?></div>
-            <?php if (is_array($authUser)): ?>
-                <div class="comment-actions">
+            <div class="comment-actions">
+                <?php $renderShareLink($commentUrl, $commentTitle, t('questions.share.action', 'Share')); ?>
+                <?php if (is_array($authUser)): ?>
                     <?php if ($commentsOpen): ?>
                         <button type="button" class="button-secondary quote-comment" data-quote-comment data-quote-inline-target="<?= h($replyId) ?>" data-quote-parent="<?= (int) $comment['id'] ?>" data-quote-author="<?= h((string) $comment['username']) ?>" data-quote-body="<?= h($quoteBody) ?>">Quote</button>
                     <?php endif; ?>
@@ -136,7 +148,9 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                             <button type="submit" class="button-secondary">Delete</button>
                         </form>
                     <?php endif; ?>
-                </div>
+                <?php endif; ?>
+            </div>
+            <?php if (is_array($authUser)): ?>
                 <?php if ($commentsOpen): ?>
                     <details class="thread-reply-details" id="<?= h($replyId) ?>">
                         <summary>Reply in this thread</summary>
@@ -177,7 +191,18 @@ $renderCommentTree = static function (array $comment, string $composerId, string
     </div>
     <?php
 };
+$pageWidgets = is_array($pageWidgets ?? null) ? $pageWidgets : [];
+$hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
+$widgetZone = '';
+$questionShareUrl = url('/question/' . rawurlencode((string) $question['slug']));
+$questionShareTitle = (string) ($question['title'] ?? t('questions.share.question_title', 'Question'));
 ?>
+<?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
+<?php if ($hasDynamicWidgets): ?>
+    <div class="content-with-widgets question-with-widgets">
+        <?php $widgetZone = 'left'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
+        <div class="dynamic-widget-main">
+<?php endif; ?>
 <article class="question-detail">
     <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a href="/">Questions</a>
@@ -232,7 +257,10 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                 </div>
                 <div class="question-meta-right">
                     <p class="meta question-asked-meta">Asked by <a href="/user/<?= rawurlencode((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
-                    <?php if (is_array($authUser)): ?><div class="post-actions question-report-actions"><?php $renderReportButton('question', (int) $question['id'], 'Report question'); ?></div><?php endif; ?>
+                    <div class="post-actions question-report-actions">
+                        <?php $renderShareLink($questionShareUrl, $questionShareTitle, t('questions.share.question', 'Share question')); ?>
+                        <?php if (is_array($authUser)): ?><?php $renderReportButton('question', (int) $question['id'], 'Report question'); ?><?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -309,6 +337,8 @@ $renderCommentTree = static function (array $comment, string $composerId, string
         $isAccepted = (int) $answer['is_accepted'] === 1;
         $isCommunityChosen = !empty($answer['is_community_chosen']);
         $communityScore = (int) ($answer['community_score'] ?? ((int) ($answer['votes'] ?? 0) + (int) ($answer['reaction_score'] ?? 0)));
+        $answerShareUrl = url('/question/' . rawurlencode((string) $question['slug']) . '#answer-' . (int) $answer['id']);
+        $answerShareTitle = strtr(t('questions.share.answer_title', 'Answer by :username', ['username' => (string) ($answer['username'] ?? '')]), [':username' => (string) ($answer['username'] ?? '')]);
         $answerClasses = ['answer'];
         if ($isAccepted) {
             $answerClasses[] = 'answer-accepted';
@@ -341,9 +371,9 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                             <?php if (!empty($answer['review_note'])): ?><br><?= h((string) $answer['review_note']) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>
-                    <?php if (is_array($authUser)): ?>
-                        <?php $canAcceptAnswer = (int) $authUser['id'] === (int) $question['user_id']; ?>
-                        <div class="answer-action-layout">
+                    <?php $canAcceptAnswer = is_array($authUser) && (int) $authUser['id'] === (int) $question['user_id']; ?>
+                    <div class="answer-action-layout">
+                        <?php if (is_array($authUser)): ?>
                             <?php if ($canAcceptAnswer || $canModerate): ?>
                                 <div class="moderation-actions inline-moderation-actions answer-action-bar">
                                     <?php if ($canAcceptAnswer): ?>
@@ -373,9 +403,12 @@ $renderCommentTree = static function (array $comment, string $composerId, string
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>
-                            <div class="post-actions answer-report-actions"><?php $renderReportButton('answer', (int) $answer['id'], 'Report answer'); ?></div>
+                        <?php endif; ?>
+                        <div class="post-actions answer-report-actions">
+                            <?php $renderShareLink($answerShareUrl, $answerShareTitle, t('questions.share.answer', 'Share answer')); ?>
+                            <?php if (is_array($authUser)): ?><?php $renderReportButton('answer', (int) $answer['id'], 'Report answer'); ?><?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    </div>
                     <section class="comments" aria-label="Answer clarifications">
                         <?php $answerCommentTree = $answerCommentTrees[(int) $answer['id']] ?? []; ?>
                         <?php foreach (($answerCommentTree[0] ?? []) as $comment): ?>
@@ -437,4 +470,9 @@ $renderCommentTree = static function (array $comment, string $composerId, string
     <p class="flash">This question is closed to new answers.</p>
 <?php else: ?>
     <p><a href="/login">Sign in</a> to answer.</p>
+<?php endif; ?>
+<?php if ($hasDynamicWidgets): ?>
+        </div>
+        <?php $widgetZone = 'right'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
+    </div>
 <?php endif; ?>

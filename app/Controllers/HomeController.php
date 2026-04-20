@@ -9,6 +9,7 @@ use App\Models\CategoryModel;
 use App\Models\SettingsModel;
 use App\Models\UserModel;
 use App\Services\SeoService;
+use App\Services\WidgetService;
 use Core\Controller;
 use Core\Csrf;
 use Core\Request;
@@ -19,8 +20,9 @@ use Core\View;
 final class HomeController extends Controller
 {
     private const PAGE_SIZE = 20;
+    private const LANDING_PAGE_SIZE = 15;
 
-    public function __construct(View $view, Session $session, Csrf $csrf, private readonly QuestionModel $questions, private readonly CategoryModel $categories, private readonly UserModel $users, private readonly SeoService $seo, private readonly SettingsModel $settings)
+    public function __construct(View $view, Session $session, Csrf $csrf, private readonly QuestionModel $questions, private readonly CategoryModel $categories, private readonly UserModel $users, private readonly SeoService $seo, private readonly SettingsModel $settings, private readonly WidgetService $widgets)
     {
         parent::__construct($view, $session, $csrf);
     }
@@ -29,13 +31,14 @@ final class HomeController extends Controller
     public function index(Request $request, array $params): Response
     {
         $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = $this->intSetting('landing_questions_per_page', self::LANDING_PAGE_SIZE, 1, 50);
         $total = $this->questions->countLatest();
-        if ($this->pageOutOfRange($page, $total)) {
+        if ($this->pageOutOfRange($page, $total, $perPage)) {
             return $this->view('errors/http', ['status' => 404, 'message' => 'Page not found'], 404);
         }
-        $questions = $this->questions->withCardMeta($this->questions->latest(self::PAGE_SIZE, ($page - 1) * self::PAGE_SIZE));
+        $questions = $this->questions->withCardMeta($this->questions->latest($perPage, ($page - 1) * $perPage));
         $canonical = $page > 1 ? url('/questions/page/' . $page) : url('/');
-        $pagination = $this->pagination('/questions', $page, $total);
+        $pagination = $this->pagination('/questions', $page, $total, false, $perPage);
         $baseDescription = $this->siteDescription('Fresh community questions and expert answers.');
         $landingHeading = $this->setting('landing_questions_heading', 'Latest Questions');
         $pageHeading = $page > 1 ? $landingHeading . ' - Page ' . $page : $landingHeading;
@@ -49,6 +52,7 @@ final class HomeController extends Controller
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
+            'pageWidgets' => $request->path === '/' && $page === 1 ? $this->widgets->page('landing', (int) $this->session->get('user_id', 0) < 1) : [],
         ]);
     }
 
@@ -260,6 +264,21 @@ final class HomeController extends Controller
         }
 
         return $value !== '' ? $value : $fallback;
+    }
+
+    private function intSetting(string $key, int $fallback, int $min, int $max): int
+    {
+        try {
+            $value = trim($this->settings->get($key));
+        } catch (\Throwable) {
+            return $fallback;
+        }
+
+        if ($value === '' || !ctype_digit($value)) {
+            return $fallback;
+        }
+
+        return max($min, min($max, (int) $value));
     }
 
     private function pageOutOfRange(int $page, int $total, int $perPage = self::PAGE_SIZE): bool

@@ -1,4 +1,9 @@
 <?php declare(strict_types=1); ?>
+<?php
+$pageWidgets = is_array($pageWidgets ?? null) ? $pageWidgets : [];
+$hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
+$widgetZone = '';
+?>
 <section class="page-head">
     <h1><?= h($heading ?? $title ?? 'Latest Questions') ?></h1>
     <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
@@ -41,6 +46,14 @@
         <a href="/ask">Ask a Question</a>
     </nav>
 </section>
+
+<?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
+
+<?php if ($hasDynamicWidgets): ?>
+    <div class="content-with-widgets landing-with-widgets">
+        <?php $widgetZone = 'left'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
+        <div class="dynamic-widget-main">
+<?php endif; ?>
 
 <section class="question-list" aria-label="Questions">
     <?php if ($questions === []): ?>
@@ -160,4 +173,10 @@
         <?php endif; ?>
         <?php if (!empty($pagination['next'])): ?><a href="<?= h((string) $pagination['next']) ?>" rel="next">Next</a><?php endif; ?>
     </nav>
+<?php endif; ?>
+
+<?php if ($hasDynamicWidgets): ?>
+        </div>
+        <?php $widgetZone = 'right'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
+    </div>
 <?php endif; ?>

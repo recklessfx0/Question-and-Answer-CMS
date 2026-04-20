@@ -34,16 +34,26 @@ $redactedJob = static function (array $job): array {
 
 $isStaleNotification = static function (array $job): bool {
     $name = (string) ($job['job'] ?? '');
-    if (!in_array($name, ['AnswerPostedNotification', 'NotifyModerators', 'MentionNotification'], true)) {
+    $ttlByJob = [
+        'AnswerPostedNotification' => 172800,
+        'NotifyModerators' => 86400,
+        'MentionNotification' => 172800,
+    ];
+    if (!isset($ttlByJob[$name])) {
         return false;
     }
 
     $createdAt = strtotime((string) ($job['created_at'] ?? ''));
     if ($createdAt === false) {
-        return false;
+        $file = (string) ($job['__queue_file'] ?? '');
+        $mtime = $file !== '' && is_file($file) ? filemtime($file) : false;
+        if ($mtime === false) {
+            return false;
+        }
+        $createdAt = $mtime;
     }
 
-    return $createdAt < time() - 604800;
+    return $createdAt < time() - $ttlByJob[$name];
 };
 
 $logProcessed = static function (array $job) use ($redactedJob): void {

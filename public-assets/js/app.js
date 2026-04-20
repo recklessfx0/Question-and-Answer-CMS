@@ -79,6 +79,56 @@
         return html.length > 0 ? html.join('') : '<p class="meta">Nothing to preview yet.</p>';
     };
 
+    const setShareStatus = (trigger, message) => {
+        const action = trigger.closest('.share-action');
+        const status = action ? action.querySelector('[data-share-status]') : null;
+        if (!(status instanceof HTMLElement) || !message) {
+            return;
+        }
+
+        status.textContent = message;
+        window.setTimeout(() => {
+            if (status.textContent === message) {
+                status.textContent = '';
+            }
+        }, 2400);
+    };
+
+    document.addEventListener('click', async (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const trigger = target ? target.closest('[data-share-trigger]') : null;
+        if (!(trigger instanceof HTMLAnchorElement)) {
+            return;
+        }
+
+        const shareUrl = trigger.dataset.shareUrl || trigger.href;
+        const shareTitle = trigger.dataset.shareTitle || document.title;
+        if (!shareUrl) {
+            return;
+        }
+
+        event.preventDefault();
+
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: shareTitle, url: shareUrl });
+                return;
+            }
+
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(shareUrl);
+                setShareStatus(trigger, trigger.dataset.shareCopied || '');
+                return;
+            }
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+        }
+
+        setShareStatus(trigger, trigger.dataset.shareFailed || '');
+    });
+
     document.querySelectorAll('[data-markdown-editor]').forEach((textarea) => {
         if (!(textarea instanceof HTMLTextAreaElement)) {
             return;

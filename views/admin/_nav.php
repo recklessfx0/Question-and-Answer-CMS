@@ -4,6 +4,7 @@ $adminPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/admin'), PHP_URL_P
 $adminItems = [
     '/admin' => 'Overview',
     '/admin/settings' => 'Settings',
+    '/admin/widgets' => 'Widgets',
     '/admin/trust-pages' => 'Trust Pages',
     '/admin/languages' => 'Languages',
     '/admin/categories' => 'Categories',

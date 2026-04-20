@@ -31,6 +31,7 @@ final class AdminService
         private AuditLogModel $audit,
         private UploadService $uploads,
         private Slugger $slugger,
+        private WidgetService $widgets,
     ) {}
 
     /** @return array{users: array<int, array<string, mixed>>, stats: array<string, int>, settings: array<string, string>, categories: array<int, array<string, mixed>>, tags: array<int, array<string, mixed>>, gamificationLevels: array<int, array<string, mixed>>, languages: array<int, array<string, mixed>>, reactions: array<int, array<string, mixed>>, reports: array<int, array<string, mixed>>} */
@@ -56,6 +57,12 @@ final class AdminService
             'stats' => $this->questions->stats(),
             'settings' => $this->settings->all(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function widgetSettingsPage(): array
+    {
+        return array_merge($this->shell(), $this->widgets->adminPage());
     }
 
     /** @return array<string, mixed> */
@@ -310,6 +317,7 @@ final class AdminService
         $this->settings->set('default_meta_title', excerpt($input['default_meta_title'] ?? '', 120));
         $this->settings->set('default_meta_description', excerpt($input['default_meta_description'] ?? '', 200));
         $this->settings->set('landing_questions_heading', excerpt($input['landing_questions_heading'] ?? '', 120));
+        $this->settings->set('landing_questions_per_page', (string) max(1, min(50, (int) ($input['landing_questions_per_page'] ?? 15))));
         $this->settings->set('default_og_title', excerpt($input['default_og_title'] ?? '', 120));
         $this->settings->set('default_og_description', excerpt($input['default_og_description'] ?? '', 200));
         $this->settings->set('twitter_site', $this->socialHandle($input['twitter_site'] ?? ''));
@@ -389,6 +397,17 @@ final class AdminService
         }
         if ($changed !== []) {
             $this->audit->record($actorId, 'trust_pages_update', 'settings', 0, ['changed_keys' => $this->redactedSettingKeys($changed)]);
+        }
+    }
+
+    /** @param array<string, mixed> $input */
+    public function saveWidgetSettings(array $input, int $actorId): void
+    {
+        $before = $this->settings->get('dynamic_widgets_config', '');
+        $this->widgets->save($input);
+        $after = $this->settings->get('dynamic_widgets_config', '');
+        if ($before !== $after) {
+            $this->audit->record($actorId, 'widgets_update', 'settings', 0, ['changed_keys' => ['dynamic_widgets_config']]);
         }
     }
 

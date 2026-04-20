@@ -34,6 +34,14 @@ final class AdminController extends Controller
         return $this->adminView('admin/trust-pages', 'Admin Trust Pages', 'Manage about, contact, privacy, terms, and community guidelines.');
     }
 
+    public function widgetsPage(): Response
+    {
+        return $this->view('admin/widgets', array_merge([
+            'title' => 'Admin Dynamic Widgets',
+            'metaDescription' => 'Manage dynamic widgets and guest welcome messages.',
+        ], $this->admin->widgetSettingsPage()));
+    }
+
     public function languagesPage(Request $request): Response
     {
         return $this->view('admin/languages', array_merge([
@@ -133,6 +141,7 @@ final class AdminController extends Controller
             'default_meta_title' => $request->string('default_meta_title', 120),
             'default_meta_description' => $request->string('default_meta_description', 200),
             'landing_questions_heading' => $request->string('landing_questions_heading', 120),
+            'landing_questions_per_page' => (string) $request->int('landing_questions_per_page', 15, 1, 50),
             'default_og_title' => $request->string('default_og_title', 120),
             'default_og_description' => $request->string('default_og_description', 200),
             'twitter_site' => $request->string('twitter_site', 80),
@@ -175,6 +184,14 @@ final class AdminController extends Controller
         ], (int) $this->session->get('user_id', 0));
 
         return Response::redirect('/admin/trust-pages');
+    }
+
+    public function widgets(Request $request): Response
+    {
+        $this->admin->saveWidgetSettings($request->post, (int) $this->session->get('user_id', 0));
+        $this->flash('success', 'Widget settings updated.');
+
+        return Response::redirect('/admin/widgets');
     }
 
     public function createLanguage(Request $request): Response

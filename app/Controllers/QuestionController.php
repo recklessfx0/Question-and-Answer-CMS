@@ -10,6 +10,7 @@ use App\Services\CommunityChoiceService;
 use App\Services\QuestionService;
 use App\Services\ReactionService;
 use App\Services\SeoService;
+use App\Services\WidgetService;
 use Core\Controller;
 use Core\Csrf;
 use Core\Request;
@@ -29,6 +30,7 @@ final class QuestionController extends Controller
         private readonly ReactionService $reactionService,
         private readonly CommunityChoiceService $communityChoice,
         private readonly SeoService $seo,
+        private readonly WidgetService $widgets,
     ) {
         parent::__construct($view, $session, $csrf);
     }
@@ -113,6 +115,7 @@ final class QuestionController extends Controller
             'tags' => $tags,
             'related' => $this->questions->related((int) $question['id']),
             'schema' => $schema,
+            'pageWidgets' => $this->widgets->page('question', (int) $this->session->get('user_id', 0) < 1),
             'markdown' => fn (string $body): string => $this->service->markdown($body),
         ]);
     }
