@@ -739,22 +739,23 @@ final class UserModel
 
     private function removeUserContent(int $userId): void
     {
-        $questionRows = $this->db->fetchAll('SELECT id FROM questions WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]);
-        $answerRows = $this->db->fetchAll('SELECT id FROM answers WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]);
-        $commentRows = $this->db->fetchAll('SELECT id FROM comments WHERE user_id = :user', [':user' => $userId]);
+        $questionIds = $this->idsFromRows($this->db->fetchAll('SELECT id FROM questions WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]));
+        $answerIds = array_values(array_unique(array_merge(
+            $this->idsFromRows($this->db->fetchAll('SELECT id FROM answers WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId])),
+            $this->answerIdsForQuestions($questionIds)
+        )));
+        $commentIds = array_values(array_unique(array_merge(
+            $this->idsFromRows($this->db->fetchAll('SELECT id FROM comments WHERE user_id = :user', [':user' => $userId])),
+            $this->commentIdsForQuestions($questionIds),
+            $this->commentIdsForAnswers($answerIds)
+        )));
 
-        $questionIds = array_map(static fn (array $row): int => (int) $row['id'], $questionRows);
-        $answerIds = array_map(static fn (array $row): int => (int) $row['id'], $answerRows);
-        $commentIds = array_map(static fn (array $row): int => (int) $row['id'], $commentRows);
+        $this->deleteReputationFootprint($questionIds, $answerIds, $commentIds);
 
         if ($questionIds !== []) {
             $params = [];
             $in = $this->inParams($questionIds, 'delete_user_question', $params);
             $this->db->execute("UPDATE questions SET deleted_at = NOW(), accepted_answer_id = NULL, updated_at = NOW() WHERE id IN ({$in})", $params);
-            $this->db->execute("UPDATE answers SET deleted_at = NOW(), is_accepted = 0, updated_at = NOW() WHERE question_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM votes WHERE post_type = 'question' AND post_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM flags WHERE post_type = 'question' AND post_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM post_reactions WHERE post_type = 'question' AND post_id IN ({$in})", $params);
         }
 
         if ($answerIds !== []) {
@@ -762,17 +763,128 @@ final class UserModel
             $in = $this->inParams($answerIds, 'delete_user_answer', $params);
             $this->db->execute("UPDATE answers SET deleted_at = NOW(), is_accepted = 0, updated_at = NOW() WHERE id IN ({$in})", $params);
             $this->db->execute("UPDATE questions SET accepted_answer_id = NULL, updated_at = NOW() WHERE accepted_answer_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM votes WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM flags WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM post_reactions WHERE post_type = 'answer' AND post_id IN ({$in})", $params);
         }
 
         if ($commentIds !== []) {
             $params = [];
             $in = $this->inParams($commentIds, 'delete_user_comment', $params);
-            $this->db->execute("DELETE FROM votes WHERE post_type = 'comment' AND post_id IN ({$in})", $params);
-            $this->db->execute("DELETE FROM flags WHERE post_type = 'comment' AND post_id IN ({$in})", $params);
             $this->db->execute("DELETE FROM comments WHERE id IN ({$in})", $params);
+        }
+
+        $this->deletePostReferences('votes', 'question', $questionIds, 'delete_user_question_vote');
+        $this->deletePostReferences('votes', 'answer', $answerIds, 'delete_user_answer_vote');
+        $this->deletePostReferences('votes', 'comment', $commentIds, 'delete_user_comment_vote');
+        $this->deletePostReferences('flags', 'question', $questionIds, 'delete_user_question_flag');
+        $this->deletePostReferences('flags', 'answer', $answerIds, 'delete_user_answer_flag');
+        $this->deletePostReferences('flags', 'comment', $commentIds, 'delete_user_comment_flag');
+        $this->deletePostReferences('post_reactions', 'question', $questionIds, 'delete_user_question_reaction');
+        $this->deletePostReferences('post_reactions', 'answer', $answerIds, 'delete_user_answer_reaction');
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, int>
+     */
+    private function idsFromRows(array $rows): array
+    {
+        return array_values(array_unique(array_map(static fn (array $row): int => (int) $row['id'], $rows)));
+    }
+
+    /** @param array<int, int> $questionIds @return array<int, int> */
+    private function answerIdsForQuestions(array $questionIds): array
+    {
+        if ($questionIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $in = $this->inParams($questionIds, 'delete_user_question_answer', $params);
+
+        return $this->idsFromRows($this->db->fetchAll("SELECT id FROM answers WHERE question_id IN ({$in})", $params));
+    }
+
+    /** @param array<int, int> $questionIds @return array<int, int> */
+    private function commentIdsForQuestions(array $questionIds): array
+    {
+        if ($questionIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $in = $this->inParams($questionIds, 'delete_user_question_comment', $params);
+
+        return $this->idsFromRows($this->db->fetchAll("SELECT id FROM comments WHERE question_id IN ({$in})", $params));
+    }
+
+    /** @param array<int, int> $answerIds @return array<int, int> */
+    private function commentIdsForAnswers(array $answerIds): array
+    {
+        if ($answerIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $in = $this->inParams($answerIds, 'delete_user_answer_comment', $params);
+
+        return $this->idsFromRows($this->db->fetchAll("SELECT id FROM comments WHERE answer_id IN ({$in})", $params));
+    }
+
+    /**
+     * @param array<int, int> $questionIds
+     * @param array<int, int> $answerIds
+     * @param array<int, int> $commentIds
+     */
+    private function deleteReputationFootprint(array $questionIds, array $answerIds, array $commentIds): void
+    {
+        $conditions = [];
+        $params = [];
+
+        if ($questionIds !== []) {
+            $questionIn = $this->inParams($questionIds, 'delete_user_rep_question', $params);
+            $conditions[] = "(source_type = 'question' AND source_id IN ({$questionIn}))";
+        }
+
+        if ($answerIds !== []) {
+            $answerIn = $this->inParams($answerIds, 'delete_user_rep_answer', $params);
+            $conditions[] = "(source_type = 'answer' AND source_id IN ({$answerIn}))";
+        }
+
+        if ($commentIds !== []) {
+            $commentIn = $this->inParams($commentIds, 'delete_user_rep_comment', $params);
+            $conditions[] = "(source_type = 'comment' AND source_id IN ({$commentIn}))";
+        }
+
+        if ($conditions === []) {
+            return;
+        }
+
+        $where = implode(' OR ', $conditions);
+        $affectedUsers = $this->idsFromRows($this->db->fetchAll("SELECT DISTINCT user_id AS id FROM reputation_events WHERE {$where}", $params));
+        $this->db->execute("DELETE FROM reputation_events WHERE {$where}", $params);
+        $this->recalculateReputation($affectedUsers);
+    }
+
+    /** @param array<int, int> $ids */
+    private function deletePostReferences(string $table, string $postType, array $ids, string $prefix): void
+    {
+        if ($ids === [] || !in_array($table, ['votes', 'flags', 'post_reactions'], true)) {
+            return;
+        }
+
+        $params = [':post_type' => $postType];
+        $in = $this->inParams($ids, $prefix, $params);
+        $this->db->execute("DELETE FROM {$table} WHERE post_type = :post_type AND post_id IN ({$in})", $params);
+    }
+
+    /** @param array<int, int> $userIds */
+    private function recalculateReputation(array $userIds): void
+    {
+        foreach (array_values(array_unique($userIds)) as $userId) {
+            $total = $this->db->fetch('SELECT COALESCE(SUM(points), 0) AS total FROM reputation_events WHERE user_id = :user', [':user' => $userId]);
+            $this->db->execute(
+                'UPDATE users SET reputation = GREATEST(0, :reputation), updated_at = NOW() WHERE id = :id',
+                [':reputation' => (int) ($total['total'] ?? 0), ':id' => $userId]
+            );
         }
     }
 
