@@ -135,7 +135,7 @@ final class AdminController extends Controller
     public function settings(Request $request): Response
     {
         $this->admin->saveSettings([
-            'site_title' => $request->string('site_title', 100),
+            'site_title' => $request->string('site_title', 80),
             'site_url' => $request->string('site_url', 255),
             'site_description' => $request->string('site_description', 200),
             'default_meta_title' => $request->string('default_meta_title', 120),
@@ -144,8 +144,8 @@ final class AdminController extends Controller
             'landing_questions_per_page' => (string) $request->int('landing_questions_per_page', 15, 1, 50),
             'default_og_title' => $request->string('default_og_title', 120),
             'default_og_description' => $request->string('default_og_description', 200),
-            'twitter_site' => $request->string('twitter_site', 80),
-            'twitter_creator' => $request->string('twitter_creator', 80),
+            'twitter_site' => $request->string('twitter_site', 31),
+            'twitter_creator' => $request->string('twitter_creator', 31),
             'recaptcha_enabled' => (string) $request->int('recaptcha_enabled', 0, 0, 1),
             'recaptcha_site_key' => $request->string('recaptcha_site_key', 255),
             'recaptcha_secret_key' => $request->string('recaptcha_secret_key', 255),

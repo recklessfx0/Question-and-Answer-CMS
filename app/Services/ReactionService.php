@@ -32,7 +32,7 @@ final class ReactionService
             $reason = (int) $result['reputation_delta'] > 0 ? 'reaction_' . (string) $result['slug'] : 'reaction_removed_' . (string) $result['slug'];
             $this->gamification->award((int) $result['target_user_id'], (int) $result['reputation_delta'], $reason, $postType, $postId);
         }
-        if ($result !== null && !empty($result['added'])) {
+        if ($result !== null && !empty($result['added']) && (int) ($result['reputation_delta'] ?? 0) > 0) {
             $url = '/question/' . (string) $result['question_slug'] . ($postType === 'answer' ? '#answer-' . $postId : '');
             $this->queueNotification('MentionNotification', [
                 'user_id' => (int) $result['target_user_id'],

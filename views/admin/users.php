@@ -27,7 +27,7 @@ $authUserId = is_array($authUser ?? null) ? (int) ($authUser['id'] ?? 0) : 0;
     </div>
     <form method="get" action="/admin/users" class="admin-search-form">
         <label>Search users
-            <input name="q" value="<?= h($search) ?>" maxlength="80" autocomplete="off" placeholder="Username or email…">
+            <input name="q" value="<?= h($search) ?>" maxlength="80" autocomplete="off" placeholder="Username or email...">
         </label>
         <div class="admin-search-actions">
             <button type="submit">Search Users</button>
