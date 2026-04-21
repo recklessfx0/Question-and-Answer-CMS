@@ -27,9 +27,7 @@ final class TranslationService
     public function boot(Request $request): void
     {
         try {
-            if (!$this->languages->defaultTranslationsSeeded($this->defaults)) {
-                $this->languages->seedDefaults($this->defaults);
-            }
+            $this->ensureDefaultsSeeded();
             $active = $this->languages->all(true);
             $default = $this->languages->defaultLanguage();
             $this->languageCode = $this->chooseLanguage($request, $active, is_array($default) ? (string) $default['code'] : 'en');
@@ -55,6 +53,33 @@ final class TranslationService
     public function languageCode(): string
     {
         return $this->languageCode;
+    }
+
+    private function ensureDefaultsSeeded(): void
+    {
+        $stamp = $this->defaultsStampPath();
+        if (is_file($stamp)) {
+            return;
+        }
+
+        if (!$this->languages->defaultTranslationsSeeded($this->defaults)) {
+            $this->languages->seedDefaults($this->defaults);
+        }
+
+        $directory = dirname($stamp);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0750, true);
+        }
+
+        @file_put_contents($stamp, date(DATE_ATOM) . PHP_EOL, LOCK_EX);
+    }
+
+    private function defaultsStampPath(): string
+    {
+        $encoded = json_encode($this->defaults, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $hash = hash('sha256', $encoded);
+
+        return STORAGE_PATH . '/cache/translations/defaults-' . $hash . '.stamp';
     }
 
     /** @param array<int, array<string, mixed>> $activeLanguages */
