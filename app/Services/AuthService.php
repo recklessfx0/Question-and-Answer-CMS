@@ -135,6 +135,8 @@ final class AuthService
         $user = $this->users->findByIdWithSecurity($userId);
         if (
             $user === null
+            || !empty($user['deleted_at'])
+            || !empty($user['banned_at'])
             || ($user['role'] ?? '') !== 'administrator'
             || empty($user['two_factor_enabled_at'])
             || !$twoFactor->verify((string) ($user['two_factor_secret'] ?? ''), $code)
