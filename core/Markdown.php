@@ -158,7 +158,7 @@ final class Markdown
             return null;
         }
 
-        $user = $this->users->findByUsername($username);
+        $user = $this->users->findMentionableByUsername($username);
         $slug = is_array($user) ? (string) ($user['username'] ?? '') : '';
         $this->mentionSlugs[$key] = $slug !== '' ? $slug : null;
 

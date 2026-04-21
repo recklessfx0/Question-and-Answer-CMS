@@ -59,6 +59,20 @@ final class UserModel
         return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, banned_at, deleted_at, created_at FROM users WHERE username = :username LIMIT 1', [':username' => $username]);
     }
 
+    /** @return array<string, mixed>|null */
+    public function findMentionableByUsername(string $username): ?array
+    {
+        return $this->db->fetch(
+            'SELECT id, username, avatar_path, reputation
+             FROM users
+             WHERE username = :username
+               AND deleted_at IS NULL
+               AND banned_at IS NULL
+             LIMIT 1',
+            [':username' => $username]
+        );
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function suggestMentions(string $query, int $limit = 6): array
     {
@@ -74,6 +88,7 @@ final class UserModel
             'SELECT id, username, avatar_path, reputation
              FROM users
              WHERE deleted_at IS NULL
+               AND banned_at IS NULL
                AND username LIKE :contains
              ORDER BY
                CASE WHEN username LIKE :prefix THEN 0 ELSE 1 END,

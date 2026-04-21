@@ -13,6 +13,10 @@ final class NotificationModel
     /** @param array<string, mixed> $payload */
     public function create(int $userId, string $type, array $payload): void
     {
+        if (!$this->recipientIsActive($userId)) {
+            return;
+        }
+
         $this->db->execute(
             'INSERT INTO notifications (user_id, type, payload, created_at) VALUES (:user, :type, :payload, NOW())',
             [':user' => $userId, ':type' => $type, ':payload' => json_encode($payload, JSON_THROW_ON_ERROR)]
@@ -30,6 +34,20 @@ final class NotificationModel
         $windowSeconds = min($windowSeconds, 7 * 86400);
 
         return $this->db->transaction(function () use ($userId, $type, $encodedPayload, $windowSeconds): bool {
+            $recipient = $this->db->fetch(
+                'SELECT id
+                 FROM users
+                 WHERE id = :user
+                   AND deleted_at IS NULL
+                   AND banned_at IS NULL
+                 LIMIT 1
+                 FOR UPDATE',
+                [':user' => $userId]
+            );
+            if ($recipient === null) {
+                return false;
+            }
+
             $existing = $this->db->fetch(
                 'SELECT id
                  FROM notifications
@@ -127,5 +145,22 @@ final class NotificationModel
         ksort($payload);
 
         return json_encode($payload, JSON_THROW_ON_ERROR);
+    }
+
+    private function recipientIsActive(int $userId): bool
+    {
+        if ($userId < 1) {
+            return false;
+        }
+
+        return $this->db->fetch(
+            'SELECT id
+             FROM users
+             WHERE id = :user
+               AND deleted_at IS NULL
+               AND banned_at IS NULL
+             LIMIT 1',
+            [':user' => $userId]
+        ) !== null;
     }
 }

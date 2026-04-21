@@ -299,7 +299,7 @@ final class ModerationService
             }
             $seenNames[$key] = true;
 
-            $user = $this->users->findByUsername((string) $username);
+            $user = $this->users->findMentionableByUsername((string) $username);
             if ($user === null || (int) ($user['id'] ?? 0) === $authorId) {
                 continue;
             }
