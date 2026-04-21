@@ -5,6 +5,7 @@ $hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
 $widgetZone = '';
 ?>
 <section class="page-head">
+    <?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
     <h1><?= h($heading ?? $title ?? 'Latest Questions') ?></h1>
     <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
     <?php if (!empty($category) && is_array($category)): ?>
@@ -46,8 +47,6 @@ $widgetZone = '';
         <a href="/ask">Ask a Question</a>
     </nav>
 </section>
-
-<?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
 
 <?php if ($hasDynamicWidgets): ?>
     <div class="content-with-widgets landing-with-widgets">
