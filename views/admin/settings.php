@@ -8,7 +8,7 @@
     <form method="post" action="/admin/settings" class="admin-form" enctype="multipart/form-data">
         <?= $csrf->field('/admin/settings') ?>
         <h2>SEO</h2>
-        <label>Site title <input name="site_title" value="<?= h($settings['site_title'] ?? '') ?>" maxlength="100"></label>
+        <label>Site title <input name="site_title" value="<?= h($settings['site_title'] ?? '') ?>" maxlength="80"></label>
         <label>Default meta title <input name="default_meta_title" value="<?= h($settings['default_meta_title'] ?? '') ?>" maxlength="120" placeholder="<?= h((string) ($settings['site_title'] ?? 'Question And Answer Platform')) ?>"></label>
         <label>Website logo <input name="site_logo" type="file" accept="image/avif,image/webp,image/svg+xml,image/jpeg,image/png,image/gif,image/*"></label>
         <?php if (!empty($settings['site_logo_path'])): ?>
@@ -44,8 +44,8 @@
             </div>
         <?php endif; ?>
         <div class="form-row">
-            <label>X/Twitter site handle <input name="twitter_site" value="<?= h($settings['twitter_site'] ?? '') ?>" maxlength="80" placeholder="@site"></label>
-            <label>X/Twitter creator handle <input name="twitter_creator" value="<?= h($settings['twitter_creator'] ?? '') ?>" maxlength="80" placeholder="@creator"></label>
+            <label>X/Twitter site handle <input name="twitter_site" value="<?= h($settings['twitter_site'] ?? '') ?>" maxlength="31" placeholder="@site"></label>
+            <label>X/Twitter creator handle <input name="twitter_creator" value="<?= h($settings['twitter_creator'] ?? '') ?>" maxlength="31" placeholder="@creator"></label>
         </div>
         <h2>Google reCAPTCHA</h2>
         <label class="checkbox-label"><input name="recaptcha_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'recaptcha_enabled') ? 'checked' : '' ?>> Enable reCAPTCHA on account forms</label>

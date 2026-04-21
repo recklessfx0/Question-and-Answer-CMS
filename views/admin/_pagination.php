@@ -16,7 +16,7 @@
         <?php $window = is_array($adminPagination['window'] ?? null) ? $adminPagination['window'] : []; ?>
         <?php if ($window !== [] && (int) $window[0] > 1): ?>
             <a href="<?= h($adminPageHref(1)) ?>">1</a>
-            <?php if ((int) $window[0] > 2): ?><span>…</span><?php endif; ?>
+            <?php if ((int) $window[0] > 2): ?><span>&hellip;</span><?php endif; ?>
         <?php endif; ?>
         <?php foreach ($window as $pageNumber): ?>
             <?php $target = (int) $pageNumber; ?>
@@ -28,7 +28,7 @@
             <?php endif; ?>
         <?php endforeach; ?>
         <?php if ($window !== [] && (int) end($window) < (int) ($adminPagination['total_pages'] ?? 1)): ?>
-            <?php if ((int) end($window) < (int) ($adminPagination['total_pages'] ?? 1) - 1): ?><span>…</span><?php endif; ?>
+            <?php if ((int) end($window) < (int) ($adminPagination['total_pages'] ?? 1) - 1): ?><span>&hellip;</span><?php endif; ?>
             <?php $last = (int) $adminPagination['total_pages']; ?>
             <a href="<?= h($adminPageHref($last)) ?>"><?= $last ?></a>
         <?php endif; ?>

@@ -72,8 +72,8 @@ if (isset($schemas) && is_array($schemas)) {
     <meta name="description" content="<?= h($description) ?>">
     <meta name="robots" content="<?= h($robotsContent) ?>">
     <link rel="canonical" href="<?= h($canonicalUrl) ?>">
-    <?php if (!empty($pagination['previous'])): ?><link rel="prev" href="<?= h(url((string) $pagination['previous'])) ?>"><?php endif; ?>
-    <?php if (!empty($pagination['next'])): ?><link rel="next" href="<?= h(url((string) $pagination['next'])) ?>"><?php endif; ?>
+    <?php if (!empty($pagination['previous'])): ?><link rel="prev" href="<?= h((string) $pagination['previous']) ?>"><?php endif; ?>
+    <?php if (!empty($pagination['next'])): ?><link rel="next" href="<?= h((string) $pagination['next']) ?>"><?php endif; ?>
     <?php if (isset($authorName) && is_string($authorName) && trim($authorName) !== ''): ?><meta name="author" content="<?= h($authorName) ?>"><?php endif; ?>
     <?php if (isset($keywords) && is_string($keywords) && trim($keywords) !== ''): ?><meta name="keywords" content="<?= h($keywords) ?>"><?php endif; ?>
     <meta property="og:title" content="<?= h($ogTitleContent) ?>">
