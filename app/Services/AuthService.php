@@ -99,9 +99,7 @@ final class AuthService
         $this->limiter->reset('login-account', $emailKey);
 
         if (($user['role'] ?? '') === 'administrator' && !empty($user['two_factor_enabled_at']) && !empty($user['two_factor_secret'])) {
-            $this->session->regenerate();
-            $this->session->set('two_factor_user_id', (int) $user['id']);
-            $this->session->set('two_factor_started_at', time());
+            $this->beginPendingTwoFactor((int) $user['id']);
             return 'two_factor';
         }
 
@@ -231,6 +229,7 @@ final class AuthService
     /** @param array<string, mixed> $user */
     private function loginSession(array $user): void
     {
+        $this->clearPendingTwoFactor();
         $this->session->regenerate();
         $this->session->set('user_id', (int) $user['id']);
         if (array_key_exists('auth_fingerprint', $user)) {
@@ -286,6 +285,16 @@ final class AuthService
     {
         $this->session->remove('two_factor_user_id');
         $this->session->remove('two_factor_started_at');
+    }
+
+    private function beginPendingTwoFactor(int $userId): void
+    {
+        $this->session->regenerate();
+        $this->session->remove('user_id');
+        $this->session->remove('user');
+        $this->session->remove('_auth_fingerprint');
+        $this->session->set('two_factor_user_id', $userId);
+        $this->session->set('two_factor_started_at', time());
     }
 
     private function identityKey(string $email): string

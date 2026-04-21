@@ -98,15 +98,14 @@ final class GoogleAuthService
         if (($user['role'] ?? '') === 'administrator') {
             $secureUser = $this->users->findByIdWithSecurity((int) $user['id']);
             if ($secureUser !== null && !empty($secureUser['two_factor_enabled_at']) && !empty($secureUser['two_factor_secret'])) {
-                $this->session->regenerate();
-                $this->session->set('two_factor_user_id', (int) $secureUser['id']);
-                $this->session->set('two_factor_started_at', time());
+                $this->beginPendingTwoFactor((int) $secureUser['id']);
 
                 return 'two_factor';
             }
         }
 
         $this->users->updateLastLogin((int) $user['id']);
+        $this->clearPendingTwoFactor();
         $this->session->regenerate();
         $this->session->set('user_id', (int) $user['id']);
         if (array_key_exists('auth_fingerprint', $user)) {
@@ -121,6 +120,22 @@ final class GoogleAuthService
     private function redirectUri(): string
     {
         return url('/auth/google/callback');
+    }
+
+    private function clearPendingTwoFactor(): void
+    {
+        $this->session->remove('two_factor_user_id');
+        $this->session->remove('two_factor_started_at');
+    }
+
+    private function beginPendingTwoFactor(int $userId): void
+    {
+        $this->session->regenerate();
+        $this->session->remove('user_id');
+        $this->session->remove('user');
+        $this->session->remove('_auth_fingerprint');
+        $this->session->set('two_factor_user_id', $userId);
+        $this->session->set('two_factor_started_at', time());
     }
 
     private function createGoogleUser(string $name, string $email, string $hash): ?int
