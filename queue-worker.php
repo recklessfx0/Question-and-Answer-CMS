@@ -124,7 +124,7 @@ while (true) {
         }
 
         if ($name === 'NotifyModerators') {
-            foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator")') as $moderator) {
+            foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator") AND deleted_at IS NULL AND banned_at IS NULL') as $moderator) {
                 $createNotification((int) $moderator['id'], 'New question', ['message' => 'A new question was posted.', 'url' => '/moderator'], 86400);
             }
         }

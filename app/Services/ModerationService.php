@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\QuestionModel;
 use App\Models\AuditLogModel;
+use App\Models\NotificationModel;
 use App\Models\UserModel;
 use Core\Session;
 use Core\Queue;
@@ -20,6 +21,7 @@ final class ModerationService
     public function __construct(
         private QuestionModel $questions,
         private AuditLogModel $audit,
+        private NotificationModel $notifications,
         private GamificationService $gamification,
         private Session $session,
         private UserModel $users,
@@ -102,6 +104,7 @@ final class ModerationService
             );
         }
 
+        $this->notifyQuestionModerationDecision($moderatorId, $result, $decision);
         $this->audit->record($moderatorId, 'question_' . $decision, 'question', (int) $result['question_id']);
         return true;
     }
@@ -253,6 +256,30 @@ final class ModerationService
                 $this->logger->error($e);
             }
         }
+    }
+
+    /** @param array{question_id: int, user_id: int, title: string, slug: string, body: string} $result */
+    private function notifyQuestionModerationDecision(int $moderatorId, array $result, string $decision): void
+    {
+        $targetUserId = (int) ($result['user_id'] ?? 0);
+        if ($targetUserId < 1 || $targetUserId === $moderatorId) {
+            return;
+        }
+
+        $questionTitle = (string) ($result['title'] ?? 'your question');
+        $questionSlug = (string) ($result['slug'] ?? '');
+        $payload = $decision === 'approved'
+            ? [
+                'message' => 'Your question "' . $questionTitle . '" was approved.',
+                'url' => $questionSlug !== '' ? '/question/' . $questionSlug : '/notifications',
+            ]
+            : [
+                'message' => 'Your question "' . $questionTitle . '" was declined.',
+                'url' => '/ask',
+            ];
+
+        $type = $decision === 'approved' ? 'Question approved' : 'Question declined';
+        $this->notifications->createUniqueRecent($targetUserId, $type, $payload, 7 * 86400);
     }
 
     /** @return array<int, array<string, mixed>> */
