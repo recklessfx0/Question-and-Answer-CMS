@@ -7,6 +7,7 @@ $welcome = is_array($config['welcome'] ?? null) ? $config['welcome'] : [];
 $types = is_array($widgetTypes ?? null) ? $widgetTypes : [];
 $zones = is_array($widgetZones ?? null) ? $widgetZones : [];
 $pages = is_array($widgetPages ?? null) ? $widgetPages : [];
+$devices = is_array($widgetDevices ?? null) ? $widgetDevices : [];
 ?>
 <section class="page-head admin-page-head">
     <div>
@@ -29,6 +30,14 @@ $pages = is_array($widgetPages ?? null) ? $widgetPages : [];
             <input type="checkbox" name="widgets_enabled" value="1" <?= !empty($config['enabled']) ? 'checked' : '' ?>>
             <?= h(t('admin.widgets.enable_all', 'Enable dynamic widget columns')) ?>
         </label>
+        <div class="widget-page-options" aria-label="<?= h(t('admin.widgets.global_devices', 'Global widget devices')) ?>">
+            <?php foreach ($devices as $deviceKey => $deviceLabel): ?>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="widget_devices[]" value="<?= h((string) $deviceKey) ?>" <?= in_array($deviceKey, (array) ($config['devices'] ?? []), true) ? 'checked' : '' ?>>
+                    <?= h(strtr(t('admin.widgets.show_on_device', 'Show on :device'), [':device' => (string) $deviceLabel])) ?>
+                </label>
+            <?php endforeach; ?>
+        </div>
     </section>
 
     <section class="admin-create-panel widget-settings-panel">
@@ -104,6 +113,14 @@ $pages = is_array($widgetPages ?? null) ? $widgetPages : [];
                             <label class="checkbox-label">
                                 <input type="checkbox" name="widgets[<?= h((string) $type) ?>][pages][]" value="<?= h((string) $pageKey) ?>" <?= in_array($pageKey, (array) ($widget['pages'] ?? []), true) ? 'checked' : '' ?>>
                                 <?= h((string) $pageLabel) ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="widget-page-options" aria-label="<?= h((string) ($meta['label'] ?? $type) . ' devices') ?>">
+                        <?php foreach ($devices as $deviceKey => $deviceLabel): ?>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="widgets[<?= h((string) $type) ?>][devices][]" value="<?= h((string) $deviceKey) ?>" <?= in_array($deviceKey, (array) ($widget['devices'] ?? []), true) ? 'checked' : '' ?>>
+                                <?= h((string) $deviceLabel) ?>
                             </label>
                         <?php endforeach; ?>
                     </div>

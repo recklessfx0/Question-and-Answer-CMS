@@ -2,6 +2,14 @@
 <?php
 $pageWidgets = is_array($pageWidgets ?? null) ? $pageWidgets : [];
 $hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
+$widgetDevices = is_array($pageWidgets['devices'] ?? null) ? array_map('strval', $pageWidgets['devices']) : ['desktop', 'phone'];
+$widgetLayoutClass = '';
+if (!in_array('desktop', $widgetDevices, true)) {
+    $widgetLayoutClass .= ' widgets-hide-desktop';
+}
+if (!in_array('phone', $widgetDevices, true)) {
+    $widgetLayoutClass .= ' widgets-hide-phone';
+}
 $widgetZone = '';
 ?>
 <section class="page-head">
@@ -49,7 +57,7 @@ $widgetZone = '';
 </section>
 
 <?php if ($hasDynamicWidgets): ?>
-    <div class="content-with-widgets landing-with-widgets">
+    <div class="content-with-widgets landing-with-widgets<?= h($widgetLayoutClass) ?>">
         <?php $widgetZone = 'left'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
         <div class="dynamic-widget-main">
 <?php endif; ?>

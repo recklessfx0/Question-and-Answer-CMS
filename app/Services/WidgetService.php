@@ -12,6 +12,7 @@ final class WidgetService
 {
     private const SETTINGS_KEY = 'dynamic_widgets_config';
     private const MAX_LIMIT = 12;
+    private const DEVICES = ['desktop', 'phone'];
 
     /** @return array<string, array<string, string>> */
     public function types(): array
@@ -37,6 +38,7 @@ final class WidgetService
             'widgetTypes' => $this->types(),
             'widgetZones' => ['left' => 'Left column', 'right' => 'Right column'],
             'widgetPages' => ['landing' => 'Landing page', 'question' => 'Question pages'],
+            'widgetDevices' => ['desktop' => 'Desktop', 'phone' => 'Phone'],
         ];
     }
 
@@ -46,6 +48,7 @@ final class WidgetService
         $config = $this->config();
         $result = [
             'enabled' => !empty($config['enabled']),
+            'devices' => $this->cleanDevices(is_array($config['devices'] ?? null) ? $config['devices'] : self::DEVICES),
             'welcome' => null,
             'zones' => ['left' => [], 'right' => []],
             'has_widgets' => false,
@@ -59,12 +62,13 @@ final class WidgetService
             ];
         }
 
-        if (empty($config['enabled'])) {
+        if (empty($config['enabled']) || $result['devices'] === []) {
             return $result;
         }
 
         foreach ($config['widgets'] as $type => $widget) {
-            if (empty($widget['enabled']) || !in_array($page, $widget['pages'], true)) {
+            $devices = $this->cleanDevices(is_array($widget['devices'] ?? null) ? $widget['devices'] : self::DEVICES);
+            if (empty($widget['enabled']) || $devices === [] || !in_array($page, $widget['pages'], true)) {
                 continue;
             }
 
@@ -77,6 +81,7 @@ final class WidgetService
             $result['zones'][$zone][] = [
                 'type' => $type,
                 'title' => (string) $widget['title'],
+                'devices' => $devices,
                 'items' => $items,
             ];
             $result['has_widgets'] = true;
@@ -117,6 +122,7 @@ final class WidgetService
         $welcomeInput = is_array($input['guest_welcome'] ?? null) ? $input['guest_welcome'] : [];
         $config = [
             'enabled' => !empty($input['widgets_enabled']),
+            'devices' => $this->cleanDevices(is_array($input['widget_devices'] ?? null) ? $input['widget_devices'] : []),
             'welcome' => [
                 'enabled' => !empty($welcomeInput['enabled']),
                 'pages' => $this->cleanPages(is_array($welcomeInput['pages'] ?? null) ? $welcomeInput['pages'] : []),
@@ -141,6 +147,7 @@ final class WidgetService
                 'title' => $title !== '' ? $title : (string) $meta['label'],
                 'zone' => in_array($zone, ['left', 'right'], true) ? $zone : (string) $defaultWidget['zone'],
                 'pages' => $this->cleanPages(is_array($widgetInput['pages'] ?? null) ? $widgetInput['pages'] : []),
+                'devices' => $this->cleanDevices(is_array($widgetInput['devices'] ?? null) ? $widgetInput['devices'] : []),
                 'limit' => max(1, min(self::MAX_LIMIT, (int) ($widgetInput['limit'] ?? $defaultWidget['limit']))),
             ];
         }
@@ -154,6 +161,7 @@ final class WidgetService
         $defaults = $this->defaultConfig();
         $merged = $defaults;
         $merged['enabled'] = (bool) ($stored['enabled'] ?? $defaults['enabled']);
+        $merged['devices'] = $this->cleanDevices(is_array($stored['devices'] ?? null) ? $stored['devices'] : $defaults['devices']);
 
         if (is_array($stored['welcome'] ?? null)) {
             $welcome = $stored['welcome'];
@@ -179,6 +187,7 @@ final class WidgetService
                 'title' => $title !== '' ? $title : (string) $meta['label'],
                 'zone' => in_array($zone, ['left', 'right'], true) ? $zone : (string) $defaults['widgets'][$type]['zone'],
                 'pages' => $this->cleanPages(is_array($widget['pages'] ?? null) ? $widget['pages'] : $defaults['widgets'][$type]['pages']),
+                'devices' => $this->cleanDevices(is_array($widget['devices'] ?? null) ? $widget['devices'] : $defaults['widgets'][$type]['devices']),
                 'limit' => max(1, min(self::MAX_LIMIT, (int) ($widget['limit'] ?? $defaults['widgets'][$type]['limit']))),
             ];
         }
@@ -191,6 +200,7 @@ final class WidgetService
     {
         return [
             'enabled' => false,
+            'devices' => self::DEVICES,
             'welcome' => [
                 'enabled' => false,
                 'pages' => ['landing', 'question'],
@@ -199,13 +209,13 @@ final class WidgetService
                 'button_label' => 'Register',
             ],
             'widgets' => [
-                'categories' => ['enabled' => true, 'title' => 'Categories', 'zone' => 'left', 'pages' => ['landing', 'question'], 'limit' => 8],
-                'last_registered_users' => ['enabled' => true, 'title' => 'New Members', 'zone' => 'right', 'pages' => ['landing'], 'limit' => 6],
-                'popular_questions' => ['enabled' => true, 'title' => 'Popular Questions', 'zone' => 'right', 'pages' => ['landing', 'question'], 'limit' => 5],
-                'accepted_answers' => ['enabled' => false, 'title' => 'Accepted Answers', 'zone' => 'left', 'pages' => ['question'], 'limit' => 5],
-                'community_answers' => ['enabled' => false, 'title' => 'Community Chosen', 'zone' => 'right', 'pages' => ['landing', 'question'], 'limit' => 5],
-                'top_users' => ['enabled' => false, 'title' => 'Top Users', 'zone' => 'left', 'pages' => ['landing', 'question'], 'limit' => 6],
-                'platform_stats' => ['enabled' => true, 'title' => 'Platform Stats', 'zone' => 'left', 'pages' => ['landing'], 'limit' => 4],
+                'categories' => ['enabled' => true, 'title' => 'Categories', 'zone' => 'left', 'pages' => ['landing', 'question'], 'devices' => self::DEVICES, 'limit' => 8],
+                'last_registered_users' => ['enabled' => true, 'title' => 'New Members', 'zone' => 'right', 'pages' => ['landing'], 'devices' => self::DEVICES, 'limit' => 6],
+                'popular_questions' => ['enabled' => true, 'title' => 'Popular Questions', 'zone' => 'right', 'pages' => ['landing', 'question'], 'devices' => self::DEVICES, 'limit' => 5],
+                'accepted_answers' => ['enabled' => false, 'title' => 'Accepted Answers', 'zone' => 'left', 'pages' => ['question'], 'devices' => self::DEVICES, 'limit' => 5],
+                'community_answers' => ['enabled' => false, 'title' => 'Community Chosen', 'zone' => 'right', 'pages' => ['landing', 'question'], 'devices' => self::DEVICES, 'limit' => 5],
+                'top_users' => ['enabled' => false, 'title' => 'Top Users', 'zone' => 'left', 'pages' => ['landing', 'question'], 'devices' => self::DEVICES, 'limit' => 6],
+                'platform_stats' => ['enabled' => true, 'title' => 'Platform Stats', 'zone' => 'left', 'pages' => ['landing'], 'devices' => self::DEVICES, 'limit' => 4],
             ],
         ];
     }
@@ -214,6 +224,12 @@ final class WidgetService
     private function cleanPages(array $pages): array
     {
         return array_values(array_unique(array_intersect(['landing', 'question'], array_map('strval', $pages))));
+    }
+
+    /** @param array<int, mixed> $devices @return array<int, string> */
+    private function cleanDevices(array $devices): array
+    {
+        return array_values(array_unique(array_intersect(self::DEVICES, array_map('strval', $devices))));
     }
 
     private function cleanText(string $value, int $length): string

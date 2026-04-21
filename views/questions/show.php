@@ -193,13 +193,21 @@ $renderCommentTree = static function (array $comment, string $composerId, string
 };
 $pageWidgets = is_array($pageWidgets ?? null) ? $pageWidgets : [];
 $hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
+$widgetDevices = is_array($pageWidgets['devices'] ?? null) ? array_map('strval', $pageWidgets['devices']) : ['desktop', 'phone'];
+$widgetLayoutClass = '';
+if (!in_array('desktop', $widgetDevices, true)) {
+    $widgetLayoutClass .= ' widgets-hide-desktop';
+}
+if (!in_array('phone', $widgetDevices, true)) {
+    $widgetLayoutClass .= ' widgets-hide-phone';
+}
 $widgetZone = '';
 $questionShareUrl = url('/question/' . rawurlencode((string) $question['slug']));
 $questionShareTitle = (string) ($question['title'] ?? t('questions.share.question_title', 'Question'));
 ?>
 <?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
 <?php if ($hasDynamicWidgets): ?>
-    <div class="content-with-widgets question-with-widgets">
+    <div class="content-with-widgets question-with-widgets<?= h($widgetLayoutClass) ?>">
         <?php $widgetZone = 'left'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
         <div class="dynamic-widget-main">
 <?php endif; ?>

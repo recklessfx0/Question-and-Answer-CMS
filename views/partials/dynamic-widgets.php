@@ -2,19 +2,41 @@
 <?php
 $zone = is_string($widgetZone ?? null) ? $widgetZone : '';
 $widgetsForZone = is_array($pageWidgets['zones'][$zone] ?? null) ? $pageWidgets['zones'][$zone] : [];
+$columnDevices = [];
+foreach ($widgetsForZone as $widgetForDevice) {
+    $widgetDevices = is_array($widgetForDevice['devices'] ?? null) ? array_map('strval', $widgetForDevice['devices']) : ['desktop', 'phone'];
+    foreach ($widgetDevices as $device) {
+        $columnDevices[$device] = true;
+    }
+}
+$columnDeviceClass = '';
+if (empty($columnDevices['desktop'])) {
+    $columnDeviceClass .= ' widgets-column-phone-only';
+}
+if (empty($columnDevices['phone'])) {
+    $columnDeviceClass .= ' widgets-column-desktop-only';
+}
 $initial = static function (string $name): string {
     $name = trim($name);
     return $name !== '' ? mb_strtoupper(mb_substr($name, 0, 1)) : '?';
 };
 ?>
 <?php if ($widgetsForZone !== []): ?>
-    <aside class="dynamic-widget-column dynamic-widget-<?= h($zone) ?>" aria-label="<?= h(t('widgets.column.label', 'Dynamic widgets')) ?>">
+    <aside class="dynamic-widget-column dynamic-widget-<?= h($zone) ?><?= h($columnDeviceClass) ?>" aria-label="<?= h(t('widgets.column.label', 'Dynamic widgets')) ?>">
         <?php foreach ($widgetsForZone as $widget): ?>
             <?php
             $type = (string) ($widget['type'] ?? '');
             $items = is_array($widget['items'] ?? null) ? $widget['items'] : [];
+            $widgetDevices = is_array($widget['devices'] ?? null) ? array_map('strval', $widget['devices']) : ['desktop', 'phone'];
+            $widgetDeviceClass = '';
+            if (!in_array('desktop', $widgetDevices, true)) {
+                $widgetDeviceClass .= ' dynamic-widget-phone-only';
+            }
+            if (!in_array('phone', $widgetDevices, true)) {
+                $widgetDeviceClass .= ' dynamic-widget-desktop-only';
+            }
             ?>
-            <section class="dynamic-widget dynamic-widget-type-<?= h($type) ?>">
+            <section class="dynamic-widget dynamic-widget-type-<?= h($type) ?><?= h($widgetDeviceClass) ?>">
                 <h2><?= h((string) ($widget['title'] ?? '')) ?></h2>
                 <div class="dynamic-widget-body">
                     <?php if ($items === []): ?>
