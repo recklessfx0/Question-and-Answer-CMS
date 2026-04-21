@@ -52,8 +52,8 @@ final class ModeratorController extends Controller
     /** @param array<string, string> $params */
     public function update(Request $request, array $params): Response
     {
-        $this->moderation->update($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->string('title', 180), $request->string('body', 20000));
-        $this->flash('success', 'Content updated.');
+        $updated = $this->moderation->update($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->string('title', 180), $request->string('body', 20000));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Content updated.' : 'Content could not be updated.');
 
         return Response::redirect($this->localReferer($request));
     }
@@ -108,8 +108,8 @@ final class ModeratorController extends Controller
     /** @param array<string, string> $params */
     public function verifyAnswer(Request $request, array $params): Response
     {
-        $this->moderation->verifyAnswer((int) ($params['id'] ?? 0), $request->string('review_note', 240));
-        $this->flash('success', 'Answer marked as reviewed.');
+        $updated = $this->moderation->verifyAnswer((int) ($params['id'] ?? 0), $request->string('review_note', 240));
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Answer marked as reviewed.' : 'Answer could not be marked as reviewed.');
 
         return Response::redirect($this->localReferer($request));
     }

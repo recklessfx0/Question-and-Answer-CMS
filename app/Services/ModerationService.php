@@ -121,13 +121,21 @@ final class ModerationService
         return $this->questions->findPost($type, $id);
     }
 
-    public function update(string $type, int $id, string $title, string $body): void
+    public function update(string $type, int $id, string $title, string $body): bool
     {
         $minimumLength = $type === 'comment' ? 3 : 10;
-        if (in_array($type, ['question', 'answer', 'comment'], true) && mb_strlen($body) >= $minimumLength) {
-            $this->questions->updatePost($type, $id, $title, $body);
-            $this->audit->record((int) $this->session->get('user_id'), 'edit', $type, $id);
+        if (!in_array($type, ['question', 'answer', 'comment'], true) || $id < 1 || mb_strlen($body) < $minimumLength) {
+            return false;
         }
+
+        if ($this->questions->findPost($type, $id) === null) {
+            return false;
+        }
+
+        $this->questions->updatePost($type, $id, $title, $body);
+        $this->audit->record((int) $this->session->get('user_id'), 'edit', $type, $id);
+
+        return true;
     }
 
     public function closeQuestion(int $questionId): void
@@ -150,12 +158,15 @@ final class ModerationService
         return true;
     }
 
-    public function verifyAnswer(int $answerId, string $note): void
+    public function verifyAnswer(int $answerId, string $note): bool
     {
         $moderatorId = (int) $this->session->get('user_id');
         if ($this->questions->verifyAnswer($answerId, $moderatorId, $note)) {
             $this->audit->record($moderatorId, 'verify', 'answer', $answerId);
+            return true;
         }
+
+        return false;
     }
 
     public function unverifyAnswer(int $answerId): bool
