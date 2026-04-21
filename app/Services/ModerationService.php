@@ -10,6 +10,7 @@ use Core\Session;
 
 final class ModerationService
 {
+    private const PENDING_PAGE_SIZE = 10;
     private const REPORTS_PAGE_SIZE = 10;
     private const AUDIT_PAGE_SIZE = 15;
 
@@ -27,8 +28,12 @@ final class ModerationService
     }
 
     /** @return array<string, mixed> */
-    public function dashboard(int $reportsPage, int $auditPage): array
+    public function dashboard(int $pendingPage, int $reportsPage, int $auditPage): array
     {
+        $pendingTotal = $this->questions->countPendingQuestions();
+        $pendingPage = $this->boundedPage($pendingPage, $pendingTotal, self::PENDING_PAGE_SIZE);
+        $pendingOffset = ($pendingPage - 1) * self::PENDING_PAGE_SIZE;
+
         $reportsTotal = $this->questions->countOpenFlags();
         $reportsPage = $this->boundedPage($reportsPage, $reportsTotal, self::REPORTS_PAGE_SIZE);
         $reportsOffset = ($reportsPage - 1) * self::REPORTS_PAGE_SIZE;
@@ -38,29 +43,55 @@ final class ModerationService
         $auditOffset = ($auditPage - 1) * self::AUDIT_PAGE_SIZE;
 
         return [
+            'pendingQuestions' => $this->questions->pendingQuestions(self::PENDING_PAGE_SIZE, $pendingOffset),
             'flags' => $this->questions->openFlags(self::REPORTS_PAGE_SIZE, $reportsOffset),
             'auditLog' => $this->audit->latest(self::AUDIT_PAGE_SIZE, $auditOffset),
             'moderatorStats' => [
+                'pending_questions' => $pendingTotal,
                 'open_reports' => $reportsTotal,
                 'audit_entries' => $auditTotal,
+                'pending_page_size' => self::PENDING_PAGE_SIZE,
                 'report_page_size' => self::REPORTS_PAGE_SIZE,
                 'audit_page_size' => self::AUDIT_PAGE_SIZE,
             ],
+            'pendingPagination' => $this->pagination(
+                'pending_page',
+                $pendingTotal,
+                $pendingPage,
+                self::PENDING_PAGE_SIZE,
+                ['reports_page' => $reportsPage, 'audit_page' => $auditPage]
+            ),
             'reportsPagination' => $this->pagination(
                 'reports_page',
                 $reportsTotal,
                 $reportsPage,
                 self::REPORTS_PAGE_SIZE,
-                ['audit_page' => $auditPage]
+                ['pending_page' => $pendingPage, 'audit_page' => $auditPage]
             ),
             'auditPagination' => $this->pagination(
                 'audit_page',
                 $auditTotal,
                 $auditPage,
                 self::AUDIT_PAGE_SIZE,
-                ['reports_page' => $reportsPage]
+                ['pending_page' => $pendingPage, 'reports_page' => $reportsPage]
             ),
         ];
+    }
+
+    public function moderateQuestion(int $questionId, string $decision): bool
+    {
+        $moderatorId = (int) $this->session->get('user_id');
+        $result = $this->questions->moderatePendingQuestion($questionId, $moderatorId, $decision);
+        if ($result === null) {
+            return false;
+        }
+
+        if ($decision === 'approved') {
+            $this->gamification->award((int) $result['user_id'], 3, 'question_created', 'question', (int) $result['question_id']);
+        }
+
+        $this->audit->record($moderatorId, 'question_' . $decision, 'question', (int) $result['question_id']);
+        return true;
     }
 
     public function delete(string $type, int $id): void
@@ -171,7 +202,7 @@ final class ModerationService
                 $query[$pageKey] = $target;
             }
 
-            return '/moderator' . ($query === [] ? '' : '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986));
+            return '/moderate' . ($query === [] ? '' : '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986));
         };
 
         return [

@@ -261,7 +261,7 @@ final class WidgetService
         return $this->db->fetchAll(
             'SELECT c.name, c.slug, COUNT(DISTINCT q.id) AS count
              FROM categories c
-             JOIN questions q ON q.category_id = c.id AND q.deleted_at IS NULL
+             JOIN questions q ON q.category_id = c.id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY c.id, c.name, c.slug
              ORDER BY count DESC, c.name ASC
              LIMIT :limit',
@@ -289,7 +289,7 @@ final class WidgetService
             'SELECT q.title, q.slug, q.views, q.votes, COUNT(DISTINCT a.id) AS answer_count
              FROM questions q
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY q.id, q.title, q.slug, q.views, q.votes
              ORDER BY (q.views + (q.votes * 4) + (COUNT(DISTINCT a.id) * 8)) DESC, q.created_at DESC
              LIMIT :limit',
@@ -303,7 +303,7 @@ final class WidgetService
         return $this->db->fetchAll(
             'SELECT a.id, a.body, a.votes, q.title AS question_title, q.slug AS question_slug, u.username
              FROM answers a
-             JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL
+             JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              JOIN users u ON u.id = a.user_id
              WHERE a.deleted_at IS NULL AND a.is_accepted = 1
              ORDER BY a.votes DESC, a.created_at DESC
@@ -321,7 +321,7 @@ final class WidgetService
                     COALESCE(reactions.reaction_score, 0) AS reaction_score,
                     COALESCE(a.votes, 0) + COALESCE(reactions.reaction_score, 0) AS score
              FROM answers a
-             JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL
+             JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              JOIN users u ON u.id = a.user_id
              LEFT JOIN (
                 SELECT pr.post_id, COUNT(*) AS reaction_count, COALESCE(SUM(rt.reputation_delta), 0) AS reaction_score
@@ -379,13 +379,13 @@ final class WidgetService
                     COUNT(DISTINCT CASE WHEN cq.id IS NOT NULL OR caq.id IS NOT NULL THEN c.id END) AS comment_count,
                     (COUNT(DISTINCT q.id) * 3 + COUNT(DISTINCT CASE WHEN aq.id IS NOT NULL THEN a.id END) * 2 + COUNT(DISTINCT CASE WHEN cq.id IS NOT NULL OR caq.id IS NOT NULL THEN c.id END)) AS activity_score
              FROM users u
-             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
+             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
-             LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL
+             LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
              LEFT JOIN comments c ON c.user_id = u.id
-             LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL
+             LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL' . $this->approvalFilter('cq') . '
              LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
-             LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL
+             LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL' . $this->approvalFilter('caq') . '
              WHERE u.deleted_at IS NULL
              GROUP BY u.id, u.username, u.avatar_path, u.reputation
              HAVING activity_score > 0
@@ -400,12 +400,12 @@ final class WidgetService
     {
         $row = $this->db->fetch(
             'SELECT
-                (SELECT COUNT(*) FROM questions WHERE deleted_at IS NULL) AS questions,
-                (SELECT COUNT(*) FROM answers WHERE deleted_at IS NULL) AS answers,
+                (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS questions,
+                (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' WHERE a.deleted_at IS NULL) AS answers,
                 (SELECT COUNT(*)
                  FROM comments c
                  LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
-                 JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id) AND q.deleted_at IS NULL
+                 JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id) AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                  WHERE c.answer_id IS NULL OR a.id IS NOT NULL) AS clarifications,
                 (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users'
         ) ?? [];
@@ -416,5 +416,18 @@ final class WidgetService
             ['label' => 'Clarifications', 'value' => (int) ($row['clarifications'] ?? 0)],
             ['label' => 'Members', 'value' => (int) ($row['users'] ?? 0)],
         ];
+    }
+
+    private function approvalFilter(string $alias): string
+    {
+        try {
+            $exists = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'approval_status' LIMIT 1"
+            ) !== null;
+        } catch (\Throwable) {
+            $exists = false;
+        }
+
+        return $exists ? ' AND ' . $alias . '.approval_status = "approved"' : '';
     }
 }

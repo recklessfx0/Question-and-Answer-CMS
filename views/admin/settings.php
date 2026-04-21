@@ -55,6 +55,9 @@
         <label class="checkbox-label"><input name="google_auth_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'google_auth_enabled') ? 'checked' : '' ?>> Enable Google sign-in</label>
         <label>Client ID <input name="google_client_id" value="<?= h($settings['google_client_id'] ?? '') ?>" maxlength="255" autocomplete="off"></label>
         <label>Client secret <input name="google_client_secret" type="password" maxlength="255" autocomplete="new-password" placeholder="<?= empty($settings['google_client_secret'] ?? '') ? 'Paste client secret' : 'Leave blank to keep current secret' ?>"></label>
+        <h2>Question moderation</h2>
+        <label class="checkbox-label"><input name="question_approval_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'question_approval_enabled') ? 'checked' : '' ?>> Require moderator approval for new questions</label>
+        <p class="meta">New questions stay private until an administrator or moderator approves them under <a href="/moderate">/moderate</a>.</p>
         <h2>SMTP email</h2>
         <label class="checkbox-label"><input name="smtp_enabled" type="checkbox" value="1" <?= setting_enabled($settings, 'smtp_enabled') ? 'checked' : '' ?>> Send email through SMTP</label>
         <label>SMTP host <input name="smtp_host" value="<?= h($settings['smtp_host'] ?? '') ?>" maxlength="255" autocomplete="off" placeholder="smtp.example.com"></label>

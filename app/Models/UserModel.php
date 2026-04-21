@@ -148,8 +148,8 @@ final class UserModel
         $row = $this->db->fetch(
             'SELECT
                 COALESCE(MAX(u.reputation), 0) AS top_reputation,
-                (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.deleted_at IS NULL AND q.deleted_at IS NULL) AS total_answers,
-                (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL) AS total_questions
+                (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS total_answers,
+                (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS total_questions
              FROM users u
              WHERE u.deleted_at IS NULL'
         );
@@ -425,12 +425,12 @@ final class UserModel
     /** @return array{questions: int, answers: int, comments: int} */
     public function activityStats(int $userId): array
     {
-        $questions = $this->db->fetch('SELECT COUNT(*) AS total FROM questions WHERE user_id = :user AND deleted_at IS NULL', [':user' => $userId]);
+        $questions = $this->db->fetch('SELECT COUNT(*) AS total FROM questions q WHERE q.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q'), [':user' => $userId]);
         $answers = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM answers a
              JOIN questions q ON q.id = a.question_id
-             WHERE a.user_id = :user AND a.deleted_at IS NULL AND q.deleted_at IS NULL',
+             WHERE a.user_id = :user AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
             [':user' => $userId]
         );
         $comments = $this->db->fetch(
@@ -438,7 +438,7 @@ final class UserModel
              FROM comments c
              LEFT JOIN answers a ON a.id = c.answer_id
              LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-             WHERE c.user_id = :user AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.deleted_at IS NULL)',
+             WHERE c.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (c.answer_id IS NULL OR a.deleted_at IS NULL)',
             [':user' => $userId]
         );
 
@@ -456,7 +456,7 @@ final class UserModel
             'SELECT q.*, COUNT(DISTINCT a.id) AS answer_count
              FROM questions q
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.user_id = :user AND q.deleted_at IS NULL
+             WHERE q.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY q.id
              ORDER BY q.created_at DESC
              LIMIT :limit',
@@ -471,7 +471,7 @@ final class UserModel
             'SELECT a.id, a.body, a.votes, a.is_accepted, a.created_at, q.id AS question_id, q.title AS question_title, q.slug AS question_slug
              FROM answers a
              JOIN questions q ON q.id = a.question_id
-             WHERE a.user_id = :user AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+             WHERE a.user_id = :user AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              ORDER BY a.created_at DESC
              LIMIT :limit',
             [':user' => $userId, ':limit' => $limit]
@@ -481,23 +481,24 @@ final class UserModel
     /** @return array<int, array<string, mixed>> */
     public function recentActivity(int $userId, int $limit = 10): array
     {
+        $approvalFilter = $this->approvalFilter('q');
         return $this->db->fetchAll(
             "SELECT *
              FROM (
                 SELECT 'question' AS type, 'Asked' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, q.body AS summary, q.created_at AS created_at
                 FROM questions q
-                WHERE q.user_id = :question_user AND q.deleted_at IS NULL
+                WHERE q.user_id = :question_user AND q.deleted_at IS NULL{$approvalFilter}
                 UNION ALL
                 SELECT 'answer' AS type, 'Answered' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, a.body AS summary, a.created_at AS created_at
                 FROM answers a
                 JOIN questions q ON q.id = a.question_id
-                WHERE a.user_id = :answer_user AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+                WHERE a.user_id = :answer_user AND a.deleted_at IS NULL AND q.deleted_at IS NULL{$approvalFilter}
                 UNION ALL
                 SELECT 'comment' AS type, 'Commented' AS label, q.id AS question_id, q.title AS title, q.slug AS slug, c.body AS summary, c.created_at AS created_at
                 FROM comments c
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                WHERE c.user_id = :comment_user AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
+                WHERE c.user_id = :comment_user AND q.deleted_at IS NULL{$approvalFilter} AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
              ) activity
              ORDER BY created_at DESC
              LIMIT :limit",
@@ -518,24 +519,25 @@ final class UserModel
         $answerIn = $this->inParams($questionIds, 'participant_answer', $params);
         $commentQuestionIn = $this->inParams($questionIds, 'participant_comment_question', $params);
         $commentAnswerIn = $this->inParams($questionIds, 'participant_comment_answer', $params);
+        $approvalFilter = $this->approvalFilter('q');
         $rows = $this->db->fetchAll(
             "SELECT activity.question_id, activity.user_id, u.username, u.avatar_path, MAX(activity.last_activity) AS last_activity
              FROM (
                 SELECT q.id AS question_id, q.user_id, q.created_at AS last_activity
                 FROM questions q
-                WHERE q.id IN ({$questionIn}) AND q.deleted_at IS NULL
+                WHERE q.id IN ({$questionIn}) AND q.deleted_at IS NULL{$approvalFilter}
                 UNION ALL
                 SELECT a.question_id, a.user_id, a.created_at AS last_activity
                 FROM answers a
                 JOIN questions q ON q.id = a.question_id
-                WHERE a.question_id IN ({$answerIn}) AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+                WHERE a.question_id IN ({$answerIn}) AND a.deleted_at IS NULL AND q.deleted_at IS NULL{$approvalFilter}
                 UNION ALL
                 SELECT COALESCE(c.question_id, a.question_id) AS question_id, c.user_id, c.created_at AS last_activity
                 FROM comments c
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
                 WHERE (c.question_id IN ({$commentQuestionIn}) OR a.question_id IN ({$commentAnswerIn}))
-                  AND q.deleted_at IS NULL
+                  AND q.deleted_at IS NULL{$approvalFilter}
                   AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
              ) activity
              JOIN users u ON u.id = activity.user_id
@@ -675,10 +677,11 @@ final class UserModel
         return $this->db->fetchAll(
             'SELECT u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at,
                     COUNT(DISTINCT q.id) AS question_count,
-                    COUNT(DISTINCT a.id) AS answer_count
+                    COUNT(DISTINCT CASE WHEN aq.id IS NOT NULL THEN a.id END) AS answer_count
              FROM users u
-             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
+             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
+             LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
              WHERE u.deleted_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              ORDER BY u.reputation DESC, u.created_at DESC
@@ -691,14 +694,15 @@ final class UserModel
     public function sitemapUsers(): array
     {
         return $this->db->fetchAll(
-            'SELECT u.username, COALESCE(MAX(q.updated_at), MAX(a.updated_at), u.updated_at, u.created_at) AS updated_at
+            'SELECT u.username, COALESCE(MAX(q.updated_at), MAX(CASE WHEN aq.id IS NOT NULL THEN a.updated_at END), u.updated_at, u.created_at) AS updated_at
              FROM users u
-             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL
+             LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
+             LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
              WHERE u.deleted_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              HAVING COUNT(DISTINCT q.id) > 0
-                 OR COUNT(DISTINCT a.id) > 0
+                OR COUNT(DISTINCT CASE WHEN aq.id IS NOT NULL THEN a.id END) > 0
                  OR TRIM(MAX(COALESCE(u.bio, ""))) <> ""
                  OR TRIM(MAX(COALESCE(u.expertise, ""))) <> ""
                  OR TRIM(MAX(COALESCE(u.credentials, ""))) <> ""
@@ -933,5 +937,18 @@ final class UserModel
                 ]
             );
         }
+    }
+
+    private function approvalFilter(string $alias): string
+    {
+        try {
+            $exists = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'approval_status' LIMIT 1"
+            ) !== null;
+        } catch (Throwable) {
+            $exists = false;
+        }
+
+        return $exists ? ' AND ' . $alias . '.approval_status = "approved"' : '';
     }
 }

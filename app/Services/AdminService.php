@@ -346,6 +346,8 @@ final class AdminService
             $this->settings->set('google_client_secret', excerpt($input['google_client_secret'] ?? '', 255));
         }
 
+        $this->settings->set('question_approval_enabled', ($input['question_approval_enabled'] ?? '0') === '1' ? '1' : '0');
+
         $this->settings->set('smtp_enabled', ($input['smtp_enabled'] ?? '0') === '1' ? '1' : '0');
         $this->settings->set('smtp_host', excerpt($input['smtp_host'] ?? '', 255));
         $this->settings->set('smtp_port', (string) max(1, min(65535, (int) ($input['smtp_port'] ?? 587))));

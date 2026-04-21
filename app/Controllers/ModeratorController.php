@@ -26,6 +26,7 @@ final class ModeratorController extends Controller
             'metaDescription' => 'Moderator review queue.',
             'moderatorReturnTo' => $this->moderatorReturnTo($request),
         ] + $this->moderation->dashboard(
+            $request->int('pending_page', 1, 1, 100000),
             $request->int('reports_page', 1, 1, 100000),
             $request->int('audit_page', 1, 1, 100000)
         ));
@@ -87,6 +88,24 @@ final class ModeratorController extends Controller
     }
 
     /** @param array<string, string> $params */
+    public function approveQuestion(Request $request, array $params): Response
+    {
+        $updated = $this->moderation->moderateQuestion((int) ($params['id'] ?? 0), 'approved');
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Question approved.' : 'Question could not be approved.');
+
+        return Response::redirect($this->localReferer($request));
+    }
+
+    /** @param array<string, string> $params */
+    public function declineQuestion(Request $request, array $params): Response
+    {
+        $updated = $this->moderation->moderateQuestion((int) ($params['id'] ?? 0), 'declined');
+        $this->flash($updated ? 'success' : 'error', $updated ? 'Question declined.' : 'Question could not be declined.');
+
+        return Response::redirect($this->localReferer($request));
+    }
+
+    /** @param array<string, string> $params */
     public function verifyAnswer(Request $request, array $params): Response
     {
         $this->moderation->verifyAnswer((int) ($params['id'] ?? 0), $request->string('review_note', 240));
@@ -116,15 +135,15 @@ final class ModeratorController extends Controller
     private function localReferer(Request $request): string
     {
         $redirect = $this->moderatorReturnTo($request->string('redirect', 160) !== '' ? $request : null);
-        if ($redirect !== '/moderator') {
+        if ($redirect !== '/moderator' && $redirect !== '/moderate') {
             return $redirect;
         }
 
-        $referer = (string) ($request->server['HTTP_REFERER'] ?? '/moderator');
+        $referer = (string) ($request->server['HTTP_REFERER'] ?? '/moderate');
         $path = parse_url($referer, PHP_URL_PATH);
         $query = parse_url($referer, PHP_URL_QUERY);
         if (!is_string($path) || !str_starts_with($path, '/')) {
-            return '/moderator';
+            return '/moderate';
         }
 
         return $this->moderatorPathWithQuery($path, is_string($query) ? $query : '');
@@ -133,7 +152,7 @@ final class ModeratorController extends Controller
     private function moderatorReturnTo(?Request $request): string
     {
         if (!$request instanceof Request) {
-            return '/moderator';
+            return '/moderate';
         }
 
         $redirect = $request->string('redirect', 160);
@@ -149,13 +168,13 @@ final class ModeratorController extends Controller
 
     private function moderatorPathWithQuery(string $path, string $queryString): string
     {
-        if ($path !== '/moderator') {
-            return '/moderator';
+        if ($path !== '/moderator' && $path !== '/moderate') {
+            return '/moderate';
         }
 
         parse_str($queryString, $query);
         $allowed = [];
-        foreach (['reports_page', 'audit_page'] as $key) {
+        foreach (['pending_page', 'reports_page', 'audit_page'] as $key) {
             $value = filter_var($query[$key] ?? null, FILTER_VALIDATE_INT, [
                 'options' => ['min_range' => 2, 'max_range' => 100000],
             ]);
@@ -164,6 +183,6 @@ final class ModeratorController extends Controller
             }
         }
 
-        return '/moderator' . ($allowed === [] ? '' : '?' . http_build_query($allowed, '', '&', PHP_QUERY_RFC3986));
+        return '/moderate' . ($allowed === [] ? '' : '?' . http_build_query($allowed, '', '&', PHP_QUERY_RFC3986));
     }
 }

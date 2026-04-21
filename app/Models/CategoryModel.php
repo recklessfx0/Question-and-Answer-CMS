@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Core\Database;
 use PDOException;
+use Throwable;
 
 final class CategoryModel
 {
@@ -105,7 +106,7 @@ final class CategoryModel
             'SELECT c.slug, COALESCE(MAX(q.updated_at), c.updated_at, c.created_at) AS updated_at
              FROM categories c
              LEFT JOIN categories child ON child.parent_id = c.id
-             JOIN questions q ON q.deleted_at IS NULL AND (q.category_id = c.id OR q.category_id = child.id)
+             JOIN questions q ON q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = c.id OR q.category_id = child.id)
              GROUP BY c.id, c.slug, c.updated_at, c.created_at
              ORDER BY updated_at DESC
              LIMIT 50000'
@@ -163,5 +164,18 @@ final class CategoryModel
         }
 
         return false;
+    }
+
+    private function approvalFilter(string $alias): string
+    {
+        try {
+            $exists = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'approval_status' LIMIT 1"
+            ) !== null;
+        } catch (Throwable) {
+            $exists = false;
+        }
+
+        return $exists ? ' AND ' . $alias . '.approval_status = "approved"' : '';
     }
 }

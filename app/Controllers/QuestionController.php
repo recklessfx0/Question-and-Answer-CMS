@@ -67,6 +67,11 @@ final class QuestionController extends Controller
             return $this->redirect('/ask');
         }
 
+        if (!empty($result['pending'])) {
+            $this->flash('success', 'Question submitted. It will appear publicly after moderator approval.');
+            return $this->redirect('/');
+        }
+
         return $this->redirect('/question/' . $result['slug']);
     }
 

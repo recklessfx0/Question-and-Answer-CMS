@@ -1,7 +1,10 @@
 <?php declare(strict_types=1); ?>
 <?php
 $stats = is_array($moderatorStats ?? null) ? $moderatorStats : [];
-$returnTo = is_string($moderatorReturnTo ?? null) && $moderatorReturnTo !== '' ? $moderatorReturnTo : '/moderator';
+$returnTo = is_string($moderatorReturnTo ?? null) && $moderatorReturnTo !== '' ? $moderatorReturnTo : '/moderate';
+$pendingQuestions = is_array($pendingQuestions ?? null) ? $pendingQuestions : [];
+$flags = is_array($flags ?? null) ? $flags : [];
+$auditLog = is_array($auditLog ?? null) ? $auditLog : [];
 $renderPagination = static function (array $pagination, string $label, string $itemLabel): void {
     if ((int) ($pagination['total_pages'] ?? 1) <= 1) {
         return;
@@ -46,6 +49,10 @@ $renderPagination = static function (array $pagination, string $label, string $i
     </div>
     <div class="moderator-summary" aria-label="<?= h(t('moderator.dashboard.summary_label', 'Moderation summary')) ?>">
         <div>
+            <strong><?= (int) ($stats['pending_questions'] ?? 0) ?></strong>
+            <span><?= h(t('moderator.dashboard.pending_questions', 'Pending questions')) ?></span>
+        </div>
+        <div>
             <strong><?= (int) ($stats['open_reports'] ?? 0) ?></strong>
             <span><?= h(t('moderator.dashboard.open_reports', 'Open reports')) ?></span>
         </div>
@@ -58,6 +65,65 @@ $renderPagination = static function (array $pagination, string $label, string $i
             <span><?= h(t('moderator.dashboard.reports_per_page', 'Reports per page')) ?></span>
         </div>
     </div>
+</section>
+
+<section class="moderator-board" aria-labelledby="moderator-pending-title">
+    <div class="moderator-section-head">
+        <div>
+            <h2 id="moderator-pending-title"><?= h(t('moderator.pending.title', 'Pending questions')) ?></h2>
+            <p class="meta"><?= h(t('moderator.pending.help', 'Review new questions before they become public. Approving publishes the question; declining keeps it out of public listings.')) ?></p>
+        </div>
+        <p class="meta"><?= (int) ($pendingPagination['total_items'] ?? count($pendingQuestions)) ?> <?= h(t('moderator.pending.count_label', 'questions total')) ?></p>
+    </div>
+
+    <div class="moderator-report-list">
+        <?php foreach ($pendingQuestions as $question): ?>
+            <?php
+            $questionId = (int) ($question['id'] ?? 0);
+            $questionTitle = (string) ($question['title'] ?? ('#' . $questionId));
+            $categoryName = (string) ($question['category_name'] ?? '');
+            ?>
+            <article class="moderator-report">
+                <div class="moderator-report-main">
+                    <div class="moderator-report-top">
+                        <div>
+                            <p class="moderator-label"><?= h(t('moderator.pending.label', 'Question')) ?> #<?= $questionId ?></p>
+                            <h3><?= h($questionTitle) ?></h3>
+                        </div>
+                        <span class="moderator-status"><?= h(t('moderator.pending.status', 'Pending')) ?></span>
+                    </div>
+                    <div class="moderator-report-meta">
+                        <span><?= h(t('moderator.pending.submitted_by', 'Submitted by')) ?> <?= h((string) ($question['username'] ?? '')) ?></span>
+                        <span><?= h((string) ($question['created_at'] ?? '')) ?></span>
+                        <?php if ($categoryName !== ''): ?><span><?= h($categoryName) ?></span><?php endif; ?>
+                    </div>
+                    <p class="moderator-reason"><?= h(excerpt((string) ($question['body'] ?? ''), 260)) ?></p>
+                </div>
+
+                <div class="moderator-action-panel" aria-label="<?= h(t('moderator.pending.actions_label', 'Question approval actions')) ?>">
+                    <div class="moderator-action-group">
+                        <span><?= h(t('moderator.pending.review_actions', 'Review')) ?></span>
+                        <div class="moderation-actions">
+                            <form method="post" action="/moderate/questions/<?= $questionId ?>/approve">
+                                <?= $csrf->field('/moderate/questions/' . $questionId . '/approve') ?>
+                                <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
+                                <button type="submit"><?= h(t('moderator.actions.approve', 'Approve')) ?></button>
+                            </form>
+                            <form method="post" action="/moderate/questions/<?= $questionId ?>/decline">
+                                <?= $csrf->field('/moderate/questions/' . $questionId . '/decline') ?>
+                                <input type="hidden" name="redirect" value="<?= h($returnTo) ?>">
+                                <button type="submit" class="button-secondary"><?= h(t('moderator.actions.decline', 'Decline')) ?></button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        <?php endforeach; ?>
+        <?php if ($pendingQuestions === []): ?>
+            <p class="admin-empty"><?= h(t('moderator.pending.empty', 'No questions are waiting for approval.')) ?></p>
+        <?php endif; ?>
+    </div>
+    <?php $renderPagination(is_array($pendingPagination ?? null) ? $pendingPagination : [], t('moderator.pending.pagination_label', 'Pending question pages'), t('moderator.pending.pagination_items', 'questions')); ?>
 </section>
 
 <section class="moderator-board" aria-labelledby="moderator-reports-title">

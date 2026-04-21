@@ -77,7 +77,10 @@ return static function (Router $router): void {
     $router->get('/notifications', [NotificationController::class, 'index'], [AuthMiddleware::class]);
     $router->post('/notifications/read', [NotificationController::class, 'markRead'], [CsrfMiddleware::class, AuthMiddleware::class]);
 
+    $router->get('/moderate', [ModeratorController::class, 'dashboard'], [ModeratorMiddleware::class]);
     $router->get('/moderator', [ModeratorController::class, 'dashboard'], [ModeratorMiddleware::class]);
+    $router->post('/moderate/questions/{id}/approve', [ModeratorController::class, 'approveQuestion'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
+    $router->post('/moderate/questions/{id}/decline', [ModeratorController::class, 'declineQuestion'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->get('/moderator/{type}/{id}/edit', [ModeratorController::class, 'editForm'], [ModeratorMiddleware::class]);
     $router->post('/moderator/{type}/{id}/edit', [ModeratorController::class, 'update'], [CsrfMiddleware::class, ModeratorMiddleware::class]);
     $router->post('/moderator/{type}/{id}/delete', [ModeratorController::class, 'delete'], [CsrfMiddleware::class, ModeratorMiddleware::class]);

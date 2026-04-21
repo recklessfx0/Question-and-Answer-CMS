@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\QuestionModel;
+use App\Models\SettingsModel;
 use App\Models\UserModel;
 use Core\Markdown;
 use Core\Logger;
@@ -26,9 +27,10 @@ final class QuestionService
         private UploadService $uploads,
         private GamificationService $gamification,
         private UserModel $users,
+        private SettingsModel $settings,
     ) {}
 
-    /** @return array{ok: bool, slug: string, errors: array<string, string>} */
+    /** @return array{ok: bool, slug: string, errors: array<string, string>, pending?: bool} */
     public function ask(string $title, string $body, string $tags, ?int $categoryId = null, ?array $media = null, string $videoUrls = ''): array
     {
         $body = $this->appendMedia($body, $media);
@@ -45,13 +47,17 @@ final class QuestionService
 
         $meta = excerpt($body, 155);
         $userId = (int) $this->session->get('user_id');
-        [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta);
+        $requiresApproval = setting_enabled($this->settings->all(), 'question_approval_enabled');
+        $approvalStatus = $requiresApproval ? 'pending' : 'approved';
+        [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta, $approvalStatus);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);
         $this->queueNotification('NotifyModerators', ['question_id' => $id]);
-        $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . $title, '/question/' . $slug);
-        $this->gamification->award($userId, 3, 'question_created', 'question', $id);
+        if (!$requiresApproval) {
+            $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . $title, '/question/' . $slug);
+            $this->gamification->award($userId, 3, 'question_created', 'question', $id);
+        }
 
-        return ['ok' => true, 'slug' => $slug, 'errors' => []];
+        return ['ok' => true, 'slug' => $slug, 'errors' => [], 'pending' => $requiresApproval];
     }
 
     public function answer(int $questionId, string $body, ?array $media = null, string $videoUrls = ''): bool
@@ -246,7 +252,7 @@ final class QuestionService
     }
 
     /** @return array{0: int, 1: string} */
-    private function createQuestionWithUniqueSlug(int $userId, ?int $categoryId, string $title, string $body, string $meta): array
+    private function createQuestionWithUniqueSlug(int $userId, ?int $categoryId, string $title, string $body, string $meta, string $approvalStatus): array
     {
         $base = $this->slugger->slug($title);
 
@@ -254,7 +260,7 @@ final class QuestionService
             $slug = $this->questions->uniqueSlug($base);
 
             try {
-                $id = $this->questions->create($userId, $categoryId, $title, $slug, $body, $meta);
+                $id = $this->questions->create($userId, $categoryId, $title, $slug, $body, $meta, $approvalStatus);
                 return [$id, $slug];
             } catch (\Throwable $e) {
                 if (!is_duplicate_key_exception($e)) {

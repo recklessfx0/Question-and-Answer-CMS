@@ -152,6 +152,7 @@ final class AdminController extends Controller
             'google_auth_enabled' => (string) $request->int('google_auth_enabled', 0, 0, 1),
             'google_client_id' => $request->string('google_client_id', 255),
             'google_client_secret' => $request->string('google_client_secret', 255),
+            'question_approval_enabled' => (string) $request->int('question_approval_enabled', 0, 0, 1),
             'smtp_enabled' => (string) $request->int('smtp_enabled', 0, 0, 1),
             'smtp_host' => $request->string('smtp_host', 255),
             'smtp_port' => (string) $request->int('smtp_port', 587, 1, 65535),

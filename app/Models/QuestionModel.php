@@ -11,6 +11,8 @@ final class QuestionModel
 {
     public const MAX_QUESTION_TAGS = 8;
 
+    private ?bool $approvalColumnsAvailable = null;
+
     public function __construct(private Database $db) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -22,7 +24,7 @@ final class QuestionModel
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY q.id
              ORDER BY q.created_at DESC
              LIMIT :limit OFFSET :offset',
@@ -32,7 +34,7 @@ final class QuestionModel
 
     public function countLatest(): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM questions WHERE deleted_at IS NULL');
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q'));
         return (int) ($row['total'] ?? 0);
     }
 
@@ -246,7 +248,7 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.deleted_at IS NULL AND (q.title LIKE :query_title OR q.body LIKE :query_body)
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':query_title' => $pattern, ':query_body' => $pattern, ':limit' => $limit, ':offset' => $offset]
         );
@@ -259,7 +261,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL AND (q.title LIKE :query_title OR q.body LIKE :query_body)',
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)',
             [':query_title' => $pattern, ':query_body' => $pattern]
         );
 
@@ -288,7 +290,7 @@ final class QuestionModel
             'SELECT q.title, q.slug, q.views, q.votes, COUNT(DISTINCT a.id) AS answer_count
              FROM questions q
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL AND (' . implode(' OR ', $conditions) . ')
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (' . implode(' OR ', $conditions) . ')
              GROUP BY q.id, q.title, q.slug, q.views, q.votes
              ORDER BY answer_count DESC, q.votes DESC, q.views DESC, q.created_at DESC
              LIMIT :limit',
@@ -305,7 +307,7 @@ final class QuestionModel
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY q.id
              HAVING COUNT(a.id) = 0
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
@@ -318,7 +320,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL)'
         );
 
@@ -332,7 +334,7 @@ final class QuestionModel
             'SELECT t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro, COUNT(DISTINCT q.id) AS question_count
              FROM tags t
              LEFT JOIN question_tags qt ON qt.tag_id = t.id
-             LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL
+             LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro
              ORDER BY question_count DESC, t.name ASC LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]
@@ -352,11 +354,11 @@ final class QuestionModel
             'SELECT t.*,
                     (SELECT COUNT(DISTINCT q.id)
                      FROM question_tags qt
-                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL
+                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                      WHERE qt.tag_id = t.id) AS question_count,
                     (SELECT MAX(q.updated_at)
                      FROM question_tags qt
-                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL
+                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                      WHERE qt.tag_id = t.id) AS updated_at
              FROM tags t
              WHERE t.slug = :slug
@@ -374,7 +376,7 @@ final class QuestionModel
              JOIN question_tags qt1 ON qt1.tag_id = t1.id
              JOIN question_tags qt2 ON qt2.question_id = qt1.question_id
              JOIN tags t2 ON t2.id = qt2.tag_id
-             JOIN questions q ON q.id = qt2.question_id AND q.deleted_at IS NULL
+             JOIN questions q ON q.id = qt2.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              WHERE t1.slug = :slug AND t2.slug <> :exclude_slug
              GROUP BY t2.id, t2.name, t2.slug
              ORDER BY overlap DESC, t2.name ASC
@@ -423,7 +425,7 @@ final class QuestionModel
              FROM tags t
              JOIN question_tags qt ON qt.tag_id = t.id
              JOIN questions q ON q.id = qt.question_id
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
              GROUP BY t.id, t.name, t.slug
              ORDER BY question_count DESC, t.name ASC
@@ -442,7 +444,7 @@ final class QuestionModel
              JOIN tags t ON t.id = qt.tag_id
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE t.slug = :slug AND q.deleted_at IS NULL
+             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':slug' => $slug, ':limit' => $limit, ':offset' => $offset]
         );
@@ -455,7 +457,7 @@ final class QuestionModel
              FROM questions q
              JOIN question_tags qt ON qt.question_id = q.id
              JOIN tags t ON t.id = qt.tag_id
-             WHERE t.slug = :slug AND q.deleted_at IS NULL',
+             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
             [':slug' => $slug]
         );
 
@@ -465,7 +467,7 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function byUser(int $userId, int $limit = 30): array
     {
-        return $this->db->fetchAll('SELECT * FROM questions WHERE user_id = :user AND deleted_at IS NULL ORDER BY created_at DESC LIMIT :limit', [':user' => $userId, ':limit' => $limit]);
+        return $this->db->fetchAll('SELECT * FROM questions q WHERE q.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' ORDER BY q.created_at DESC LIMIT :limit', [':user' => $userId, ':limit' => $limit]);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -476,7 +478,7 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.deleted_at IS NULL AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':category' => $categoryId, ':child_parent' => $categoryId, ':limit' => $limit, ':offset' => $offset]
         );
@@ -487,7 +489,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))',
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))',
             [':category' => $categoryId, ':child_parent' => $categoryId]
         );
 
@@ -505,7 +507,7 @@ final class QuestionModel
                  JOIN users u ON u.id = q.user_id
                  LEFT JOIN categories c ON c.id = q.category_id
                  LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL
-                 WHERE q.slug = :slug AND q.deleted_at IS NULL LIMIT 1',
+                 WHERE q.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1',
                 [':slug' => $slug]
             );
         }
@@ -516,7 +518,7 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.slug = :slug AND q.deleted_at IS NULL LIMIT 1',
+             WHERE q.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1',
             [':slug' => $slug]
         );
     }
@@ -528,7 +530,7 @@ final class QuestionModel
 
     public function isQuestionOpen(int $questionId): bool
     {
-        $row = $this->db->fetch('SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL AND closed_at IS NULL LIMIT 1', [':id' => $questionId]);
+        $row = $this->db->fetch('SELECT id FROM questions q WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND q.closed_at IS NULL LIMIT 1', [':id' => $questionId]);
         return $row !== null;
     }
 
@@ -537,15 +539,26 @@ final class QuestionModel
     {
         return $this->db->fetch(
             'SELECT id, user_id, title, slug
-             FROM questions
-             WHERE id = :id AND deleted_at IS NULL
+             FROM questions q
+             WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LIMIT 1',
             [':id' => $id]
         );
     }
 
-    public function create(int $userId, ?int $categoryId, string $title, string $slug, string $body, string $metaDescription): int
+    public function create(int $userId, ?int $categoryId, string $title, string $slug, string $body, string $metaDescription, string $approvalStatus = 'approved'): int
     {
+        $approvalStatus = $approvalStatus === 'pending' ? 'pending' : 'approved';
+        if ($this->approvalColumnsAvailable()) {
+            $this->db->execute(
+                'INSERT INTO questions (user_id, category_id, title, slug, body, meta_description, votes, approval_status, approved_at, created_at, updated_at)
+                 VALUES (:user_id, :category_id, :title, :slug, :body, :meta, 0, :approval_status, ' . ($approvalStatus === 'approved' ? 'NOW()' : 'NULL') . ', NOW(), NOW())',
+                [':user_id' => $userId, ':category_id' => $categoryId, ':title' => $title, ':slug' => $slug, ':body' => $body, ':meta' => $metaDescription, ':approval_status' => $approvalStatus]
+            );
+
+            return $this->db->lastInsertId();
+        }
+
         $this->db->execute(
             'INSERT INTO questions (user_id, category_id, title, slug, body, meta_description, votes, created_at, updated_at) VALUES (:user_id, :category_id, :title, :slug, :body, :meta, 0, NOW(), NOW())',
             [':user_id' => $userId, ':category_id' => $categoryId, ':title' => $title, ':slug' => $slug, ':body' => $body, ':meta' => $metaDescription]
@@ -933,7 +946,7 @@ final class QuestionModel
                     qt.tag_id IS NOT NULL
                     OR (current_question.category_id IS NOT NULL AND q.category_id = current_question.category_id)
                )
-               AND q.id <> :exclude_id AND q.deleted_at IS NULL
+               AND q.id <> :exclude_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                ' . $duplicateFilter . '
              GROUP BY q.id, q.title, q.slug, q.votes, q.created_at
              ORDER BY tag_overlap DESC, has_accepted DESC, answer_count DESC, q.votes DESC, q.created_at DESC
@@ -950,7 +963,7 @@ final class QuestionModel
         return $this->db->fetchAll(
             'SELECT q.slug, q.body, q.updated_at
              FROM questions q
-             WHERE q.deleted_at IS NULL
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                ' . $duplicateFilter . '
                AND (
                    CHAR_LENGTH(TRIM(q.body)) >= 180
@@ -973,7 +986,7 @@ final class QuestionModel
             'SELECT t.slug, COALESCE(MAX(q.updated_at), MAX(t.created_at), NOW()) AS updated_at
              FROM tags t
              JOIN question_tags qt ON qt.tag_id = t.id
-             JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL
+             JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              GROUP BY t.id, t.slug
              ORDER BY updated_at DESC
              LIMIT 50000'
@@ -1020,6 +1033,75 @@ final class QuestionModel
     {
         $row = $this->db->fetch('SELECT COUNT(*) AS total FROM flags WHERE status = "open"');
         return (int) ($row['total'] ?? 0);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function pendingQuestions(int $limit = 10, int $offset = 0): array
+    {
+        if (!$this->approvalColumnsAvailable()) {
+            return [];
+        }
+
+        return $this->db->fetchAll(
+            'SELECT q.id, q.title, q.body, q.slug, q.created_at, u.username, c.name AS category_name
+             FROM questions q
+             JOIN users u ON u.id = q.user_id
+             LEFT JOIN categories c ON c.id = q.category_id
+             WHERE q.deleted_at IS NULL AND q.approval_status = "pending"
+             ORDER BY q.created_at ASC
+             LIMIT :limit OFFSET :offset',
+            [':limit' => $limit, ':offset' => $offset]
+        );
+    }
+
+    public function countPendingQuestions(): int
+    {
+        if (!$this->approvalColumnsAvailable()) {
+            return 0;
+        }
+
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM questions WHERE deleted_at IS NULL AND approval_status = "pending"');
+        return (int) ($row['total'] ?? 0);
+    }
+
+    /** @return array{question_id: int, user_id: int, title: string, slug: string}|null */
+    public function moderatePendingQuestion(int $questionId, int $moderatorId, string $decision): ?array
+    {
+        if ($questionId < 1 || $moderatorId < 1 || !$this->approvalColumnsAvailable() || !in_array($decision, ['approved', 'declined'], true)) {
+            return null;
+        }
+
+        return $this->db->transaction(function () use ($questionId, $moderatorId, $decision): ?array {
+            $question = $this->db->fetch(
+                'SELECT id, user_id, title, slug
+                 FROM questions
+                 WHERE id = :id AND deleted_at IS NULL AND approval_status = "pending"
+                 LIMIT 1 FOR UPDATE',
+                [':id' => $questionId]
+            );
+            if ($question === null) {
+                return null;
+            }
+
+            if ($decision === 'approved') {
+                $this->db->execute(
+                    'UPDATE questions SET approval_status = "approved", approved_at = NOW(), approved_by = :moderator, updated_at = NOW() WHERE id = :id',
+                    [':moderator' => $moderatorId, ':id' => $questionId]
+                );
+            } else {
+                $this->db->execute(
+                    'UPDATE questions SET approval_status = "declined", approved_by = :moderator, deleted_at = NOW(), updated_at = NOW() WHERE id = :id',
+                    [':moderator' => $moderatorId, ':id' => $questionId]
+                );
+            }
+
+            return [
+                'question_id' => (int) $question['id'],
+                'user_id' => (int) $question['user_id'],
+                'title' => (string) $question['title'],
+                'slug' => (string) $question['slug'],
+            ];
+        });
     }
 
     public function resolveFlag(int $flagId, string $status): bool
@@ -1438,5 +1520,49 @@ final class QuestionModel
         }
 
         return $available;
+    }
+
+    private function approvalFilter(string $alias = 'q'): string
+    {
+        if (!$this->approvalColumnsAvailable()) {
+            return '';
+        }
+
+        return ' AND ' . $alias . '.approval_status = "approved"';
+    }
+
+    private function approvalColumnsAvailable(): bool
+    {
+        if ($this->approvalColumnsAvailable !== null) {
+            return $this->approvalColumnsAvailable;
+        }
+
+        try {
+            if (!$this->columnExists('approval_status')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT "approved" AFTER deleted_at');
+            }
+            if (!$this->columnExists('approved_at')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_at DATETIME NULL AFTER approval_status');
+            }
+            if (!$this->columnExists('approved_by')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_by BIGINT UNSIGNED NULL AFTER approved_at');
+            }
+
+            $this->approvalColumnsAvailable = $this->columnExists('approval_status')
+                && $this->columnExists('approved_at')
+                && $this->columnExists('approved_by');
+        } catch (Throwable) {
+            $this->approvalColumnsAvailable = false;
+        }
+
+        return $this->approvalColumnsAvailable;
+    }
+
+    private function columnExists(string $column): bool
+    {
+        return $this->db->fetch(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = :column LIMIT 1",
+            [':column' => $column]
+        ) !== null;
     }
 }
