@@ -215,9 +215,9 @@ final class QuestionController extends Controller
     private function localReferer(Request $request): string
     {
         $referer = (string) ($request->server['HTTP_REFERER'] ?? '/');
-        $path = parse_url($referer, PHP_URL_PATH);
+        $internal = safe_internal_path($referer);
 
-        return is_string($path) && str_starts_with($path, '/') ? $path : '/';
+        return $internal !== '' ? $internal : '/';
     }
 
     /** @return array<string, mixed>|null */
