@@ -465,7 +465,7 @@ final class UserModel
              FROM comments c
              LEFT JOIN answers a ON a.id = c.answer_id
              LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-             WHERE c.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (c.answer_id IS NULL OR a.deleted_at IS NULL)',
+             WHERE c.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (c.answer_id IS NULL OR a.id IS NOT NULL)',
             [':user' => $userId]
         );
 
@@ -525,7 +525,7 @@ final class UserModel
                 FROM comments c
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                WHERE c.user_id = :comment_user AND q.deleted_at IS NULL{$approvalFilter} AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
+                WHERE c.user_id = :comment_user AND q.deleted_at IS NULL{$approvalFilter} AND (c.answer_id IS NULL OR a.id IS NOT NULL)
              ) activity
              ORDER BY created_at DESC
              LIMIT :limit",
@@ -565,7 +565,7 @@ final class UserModel
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
                 WHERE (c.question_id IN ({$commentQuestionIn}) OR a.question_id IN ({$commentAnswerIn}))
                   AND q.deleted_at IS NULL{$approvalFilter}
-                  AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
+                  AND (c.answer_id IS NULL OR a.id IS NOT NULL)
              ) activity
              JOIN users u ON u.id = activity.user_id
              WHERE activity.question_id IS NOT NULL
