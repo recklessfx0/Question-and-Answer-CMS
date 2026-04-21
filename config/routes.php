@@ -29,6 +29,7 @@ return static function (Router $router): void {
     $router->get('/tags/page/{page}', [HomeController::class, 'tags']);
     $router->get('/users', [HomeController::class, 'users']);
     $router->get('/users/page/{page}', [HomeController::class, 'users']);
+    $router->get('/users/suggest', [UserController::class, 'suggest']);
     $router->get('/search', [HomeController::class, 'search']);
     $router->get('/about', [StaticPageController::class, 'about']);
     $router->get('/contact', [StaticPageController::class, 'contact']);

@@ -345,6 +345,159 @@
         });
     });
 
+    document.querySelectorAll('textarea[data-mentionable]').forEach((textarea) => {
+        if (!(textarea instanceof HTMLTextAreaElement)) {
+            return;
+        }
+
+        const host = document.createElement('div');
+        host.className = 'mention-suggestions';
+        host.hidden = true;
+        host.setAttribute('role', 'listbox');
+        host.setAttribute('aria-label', 'Mention suggestions');
+        textarea.insertAdjacentElement('afterend', host);
+
+        let timer = 0;
+        let activeIndex = -1;
+        let items = [];
+
+        const hide = () => {
+            host.hidden = true;
+            host.innerHTML = '';
+            activeIndex = -1;
+            items = [];
+        };
+
+        const mentionState = () => {
+            const head = textarea.value.slice(0, textarea.selectionStart);
+            const match = head.match(/(^|[\s>(])@([a-z0-9][a-z0-9_-]{0,31})$/i);
+            if (!match) {
+                return null;
+            }
+
+            return {
+                query: match[2],
+                start: head.length - match[2].length - 1,
+                end: textarea.selectionStart,
+            };
+        };
+
+        const render = () => {
+            if (items.length === 0) {
+                hide();
+                return;
+            }
+
+            host.innerHTML = '';
+            items.forEach((item, index) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'mention-suggestion' + (index === activeIndex ? ' is-active' : '');
+                button.setAttribute('role', 'option');
+                button.setAttribute('aria-selected', index === activeIndex ? 'true' : 'false');
+                button.dataset.mentionIndex = String(index);
+
+                const avatarWrap = document.createElement('span');
+                avatarWrap.className = 'mention-suggestion-avatar';
+                if (item.avatar_path) {
+                    const image = document.createElement('img');
+                    image.src = String(item.avatar_path);
+                    image.alt = '';
+                    avatarWrap.appendChild(image);
+                } else {
+                    avatarWrap.textContent = String(item.username || '?').slice(0, 1).toUpperCase();
+                }
+
+                const textWrap = document.createElement('span');
+                textWrap.className = 'mention-suggestion-text';
+                const name = document.createElement('strong');
+                name.textContent = '@' + String(item.username || '');
+                textWrap.appendChild(name);
+
+                button.appendChild(avatarWrap);
+                button.appendChild(textWrap);
+                button.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    const state = mentionState();
+                    if (!state) {
+                        hide();
+                        return;
+                    }
+                    const before = textarea.value.slice(0, state.start);
+                    const after = textarea.value.slice(state.end);
+                    const username = String(item.username || '').replace(/[^a-z0-9_-]/gi, '');
+                    textarea.value = before + '@' + username + ' ' + after;
+                    const caret = before.length + username.length + 2;
+                    textarea.focus();
+                    textarea.setSelectionRange(caret, caret);
+                    textarea.dispatchEvent(new Event('input', {bubbles: true}));
+                    hide();
+                });
+                host.appendChild(button);
+            });
+
+            host.hidden = false;
+        };
+
+        const update = () => {
+            const state = mentionState();
+            if (!state || state.query.length < 1) {
+                hide();
+                return;
+            }
+
+            clearTimeout(timer);
+            timer = window.setTimeout(async () => {
+                try {
+                    const response = await fetch('/users/suggest?q=' + encodeURIComponent(state.query), {
+                        headers: {'Accept': 'application/json'},
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) {
+                        hide();
+                        return;
+                    }
+
+                    const data = await response.json();
+                    items = Array.isArray(data.items) ? data.items : [];
+                    activeIndex = items.length > 0 ? 0 : -1;
+                    render();
+                } catch (error) {
+                    hide();
+                }
+            }, 140);
+        };
+
+        textarea.addEventListener('input', update);
+        textarea.addEventListener('click', update);
+        textarea.addEventListener('blur', () => {
+            window.setTimeout(hide, 120);
+        });
+        textarea.addEventListener('keydown', (event) => {
+            if (host.hidden || items.length === 0) {
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                activeIndex = (activeIndex + 1) % items.length;
+                render();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                activeIndex = (activeIndex - 1 + items.length) % items.length;
+                render();
+            } else if (event.key === 'Enter' || event.key === 'Tab') {
+                if (activeIndex < 0 || activeIndex >= items.length) {
+                    return;
+                }
+                event.preventDefault();
+                host.querySelector('[data-mention-index="' + activeIndex + '"]')?.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+            } else if (event.key === 'Escape') {
+                hide();
+            }
+        });
+    });
+
     let mediaModal = null;
     let mediaImage = null;
     let mediaVideo = null;
@@ -584,7 +737,7 @@
         }
         const prefix = textarea.value.trim() === '' ? '' : '\n\n';
         if (parentInput instanceof HTMLInputElement) {
-            parentInput.value = button.dataset.quoteParent || '0';
+            parentInput.value = '0';
         }
         if (quoteInput instanceof HTMLInputElement) {
             quoteInput.value = button.dataset.quoteParent || '0';
@@ -593,7 +746,7 @@
             context.hidden = false;
         }
         if (contextText instanceof HTMLElement) {
-            contextText.textContent = 'Replying in ' + author + "'s thread";
+            contextText.textContent = 'Quoting ' + author;
         }
         form.dataset.activeQuote = quote;
         textarea.value += prefix + quote;

@@ -115,7 +115,6 @@ foreach ($answerComments as $commentLookup) {
 $renderComment = static function (array $comment, string $composerId, string $action, string $csrfAction, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question): void {
     $parent = isset($comment['parent_id']) ? ($allCommentsById[(int) $comment['parent_id']] ?? null) : null;
     $quoteBody = trim(excerpt((string) $comment['body'], 260));
-    $replyId = 'comment-' . (int) $comment['id'] . '-reply-composer';
     $depthClass = 'comment-depth-' . min(6, max(0, $depth));
     $commentUrl = url('/question/' . rawurlencode((string) $question['slug']) . '#comment-' . (int) $comment['id']);
     $commentTitle = strtr(t('questions.share.clarification_title', 'Clarification by :username', ['username' => (string) ($comment['username'] ?? '')]), [':username' => (string) ($comment['username'] ?? '')]);
@@ -138,7 +137,7 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                 <?php $renderShareLink($commentUrl, $commentTitle, t('questions.share.action', 'Share')); ?>
                 <?php if (is_array($authUser)): ?>
                     <?php if ($commentsOpen): ?>
-                        <button type="button" class="button-secondary quote-comment" data-quote-comment data-quote-inline-target="<?= h($replyId) ?>" data-quote-parent="<?= (int) $comment['id'] ?>" data-quote-author="<?= h((string) $comment['username']) ?>" data-quote-body="<?= h($quoteBody) ?>">Quote</button>
+                        <button type="button" class="button-secondary quote-comment" data-quote-comment data-quote-inline-target="<?= h($composerId) ?>" data-quote-parent="<?= (int) $comment['id'] ?>" data-quote-author="<?= h((string) $comment['username']) ?>" data-quote-body="<?= h($quoteBody) ?>">Quote</button>
                     <?php endif; ?>
                     <?php $renderReportButton('comment', (int) $comment['id'], 'Report'); ?>
                     <?php if ($canModerate): ?>
@@ -150,27 +149,6 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
-            <?php if (is_array($authUser)): ?>
-                <?php if ($commentsOpen): ?>
-                    <details class="thread-reply-details" id="<?= h($replyId) ?>">
-                        <summary>Reply in this thread</summary>
-                        <form method="post" action="<?= h($action) ?>" class="comment-form comment-form-inline" enctype="multipart/form-data">
-                            <?= $csrf->field($csrfAction) ?>
-                            <input type="hidden" name="parent_id" value="<?= (int) $comment['id'] ?>" data-quote-parent-input>
-                            <input type="hidden" name="quoted_comment_id" value="<?= (int) $comment['id'] ?>" data-quote-id-input>
-                            <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply to <?= h((string) $comment['username']) ?>. Use @username to mention someone."></textarea>
-                            <div class="comment-compose-tools">
-                                <label class="attachment-control">Attach media
-                                    <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
-                                </label>
-                                <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
-                                <button type="submit">Reply</button>
-                            </div>
-                        </form>
-                    </details>
-                <?php endif; ?>
-            <?php endif; ?>
         </div>
     </article>
     <?php
@@ -287,7 +265,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                     <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
                     <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
                     <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone."></textarea>
+                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
                     <div class="comment-compose-tools">
                         <label class="attachment-control">Attach media
                             <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
@@ -432,7 +410,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                                     <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
                                     <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
                                     <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone."></textarea>
+                                    <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
                                     <div class="comment-compose-tools">
                                         <label class="attachment-control">Attach media
                                             <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
@@ -459,7 +437,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
             <?= $csrf->field('/question/' . (string) $question['slug'] . '/answer') ?>
             <div class="form-row form-row-full">
                 <label>Your answer
-                    <textarea name="body" rows="12" minlength="10" required data-markdown-editor data-editor-context="answer" data-editor-autosave="1" data-editor-min-words="8" placeholder="Share the steps, tradeoffs, source, or exact fix that helped you solve it."></textarea>
+                    <textarea name="body" rows="12" minlength="10" required data-markdown-editor data-editor-context="answer" data-editor-autosave="1" data-editor-min-words="8" placeholder="Share the steps, tradeoffs, source, or exact fix that helped you solve it." data-mentionable></textarea>
                     <span class="field-help">Use headings, lists, links, quotes, and code to make the answer easy to scan.</span>
                 </label>
             </div>

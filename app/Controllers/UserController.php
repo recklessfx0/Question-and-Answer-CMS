@@ -170,6 +170,20 @@ final class UserController extends Controller
         return $this->redirect('/settings/profile');
     }
 
+    public function suggest(Request $request): Response
+    {
+        $items = [];
+        $query = $request->string('q', 32);
+        if (mb_strlen(trim($query)) >= 1) {
+            $items = $this->users->suggestMentions($query, 6);
+        }
+
+        return Response::text(
+            json_encode(['items' => $items], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'application/json; charset=utf-8'
+        );
+    }
+
     public function enableTwoFactor(Request $request): Response
     {
         $user = $this->users->findById((int) $this->session->get('user_id'));

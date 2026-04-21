@@ -144,7 +144,7 @@ final class QuestionController extends Controller
     {
         $question = $this->questions->findBySlug($params['slug'] ?? '');
         if ($question !== null) {
-            $parentId = max($request->int('parent_id', 0, 0), $request->int('quoted_comment_id', 0, 0));
+            $parentId = $request->int('parent_id', 0, 0);
             $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
         }
 
@@ -156,7 +156,7 @@ final class QuestionController extends Controller
     {
         $answer = $this->questions->findAnswer((int) ($params['id'] ?? 0));
         if ($answer !== null) {
-            $parentId = max($request->int('parent_id', 0, 0), $request->int('quoted_comment_id', 0, 0));
+            $parentId = $request->int('parent_id', 0, 0);
             $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
             return $this->redirect('/question/' . (string) $answer['question_slug'] . '#answer-' . (int) $answer['id']);
         }

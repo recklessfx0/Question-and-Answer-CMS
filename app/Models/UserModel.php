@@ -57,6 +57,31 @@ final class UserModel
         return $this->db->fetch('SELECT id, username, email, role, reputation, bio, website_url, expertise, credentials, avatar_path, email_verified_at, banned_at, deleted_at, created_at FROM users WHERE username = :username LIMIT 1', [':username' => $username]);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function suggestMentions(string $query, int $limit = 6): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+
+        $prefix = mb_substr($query, 0, 32);
+        $contains = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $prefix) . '%';
+
+        return $this->db->fetchAll(
+            'SELECT id, username, avatar_path, reputation
+             FROM users
+             WHERE deleted_at IS NULL
+               AND username LIKE :contains
+             ORDER BY
+               CASE WHEN username LIKE :prefix THEN 0 ELSE 1 END,
+               reputation DESC,
+               created_at DESC
+             LIMIT :limit',
+            [':contains' => $contains, ':prefix' => $prefix . '%', ':limit' => max(1, min(10, $limit))]
+        );
+    }
+
     public function create(string $username, string $email, string $passwordHash, string $role = 'user'): int
     {
         $this->db->execute(
