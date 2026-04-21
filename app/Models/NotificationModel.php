@@ -19,6 +19,46 @@ final class NotificationModel
         );
     }
 
+    /** @param array<string, mixed> $payload */
+    public function createUniqueRecent(int $userId, string $type, array $payload, int $windowSeconds = 86400): bool
+    {
+        if ($userId < 1 || $windowSeconds < 1) {
+            return false;
+        }
+
+        $encodedPayload = $this->encodedPayload($payload);
+        $windowSeconds = min($windowSeconds, 7 * 86400);
+
+        return $this->db->transaction(function () use ($userId, $type, $encodedPayload, $windowSeconds): bool {
+            $existing = $this->db->fetch(
+                'SELECT id
+                 FROM notifications
+                 WHERE user_id = :user
+                   AND type = :type
+                   AND payload = :payload
+                   AND created_at >= DATE_SUB(NOW(), INTERVAL :window SECOND)
+                 LIMIT 1
+                 FOR UPDATE',
+                [
+                    ':user' => $userId,
+                    ':type' => $type,
+                    ':payload' => $encodedPayload,
+                    ':window' => $windowSeconds,
+                ]
+            );
+            if ($existing !== null) {
+                return false;
+            }
+
+            $this->db->execute(
+                'INSERT INTO notifications (user_id, type, payload, created_at) VALUES (:user, :type, :payload, NOW())',
+                [':user' => $userId, ':type' => $type, ':payload' => $encodedPayload]
+            );
+
+            return true;
+        });
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function unreadForUser(int $userId, int $limit = 25): array
     {
@@ -79,5 +119,13 @@ final class NotificationModel
         unset($row);
 
         return $rows;
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function encodedPayload(array $payload): string
+    {
+        ksort($payload);
+
+        return json_encode($payload, JSON_THROW_ON_ERROR);
     }
 }

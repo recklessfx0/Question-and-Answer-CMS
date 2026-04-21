@@ -66,6 +66,10 @@ $logProcessed = static function (array $job) use ($redactedJob): void {
     @file_put_contents(STORAGE_PATH . '/logs/queue.log', '[' . date(DATE_ATOM) . '] processed ' . $encoded . PHP_EOL, FILE_APPEND | LOCK_EX);
 };
 
+$createNotification = static function (int $userId, string $type, array $payload, int $windowSeconds = 86400) use ($notifications): void {
+    $notifications->createUniqueRecent($userId, $type, $payload, $windowSeconds);
+};
+
 while (true) {
     $job = $queue->pop();
     if ($job === null) {
@@ -95,7 +99,11 @@ while (true) {
             if ($record !== null && empty($record['email_verified_at'])) {
                 $link = url('/email/verify/' . rawurlencode((string) $payload['token']));
                 $mail->send((string) $record['email'], 'Verify your email', "Open this link to verify your email:\n\n{$link}");
-                $notifications->create((int) $payload['user_id'], 'Email verification', ['message' => 'Verification email queued.', 'url' => '/settings/profile']);
+                try {
+                    $createNotification((int) $payload['user_id'], 'Email verification', ['message' => 'Verification email queued.', 'url' => '/settings/profile'], 86400);
+                } catch (\Throwable $notificationError) {
+                    $logger->error($notificationError);
+                }
             }
         }
 
@@ -111,24 +119,25 @@ while (true) {
             $question = $database->fetch('SELECT user_id, slug, title FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => (int) $payload['question_id']]);
             $answer = $database->fetch('SELECT id, question_id, user_id FROM answers WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => (int) ($payload['answer_id'] ?? 0)]);
             if ($question !== null && $answer !== null && (int) $answer['question_id'] === (int) $payload['question_id'] && (int) $answer['user_id'] !== (int) $question['user_id']) {
-                $notifications->create((int) $question['user_id'], 'New answer', ['message' => 'A new answer was posted on ' . (string) $question['title'], 'url' => '/question/' . (string) $question['slug'] . '#answer-' . (int) $answer['id']]);
+                $createNotification((int) $question['user_id'], 'New answer', ['message' => 'A new answer was posted on ' . (string) $question['title'], 'url' => '/question/' . (string) $question['slug'] . '#answer-' . (int) $answer['id']], 172800);
             }
         }
 
         if ($name === 'NotifyModerators') {
             foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator")') as $moderator) {
-                $notifications->create((int) $moderator['id'], 'New question', ['message' => 'A new question was posted.', 'url' => '/moderator']);
+                $createNotification((int) $moderator['id'], 'New question', ['message' => 'A new question was posted.', 'url' => '/moderator'], 86400);
             }
         }
 
         if ($name === 'MentionNotification') {
-            $notifications->create(
+            $createNotification(
                 (int) $payload['user_id'],
                 is_string($payload['type'] ?? null) && (string) $payload['type'] !== '' ? (string) $payload['type'] : 'Mention',
                 [
                     'message' => is_string($payload['message'] ?? null) && (string) $payload['message'] !== '' ? (string) $payload['message'] : 'You were mentioned.',
                     'url' => safe_internal_path((string) ($payload['url'] ?? '')),
-                ]
+                ],
+                172800
             );
         }
 
