@@ -168,7 +168,7 @@ final class AuthService
 
         $this->recordFailure('password-reset-account', $emailKey);
         $user = $this->users->findByEmail($email);
-        if ($user === null) {
+        if ($user === null || !empty($user['deleted_at']) || !empty($user['banned_at'])) {
             return;
         }
 
