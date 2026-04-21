@@ -47,7 +47,12 @@ final class QuestionService
 
         $meta = excerpt($body, 155);
         $userId = (int) $this->session->get('user_id');
-        $requiresApproval = setting_enabled($this->settings->all(), 'question_approval_enabled');
+        $approvalRequested = setting_enabled($this->settings->all(), 'question_approval_enabled');
+        if ($approvalRequested && !$this->questions->supportsQuestionApproval()) {
+            $this->logger->error(new RuntimeException('Question approval is enabled but required schema columns are unavailable.'));
+            return ['ok' => false, 'slug' => '', 'errors' => ['Question approval is temporarily unavailable. Please try again later.']];
+        }
+        $requiresApproval = $approvalRequested;
         $approvalStatus = $requiresApproval ? 'pending' : 'approved';
         [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta, $approvalStatus);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);

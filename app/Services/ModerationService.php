@@ -6,7 +6,10 @@ namespace App\Services;
 
 use App\Models\QuestionModel;
 use App\Models\AuditLogModel;
+use App\Models\UserModel;
 use Core\Session;
+use Core\Queue;
+use Core\Logger;
 
 final class ModerationService
 {
@@ -19,6 +22,9 @@ final class ModerationService
         private AuditLogModel $audit,
         private GamificationService $gamification,
         private Session $session,
+        private UserModel $users,
+        private Queue $queue,
+        private Logger $logger,
     ) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -88,6 +94,12 @@ final class ModerationService
 
         if ($decision === 'approved') {
             $this->gamification->award((int) $result['user_id'], 3, 'question_created', 'question', (int) $result['question_id']);
+            $this->notifyApprovedQuestionMentions(
+                (string) ($result['body'] ?? ''),
+                (int) $result['user_id'],
+                (string) ($result['title'] ?? ''),
+                (string) ($result['slug'] ?? '')
+            );
         }
 
         $this->audit->record($moderatorId, 'question_' . $decision, 'question', (int) $result['question_id']);
@@ -214,5 +226,49 @@ final class ModerationService
             'next' => $page < $totalPages ? $url($page + 1) : null,
             'href' => $url,
         ];
+    }
+
+    private function notifyApprovedQuestionMentions(string $body, int $authorId, string $title, string $slug): void
+    {
+        foreach ($this->mentionedUsers($body, $authorId) as $user) {
+            try {
+                $this->queue->push('MentionNotification', [
+                    'user_id' => (int) $user['id'],
+                    'type' => 'Mention',
+                    'message' => 'You were mentioned in ' . $title,
+                    'url' => '/question/' . $slug,
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->error($e);
+            }
+        }
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function mentionedUsers(string $body, int $authorId): array
+    {
+        $text = preg_replace('/`[^`]+`/', ' ', $body) ?? $body;
+        $text = preg_replace('/!\[[^\]]*\]\((?:\/public-assets\/images\/[a-zA-Z0-9\/._-]+|https?:\/\/[^\s)]+)\)/i', ' ', $text) ?? $text;
+        $text = preg_replace('/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/i', ' ', $text) ?? $text;
+        preg_match_all('/(^|[\s>(])@([a-z0-9][a-z0-9_-]{2,31})\b/i', $text, $matches);
+
+        $users = [];
+        $seenNames = [];
+        foreach ($matches[2] ?? [] as $username) {
+            $key = strtolower((string) $username);
+            if (isset($seenNames[$key])) {
+                continue;
+            }
+            $seenNames[$key] = true;
+
+            $user = $this->users->findByUsername((string) $username);
+            if ($user === null || (int) ($user['id'] ?? 0) === $authorId) {
+                continue;
+            }
+
+            $users[(int) $user['id']] = $user;
+        }
+
+        return array_values($users);
     }
 }

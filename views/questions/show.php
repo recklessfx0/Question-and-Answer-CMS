@@ -112,9 +112,22 @@ foreach ($answerComments as $commentLookup) {
     $answerCommentTrees[$answerId][$parentId][] = $commentLookup;
 }
 
-$renderComment = static function (array $comment, string $composerId, string $action, string $csrfAction, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question): void {
+$quotePreview = static function (string $body, int $wordLimit = 5): string {
+    $words = preg_split('/\s+/', trim(strip_tags($body))) ?: [];
+    $words = array_values(array_filter($words, static fn (string $word): bool => $word !== ''));
+    if ($words === []) {
+        return '';
+    }
+
+    $limited = array_slice($words, 0, $wordLimit);
+    $suffix = count($words) > $wordLimit ? '...' : '';
+
+    return implode(' ', $limited) . $suffix;
+};
+
+$renderComment = static function (array $comment, string $composerId, string $action, string $csrfAction, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question, $quotePreview): void {
     $parent = isset($comment['parent_id']) ? ($allCommentsById[(int) $comment['parent_id']] ?? null) : null;
-    $quoteBody = trim(excerpt((string) $comment['body'], 260));
+    $quoteBody = $quotePreview((string) $comment['body']);
     $depthClass = 'comment-depth-' . min(6, max(0, $depth));
     $commentUrl = url('/question/' . rawurlencode((string) $question['slug']) . '#comment-' . (int) $comment['id']);
     $commentTitle = strtr(t('questions.share.clarification_title', 'Clarification by :username', ['username' => (string) ($comment['username'] ?? '')]), [':username' => (string) ($comment['username'] ?? '')]);
@@ -130,7 +143,7 @@ $renderComment = static function (array $comment, string $composerId, string $ac
                 <span class="comment-date"><?= h((string) ($comment['created_at'] ?? '')) ?></span>
             </header>
             <?php if (is_array($parent)): ?>
-                <blockquote class="comment-quote">Quoted <?= h((string) $parent['username']) ?>: <?= h(excerpt((string) $parent['body'], 140)) ?></blockquote>
+                <blockquote class="comment-quote">Quoted <?= h((string) $parent['username']) ?>: <?= h($quotePreview((string) $parent['body'])) ?></blockquote>
             <?php endif; ?>
             <div class="comment-body"><?= $markdown((string) $comment['body']) ?></div>
             <div class="comment-actions">

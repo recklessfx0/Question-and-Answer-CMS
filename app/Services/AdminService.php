@@ -346,7 +346,11 @@ final class AdminService
             $this->settings->set('google_client_secret', excerpt($input['google_client_secret'] ?? '', 255));
         }
 
-        $this->settings->set('question_approval_enabled', ($input['question_approval_enabled'] ?? '0') === '1' ? '1' : '0');
+        $questionApprovalEnabled = ($input['question_approval_enabled'] ?? '0') === '1';
+        if ($questionApprovalEnabled) {
+            $questionApprovalEnabled = $this->questions->ensureQuestionApprovalSchema();
+        }
+        $this->settings->set('question_approval_enabled', $questionApprovalEnabled ? '1' : '0');
 
         $this->settings->set('smtp_enabled', ($input['smtp_enabled'] ?? '0') === '1' ? '1' : '0');
         $this->settings->set('smtp_host', excerpt($input['smtp_host'] ?? '', 255));

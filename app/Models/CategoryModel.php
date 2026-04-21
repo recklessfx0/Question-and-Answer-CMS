@@ -10,6 +10,8 @@ use Throwable;
 
 final class CategoryModel
 {
+    private ?bool $approvalColumnAvailable = null;
+
     public function __construct(private Database $db) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -168,14 +170,18 @@ final class CategoryModel
 
     private function approvalFilter(string $alias): string
     {
+        if ($this->approvalColumnAvailable !== null) {
+            return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+        }
+
         try {
-            $exists = $this->db->fetch(
+            $this->approvalColumnAvailable = $this->db->fetch(
                 "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'approval_status' LIMIT 1"
             ) !== null;
         } catch (Throwable) {
-            $exists = false;
+            $this->approvalColumnAvailable = false;
         }
 
-        return $exists ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+        return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
     }
 }

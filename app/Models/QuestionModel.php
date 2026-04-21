@@ -1035,6 +1035,36 @@ final class QuestionModel
         return (int) ($row['total'] ?? 0);
     }
 
+    public function supportsQuestionApproval(): bool
+    {
+        return $this->approvalColumnsAvailable();
+    }
+
+    public function ensureQuestionApprovalSchema(): bool
+    {
+        if ($this->approvalColumnsAvailable()) {
+            return true;
+        }
+
+        try {
+            if (!$this->columnExists('approval_status')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT "approved" AFTER deleted_at');
+            }
+            if (!$this->columnExists('approved_at')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_at DATETIME NULL AFTER approval_status');
+            }
+            if (!$this->columnExists('approved_by')) {
+                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_by BIGINT UNSIGNED NULL AFTER approved_at');
+            }
+            $this->approvalColumnsAvailable = null;
+
+            return $this->approvalColumnsAvailable();
+        } catch (Throwable) {
+            $this->approvalColumnsAvailable = false;
+            return false;
+        }
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function pendingQuestions(int $limit = 10, int $offset = 0): array
     {
@@ -1064,7 +1094,7 @@ final class QuestionModel
         return (int) ($row['total'] ?? 0);
     }
 
-    /** @return array{question_id: int, user_id: int, title: string, slug: string}|null */
+    /** @return array{question_id: int, user_id: int, title: string, slug: string, body: string}|null */
     public function moderatePendingQuestion(int $questionId, int $moderatorId, string $decision): ?array
     {
         if ($questionId < 1 || $moderatorId < 1 || !$this->approvalColumnsAvailable() || !in_array($decision, ['approved', 'declined'], true)) {
@@ -1073,7 +1103,7 @@ final class QuestionModel
 
         return $this->db->transaction(function () use ($questionId, $moderatorId, $decision): ?array {
             $question = $this->db->fetch(
-                'SELECT id, user_id, title, slug
+                'SELECT id, user_id, title, slug, body
                  FROM questions
                  WHERE id = :id AND deleted_at IS NULL AND approval_status = "pending"
                  LIMIT 1 FOR UPDATE',
@@ -1100,6 +1130,7 @@ final class QuestionModel
                 'user_id' => (int) $question['user_id'],
                 'title' => (string) $question['title'],
                 'slug' => (string) $question['slug'],
+                'body' => (string) $question['body'],
             ];
         });
     }
@@ -1538,16 +1569,6 @@ final class QuestionModel
         }
 
         try {
-            if (!$this->columnExists('approval_status')) {
-                $this->db->execute('ALTER TABLE questions ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT "approved" AFTER deleted_at');
-            }
-            if (!$this->columnExists('approved_at')) {
-                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_at DATETIME NULL AFTER approval_status');
-            }
-            if (!$this->columnExists('approved_by')) {
-                $this->db->execute('ALTER TABLE questions ADD COLUMN approved_by BIGINT UNSIGNED NULL AFTER approved_at');
-            }
-
             $this->approvalColumnsAvailable = $this->columnExists('approval_status')
                 && $this->columnExists('approved_at')
                 && $this->columnExists('approved_by');
