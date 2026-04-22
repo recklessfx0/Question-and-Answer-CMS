@@ -131,6 +131,17 @@ final class UserController extends Controller
             return $this->redirect('/settings/profile');
         }
 
+        $avatarPath = null;
+        $avatar = is_array($request->files['avatar'] ?? null) ? $request->files['avatar'] : null;
+        if ($avatar !== null && (int) ($avatar['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $avatarPath = $this->uploads->storeImage($avatar, 'public-assets/images/avatars');
+            } catch (RuntimeException $e) {
+                $this->flash('error', $e->getMessage());
+                return $this->redirect('/settings/profile');
+            }
+        }
+
         try {
             $this->users->updateProfile($userId, $username, $bio, $websiteUrl, $expertise, $credentials);
         } catch (\Throwable $e) {
@@ -141,14 +152,8 @@ final class UserController extends Controller
 
             throw $e;
         }
-        $avatar = is_array($request->files['avatar'] ?? null) ? $request->files['avatar'] : null;
-        if ($avatar !== null && (int) ($avatar['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            try {
-                $this->users->updateAvatar($userId, $this->uploads->storeImage($avatar, 'public-assets/images/avatars'));
-            } catch (RuntimeException $e) {
-                $this->flash('error', $e->getMessage());
-                return $this->redirect('/settings/profile');
-            }
+        if (is_string($avatarPath) && $avatarPath !== '') {
+            $this->users->updateAvatar($userId, $avatarPath);
         }
         $fresh = $this->users->findSessionStateById($userId);
         if ($fresh !== null) {
