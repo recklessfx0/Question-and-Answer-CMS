@@ -15,6 +15,7 @@ final class WidgetService
     private const DEVICES = ['desktop', 'phone'];
 
     private ?bool $approvalColumnAvailable = null;
+    private ?bool $commentDeletedColumnAvailable = null;
 
     /** @return array<string, array<string, string>> */
     public function types(): array
@@ -375,6 +376,8 @@ final class WidgetService
     /** @return array<int, array<string, mixed>> */
     private function topUsers(int $limit): array
     {
+        $commentFilter = $this->commentDeletedFilter('c');
+
         return $this->db->fetchAll(
             'SELECT u.username, u.avatar_path, u.reputation,
                     COUNT(DISTINCT q.id) AS question_count,
@@ -385,7 +388,7 @@ final class WidgetService
              LEFT JOIN questions q ON q.user_id = u.id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
              LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
-             LEFT JOIN comments c ON c.user_id = u.id
+             LEFT JOIN comments c ON c.user_id = u.id' . $commentFilter . '
              LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL' . $this->approvalFilter('cq') . '
              LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
              LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL' . $this->approvalFilter('caq') . '
@@ -402,6 +405,8 @@ final class WidgetService
     /** @return array<int, array<string, mixed>> */
     private function platformStats(): array
     {
+        $commentFilter = $this->commentDeletedFilter('c');
+
         $row = $this->db->fetch(
             'SELECT
                 (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS questions,
@@ -410,7 +415,7 @@ final class WidgetService
                  FROM comments c
                  LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                  JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id) AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
-                 WHERE c.answer_id IS NULL OR a.id IS NOT NULL) AS clarifications,
+                 WHERE (c.answer_id IS NULL OR a.id IS NOT NULL)' . $commentFilter . ') AS clarifications,
                 (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND banned_at IS NULL) AS users'
         ) ?? [];
 
@@ -437,5 +442,22 @@ final class WidgetService
         }
 
         return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+    }
+
+    private function commentDeletedFilter(string $alias): string
+    {
+        if ($this->commentDeletedColumnAvailable !== null) {
+            return $this->commentDeletedColumnAvailable ? ' AND ' . $alias . '.deleted_at IS NULL' : '';
+        }
+
+        try {
+            $this->commentDeletedColumnAvailable = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comments' AND COLUMN_NAME = 'deleted_at' LIMIT 1"
+            ) !== null;
+        } catch (\Throwable) {
+            $this->commentDeletedColumnAvailable = false;
+        }
+
+        return $this->commentDeletedColumnAvailable ? ' AND ' . $alias . '.deleted_at IS NULL' : '';
     }
 }
