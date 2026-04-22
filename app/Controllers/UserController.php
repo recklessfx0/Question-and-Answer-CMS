@@ -45,7 +45,7 @@ final class UserController extends Controller
     public function profile(Request $request, array $params): Response
     {
         $user = $this->users->findByUsername($params['username'] ?? '');
-        if ($user === null || !empty($user['deleted_at'])) {
+        if ($user === null) {
             return $this->view('errors/http', ['status' => 404, 'message' => 'User not found'], 404);
         }
 
@@ -61,14 +61,17 @@ final class UserController extends Controller
             array_map(static fn (array $item): int => (int) ($item['question_id'] ?? 0), $activity),
         ), static fn (int $id): bool => $id > 0)));
         $indexableProfile =
-            (int) ($stats['questions'] ?? 0) > 0
-            || (int) ($stats['answers'] ?? 0) > 0
-            || (int) ($stats['comments'] ?? 0) > 0
-            || trim((string) ($user['bio'] ?? '')) !== ''
-            || trim((string) ($user['expertise'] ?? '')) !== ''
-            || trim((string) ($user['credentials'] ?? '')) !== ''
-            || trim((string) ($user['website_url'] ?? '')) !== ''
-            || !empty($user['avatar_path']);
+            empty($user['deleted_at'])
+            && (
+                (int) ($stats['questions'] ?? 0) > 0
+                || (int) ($stats['answers'] ?? 0) > 0
+                || (int) ($stats['comments'] ?? 0) > 0
+                || trim((string) ($user['bio'] ?? '')) !== ''
+                || trim((string) ($user['expertise'] ?? '')) !== ''
+                || trim((string) ($user['credentials'] ?? '')) !== ''
+                || trim((string) ($user['website_url'] ?? '')) !== ''
+                || !empty($user['avatar_path'])
+            );
 
         return $this->view('users/profile', [
             'title' => (string) $user['username'],
