@@ -357,17 +357,17 @@ final class WidgetService
                          OR (
                             COALESCE(competing_answer.votes, 0) + COALESCE(competing_reactions.reaction_score, 0) = COALESCE(a.votes, 0) + COALESCE(reactions.reaction_score, 0)
                             AND COALESCE(competing_reactions.reaction_count, 0) = COALESCE(reactions.reaction_count, 0)
-                            AND competing_answer.created_at > a.created_at
+                            AND competing_answer.created_at < a.created_at
                          )
                          OR (
                             COALESCE(competing_answer.votes, 0) + COALESCE(competing_reactions.reaction_score, 0) = COALESCE(a.votes, 0) + COALESCE(reactions.reaction_score, 0)
                             AND COALESCE(competing_reactions.reaction_count, 0) = COALESCE(reactions.reaction_count, 0)
                             AND competing_answer.created_at = a.created_at
-                            AND competing_answer.id > a.id
+                            AND competing_answer.id < a.id
                          )
                       )
                )
-             ORDER BY score DESC, reaction_count DESC, a.created_at DESC
+             ORDER BY score DESC, reaction_count DESC, a.created_at ASC, a.id ASC
              LIMIT :limit',
             [':limit' => $limit]
         );
