@@ -508,7 +508,7 @@ final class QuestionModel
                  FROM questions q
                  JOIN users u ON u.id = q.user_id
                  LEFT JOIN categories c ON c.id = q.category_id
-                 LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL
+                 LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL' . $this->approvalFilter('dq') . '
                  WHERE q.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1',
                 [':slug' => $slug]
             );
@@ -1435,7 +1435,7 @@ final class QuestionModel
         }
 
         $target = $this->db->fetch(
-            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL AND (duplicate_of_id IS NULL OR duplicate_of_id <> :question_id) LIMIT 1',
+            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter() . ' AND (duplicate_of_id IS NULL OR duplicate_of_id <> :question_id) LIMIT 1',
             [':id' => $duplicateOfId, ':question_id' => $questionId]
         );
         if ($target === null) {
