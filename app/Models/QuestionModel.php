@@ -1385,6 +1385,7 @@ final class QuestionModel
                  LEFT JOIN answers a ON a.id = c.answer_id
                  LEFT JOIN questions aq ON aq.id = a.question_id
                  WHERE c.id = :id' . $this->commentDeletedFilter('c') . ' AND COALESCE(q.deleted_at, aq.deleted_at) IS NULL
+                   AND (c.answer_id IS NULL OR a.id IS NOT NULL)
                  LIMIT 1',
                 [':id' => $id]
             );
