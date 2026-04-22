@@ -69,6 +69,11 @@ try {
 }
 $assert($payloadAccepted, 'Binary media should not be rejected for incidental short-tag byte sequences.');
 @unlink((string) $jpegBinary);
+$mimeNormalizer = new ReflectionMethod($uploadService, 'normalizedDetectedMime');
+$normalizedGeneric = $mimeNormalizer->invoke($uploadService, 'application/octet-stream', __FILE__);
+$assert($normalizedGeneric === '', 'Generic MIME guesses should fall through to deeper file sniffing.');
+$normalizedJpeg = $mimeNormalizer->invoke($uploadService, 'image/jpeg', __FILE__);
+$assert($normalizedJpeg === 'image/jpeg', 'Supported MIME guesses should still be accepted.');
 $imageGuard = new ReflectionMethod($uploadService, 'assertSafeImage');
 if (extension_loaded('gd') && function_exists('imagecreatetruecolor') && function_exists('imagepng')) {
     $largeImage = imagecreatetruecolor(7000, 1000);

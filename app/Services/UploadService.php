@@ -260,20 +260,20 @@ final class UploadService
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $mime = $finfo->file($tmp);
             if (is_string($mime) && $mime !== '') {
-                if ($this->isSvgMime($mime, $tmp)) {
-                    return 'image/svg+xml';
+                $normalized = $this->normalizedDetectedMime($mime, $tmp);
+                if ($normalized !== '') {
+                    return $normalized;
                 }
-                return $mime;
             }
         }
 
         if (function_exists('mime_content_type')) {
             $mime = mime_content_type($tmp);
             if (is_string($mime) && $mime !== '') {
-                if ($this->isSvgMime($mime, $tmp)) {
-                    return 'image/svg+xml';
+                $normalized = $this->normalizedDetectedMime($mime, $tmp);
+                if ($normalized !== '') {
+                    return $normalized;
                 }
-                return $mime;
             }
         }
 
@@ -291,6 +291,30 @@ final class UploadService
         }
 
         return '';
+    }
+
+    private function normalizedDetectedMime(string $mime, string $tmp): string
+    {
+        $mime = strtolower(trim($mime));
+        if ($mime === '') {
+            return '';
+        }
+
+        if ($this->isSvgMime($mime, $tmp)) {
+            return 'image/svg+xml';
+        }
+
+        $allowed = [
+            'image/jpeg' => true,
+            'image/png' => true,
+            'image/gif' => true,
+            'image/webp' => true,
+            'image/avif' => true,
+            'video/mp4' => true,
+            'video/webm' => true,
+        ];
+
+        return isset($allowed[$mime]) ? $mime : '';
     }
 
     private function isSvgMime(string $mime, string $tmp): bool
