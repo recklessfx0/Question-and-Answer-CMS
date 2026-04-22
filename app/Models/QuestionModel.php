@@ -1291,9 +1291,14 @@ final class QuestionModel
         });
     }
 
-    public function closeQuestion(int $id): void
+    public function closeQuestion(int $id): bool
     {
-        $this->db->execute('UPDATE questions SET closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL', [':id' => $id]);
+        $updated = $this->db->query(
+            'UPDATE questions SET closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            [':id' => $id]
+        )->rowCount();
+
+        return $updated > 0;
     }
 
     /** @return array<string, mixed>|null */

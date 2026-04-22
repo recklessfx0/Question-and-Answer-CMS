@@ -62,8 +62,8 @@ final class ModeratorController extends Controller
     public function delete(Request $request, array $params): Response
     {
         $type = $params['type'] ?? '';
-        $this->moderation->delete($type, (int) ($params['id'] ?? 0));
-        $this->flash('success', 'Content removed.');
+        $deleted = $this->moderation->delete($type, (int) ($params['id'] ?? 0));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Content removed.' : 'Content could not be removed.');
 
         return Response::redirect($type === 'question' ? $this->moderatorReturnTo($request) : $this->localReferer($request));
     }
@@ -71,8 +71,8 @@ final class ModeratorController extends Controller
     /** @param array<string, string> $params */
     public function closeQuestion(Request $request, array $params): Response
     {
-        $this->moderation->closeQuestion((int) ($params['id'] ?? 0));
-        $this->flash('success', 'Question closed.');
+        $closed = $this->moderation->closeQuestion((int) ($params['id'] ?? 0));
+        $this->flash($closed ? 'success' : 'error', $closed ? 'Question closed.' : 'Question could not be closed.');
 
         return Response::redirect($this->localReferer($request));
     }

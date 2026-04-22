@@ -109,13 +109,21 @@ final class ModerationService
         return true;
     }
 
-    public function delete(string $type, int $id): void
+    public function delete(string $type, int $id): bool
     {
-        if (in_array($type, ['question', 'answer', 'comment'], true)) {
-            $affectedUserIds = $this->questions->softDelete($type, $id);
-            $this->gamification->recalculateUsers($affectedUserIds);
-            $this->audit->record((int) $this->session->get('user_id'), 'delete', $type, $id);
+        if (!in_array($type, ['question', 'answer', 'comment'], true) || $id < 1) {
+            return false;
         }
+
+        if ($this->questions->findPost($type, $id) === null) {
+            return false;
+        }
+
+        $affectedUserIds = $this->questions->softDelete($type, $id);
+        $this->gamification->recalculateUsers($affectedUserIds);
+        $this->audit->record((int) $this->session->get('user_id'), 'delete', $type, $id);
+
+        return true;
     }
 
     /** @return array<string, mixed>|null */
@@ -141,14 +149,19 @@ final class ModerationService
         return true;
     }
 
-    public function closeQuestion(int $questionId): void
+    public function closeQuestion(int $questionId): bool
     {
         if ($questionId < 1) {
-            return;
+            return false;
         }
 
-        $this->questions->closeQuestion($questionId);
+        if (!$this->questions->closeQuestion($questionId)) {
+            return false;
+        }
+
         $this->audit->record((int) $this->session->get('user_id'), 'close', 'question', $questionId);
+
+        return true;
     }
 
     public function markDuplicate(int $questionId, ?int $duplicateOfId): bool
