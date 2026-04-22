@@ -72,6 +72,9 @@ final class UserController extends Controller
                 || trim((string) ($user['website_url'] ?? '')) !== ''
                 || !empty($user['avatar_path'])
             );
+        $profileSchema = empty($user['deleted_at'])
+            ? $this->seo->profileSchema($user, $stats, $rank, $badges)
+            : '';
 
         return $this->view('users/profile', [
             'title' => (string) $user['username'],
@@ -80,7 +83,7 @@ final class UserController extends Controller
             'ogType' => 'profile',
             'ogImage' => !empty($user['avatar_path']) ? url((string) $user['avatar_path']) : '',
             'robots' => $indexableProfile ? null : 'noindex,follow',
-            'schema' => $this->seo->profileSchema($user, $stats, $rank, $badges),
+            'schema' => $profileSchema,
             'profile' => $user,
             'questions' => $questions,
             'answers' => $answers,
