@@ -28,9 +28,14 @@ final class ReactionService
         }
 
         $result = $this->reactions->toggleForUser($userId, $postType, $postId, $reactionTypeId);
-        if ($result !== null && (int) ($result['reputation_delta'] ?? 0) !== 0) {
-            $reason = (int) $result['reputation_delta'] > 0 ? 'reaction_' . (string) $result['slug'] : 'reaction_removed_' . (string) $result['slug'];
-            $this->gamification->award((int) $result['target_user_id'], (int) $result['reputation_delta'], $reason, $postType, $postId);
+        if ($result !== null) {
+            $this->gamification->setEventPoints(
+                (int) $result['target_user_id'],
+                !empty($result['added']) ? (int) ($result['reputation_delta'] ?? 0) : 0,
+                'reaction_' . (string) $result['slug'] . '_actor_' . $userId,
+                $postType,
+                $postId
+            );
         }
         if ($result !== null && !empty($result['added']) && (int) ($result['reputation_delta'] ?? 0) > 0) {
             $url = '/question/' . (string) $result['question_slug'] . ($postType === 'answer' ? '#answer-' . $postId : '');

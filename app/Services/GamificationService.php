@@ -39,6 +39,23 @@ final class GamificationService
         });
     }
 
+    public function setEventPoints(int $userId, int $points, string $reason, string $sourceType, int $sourceId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        $this->users->transaction(function () use ($userId, $points, $reason, $sourceType, $sourceId): void {
+            $delta = $this->users->setReputationEventPoints($userId, $points, $reason, $sourceType, $sourceId);
+            if ($delta === 0) {
+                return;
+            }
+
+            $this->users->adjustReputation($userId, $delta);
+            $this->syncBadges($userId);
+        });
+    }
+
     /** @param array<int, int> $userIds */
     public function recalculateUsers(array $userIds): void
     {

@@ -204,8 +204,20 @@ final class QuestionService
             return null;
         }
 
-        if ((int) ($result['reputation_delta'] ?? 0) !== 0) {
-            $this->gamification->award((int) $result['user_id'], (int) $result['reputation_delta'], $type . '_vote', $type, $postId);
+        $points = match ($type) {
+            'answer' => 10,
+            'comment' => 2,
+            'question' => 5,
+            default => 0,
+        };
+        if ($points !== 0) {
+            $this->gamification->setEventPoints(
+                (int) $result['user_id'],
+                (int) ($result['current_vote'] ?? 0) * $points,
+                $type . '_vote_actor_' . $userId,
+                $type,
+                $postId
+            );
         }
         $voteLabel = (int) ($result['current_vote'] ?? 0) > 0 ? 'upvote' : 'downvote';
         $url = $this->postUrl($type, $postId);

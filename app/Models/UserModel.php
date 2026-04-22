@@ -416,9 +416,43 @@ final class UserModel
     public function findReputationEvent(int $userId, string $sourceType, int $sourceId, string $reason): ?array
     {
         return $this->db->fetch(
-            'SELECT id FROM reputation_events WHERE user_id = :user AND source_type = :source_type AND source_id = :source_id AND reason = :reason LIMIT 1',
+            'SELECT id, points FROM reputation_events WHERE user_id = :user AND source_type = :source_type AND source_id = :source_id AND reason = :reason LIMIT 1',
             [':user' => $userId, ':source_type' => $sourceType, ':source_id' => $sourceId, ':reason' => $reason]
         );
+    }
+
+    public function setReputationEventPoints(int $userId, int $points, string $reason, string $sourceType, int $sourceId): int
+    {
+        $existing = $this->findReputationEvent($userId, $sourceType, $sourceId, $reason);
+        $currentPoints = (int) ($existing['points'] ?? 0);
+
+        if ($existing === null) {
+            if ($points === 0) {
+                return 0;
+            }
+
+            $this->db->execute(
+                'INSERT INTO reputation_events (user_id, points, reason, source_type, source_id, created_at) VALUES (:user, :points, :reason, :source_type, :source_id, NOW())',
+                [':user' => $userId, ':points' => $points, ':reason' => $reason, ':source_type' => $sourceType, ':source_id' => $sourceId]
+            );
+
+            return $points;
+        }
+
+        if ($points === $currentPoints) {
+            return 0;
+        }
+
+        if ($points === 0) {
+            $this->db->execute('DELETE FROM reputation_events WHERE id = :id', [':id' => (int) $existing['id']]);
+        } else {
+            $this->db->execute(
+                'UPDATE reputation_events SET points = :points WHERE id = :id',
+                [':points' => $points, ':id' => (int) $existing['id']]
+            );
+        }
+
+        return $points - $currentPoints;
     }
 
     public function grantBadge(int $userId, string $name, string $description): void
@@ -662,6 +696,7 @@ final class UserModel
         $this->db->transaction(function () use ($userId): void {
             $this->removeUserVotes($userId);
             $this->db->execute('DELETE FROM post_reactions WHERE user_id = :user', [':user' => $userId]);
+            $this->deleteInteractionReputationEventsByActor($userId);
         });
     }
 
@@ -689,6 +724,7 @@ final class UserModel
             $this->db->execute('DELETE FROM notifications WHERE user_id = :user', [':user' => $id]);
             $this->removeUserVotes($id);
             $this->db->execute('DELETE FROM post_reactions WHERE user_id = :user OR target_user_id = :user', [':user' => $id]);
+            $this->deleteInteractionReputationEventsByActor($id);
             $this->db->execute('DELETE FROM flags WHERE user_id = :user', [':user' => $id]);
             $this->db->execute('DELETE FROM reputation_events WHERE user_id = :user', [':user' => $id]);
             $this->db->execute('DELETE FROM user_badges WHERE user_id = :user', [':user' => $id]);
@@ -1004,6 +1040,30 @@ final class UserModel
                 ]
             );
         }
+    }
+
+    private function deleteInteractionReputationEventsByActor(int $actorUserId): void
+    {
+        if ($actorUserId < 1) {
+            return;
+        }
+
+        $pattern = '%_actor_' . $actorUserId;
+        $affectedUsers = $this->idsFromRows($this->db->fetchAll(
+            'SELECT DISTINCT user_id AS id
+             FROM reputation_events
+             WHERE reason LIKE :pattern',
+            [':pattern' => $pattern]
+        ));
+        if ($affectedUsers === []) {
+            return;
+        }
+
+        $this->db->execute(
+            'DELETE FROM reputation_events WHERE reason LIKE :pattern',
+            [':pattern' => $pattern]
+        );
+        $this->recalculateReputation($affectedUsers);
     }
 
     private function approvalFilter(string $alias): string
