@@ -93,16 +93,17 @@ final class QuestionController extends Controller
         foreach ($answers as $answer) {
             $reactionTargets[] = ['type' => 'answer', 'id' => (int) $answer['id']];
         }
-        $schema = $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $questionComments, $answerComments);
+        $duplicateSlug = (string) ($question['duplicate_slug'] ?? '');
+        $canonicalUrl = $duplicateSlug !== '' ? url('/question/' . $duplicateSlug) : url('/question/' . (string) $question['slug']);
+        $schema = $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $canonicalUrl, $questionComments, $answerComments);
         $ogImage = $this->seo->firstImageFromBodies((string) $question['body'], ...array_map(static fn (array $answer): string => (string) $answer['body'], $answers));
         $thinUnanswered = count($answers) === 0 && mb_strlen(trim(strip_tags((string) $question['body']))) < 180;
-        $duplicateSlug = (string) ($question['duplicate_slug'] ?? '');
         $tags = $this->questions->tags((int) $question['id']);
 
         return $this->view('questions/show', [
             'title' => (string) $question['title'],
             'metaDescription' => $this->seo->questionMetaDescription($question, $answers),
-            'canonical' => $duplicateSlug !== '' ? url('/question/' . $duplicateSlug) : url('/question/' . (string) $question['slug']),
+            'canonical' => $canonicalUrl,
             'ogType' => 'article',
             'ogImage' => $ogImage,
             'robots' => $duplicateSlug === '' && $thinUnanswered ? 'noindex,follow' : null,

@@ -12,7 +12,6 @@ use Core\Markdown;
 
 final class SeoService
 {
-    private const SITEMAP_STYLESHEET = '/sitemap.xsl';
     /** @var array<int, string> */
     private const AI_CRAWLERS = [
         'GPTBot',
@@ -205,11 +204,11 @@ final class SeoService
     }
 
     /** @param array<string, mixed> $question @param array<int, array<string, mixed>> $answers @param array<int, array<string, mixed>> $breadcrumbs @param array<int, array<string, mixed>> $questionComments @param array<int, array<string, mixed>> $answerComments */
-    public function qapageSchema(array $question, array $answers, array $breadcrumbs, array $questionComments = [], array $answerComments = []): string
+    public function qapageSchema(array $question, array $answers, array $breadcrumbs, string $canonicalUrl, array $questionComments = [], array $answerComments = []): string
     {
         $accepted = array_values(array_filter($answers, static fn (array $answer): bool => (int) $answer['is_accepted'] === 1));
         $suggested = array_values(array_filter($answers, static fn (array $answer): bool => (int) $answer['is_accepted'] !== 1));
-        $questionUrl = url('/question/' . rawurlencode((string) $question['slug']));
+        $questionUrl = $canonicalUrl;
         $questionImages = $this->absoluteMediaUrls((string) $question['body'], true);
         $answerCommentsByAnswer = [];
         foreach ($answerComments as $comment) {
@@ -250,7 +249,8 @@ final class SeoService
         }
 
         if ($accepted !== []) {
-            $main['acceptedAnswer'] = array_map(fn (array $answer): array => $this->answerSchema($answer, $answerCommentsByAnswer[(int) $answer['id']] ?? []), $accepted);
+            $acceptedAnswer = $accepted[0];
+            $main['acceptedAnswer'] = $this->answerSchema($acceptedAnswer, $answerCommentsByAnswer[(int) $acceptedAnswer['id']] ?? []);
         }
 
         if ($suggested !== []) {
@@ -508,7 +508,7 @@ final class SeoService
     }
 
     /** @param array<int, array<string, mixed>> $tags */
-    public function tagDirectorySchema(array $tags): string
+    public function tagDirectorySchema(array $tags, string $canonical = ''): string
     {
         $items = [];
         foreach (array_values($tags) as $index => $tag) {
@@ -520,11 +520,11 @@ final class SeoService
             ];
         }
 
-        return $this->collectionPageSchema('Tags', url('/tags'), $items);
+        return $this->collectionPageSchema('Tags', $canonical !== '' ? $canonical : url('/tags'), $items);
     }
 
     /** @param array<int, array<string, mixed>> $users */
-    public function userDirectorySchema(array $users): string
+    public function userDirectorySchema(array $users, string $canonical = ''): string
     {
         $items = [];
         foreach (array_values($users) as $index => $user) {
@@ -536,7 +536,7 @@ final class SeoService
             ];
         }
 
-        return $this->collectionPageSchema('Users', url('/users'), $items);
+        return $this->collectionPageSchema('Users', $canonical !== '' ? $canonical : url('/users'), $items);
     }
 
     /** @param array<int, string> $entries */
@@ -730,13 +730,6 @@ final class SeoService
     /** @param array<int, string> $lines */
     private function sitemapDocument(array $lines): string
     {
-        array_splice(
-            $lines,
-            1,
-            0,
-            ['<?xml-stylesheet type="text/xsl" href="' . xml_h(url(self::SITEMAP_STYLESHEET)) . '"?>']
-        );
-
         return implode("\n", $lines);
     }
 
