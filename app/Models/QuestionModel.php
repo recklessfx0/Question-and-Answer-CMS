@@ -1471,9 +1471,24 @@ final class QuestionModel
     /** @return array<string, int> */
     public function stats(): array
     {
-        $questions = $this->db->fetch('SELECT COUNT(*) AS total FROM questions WHERE deleted_at IS NULL');
-        $answers = $this->db->fetch('SELECT COUNT(*) AS total FROM answers WHERE deleted_at IS NULL');
-        $users = $this->db->fetch('SELECT COUNT(*) AS total FROM users');
+        $questions = $this->db->fetch(
+            'SELECT COUNT(*) AS total
+             FROM questions q
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q')
+        );
+        $answers = $this->db->fetch(
+            'SELECT COUNT(*) AS total
+             FROM answers a
+             JOIN questions q ON q.id = a.question_id
+             WHERE a.deleted_at IS NULL
+               AND q.deleted_at IS NULL' . $this->approvalFilter('q')
+        );
+        $users = $this->db->fetch(
+            'SELECT COUNT(*) AS total
+             FROM users
+             WHERE deleted_at IS NULL
+               AND banned_at IS NULL'
+        );
 
         return [
             'questions' => (int) ($questions['total'] ?? 0),
