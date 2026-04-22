@@ -72,8 +72,23 @@ $maxTags = max(1, (int) ($maxTags ?? 8));
                     <h2 id="ask-media-heading">Media</h2>
                     <div class="form-row form-row-actions">
                         <label>Upload media
-                            <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple data-file-summary="ask-media-summary">
-                            <span id="ask-media-summary" class="field-help">Images or short videos can make the problem easier to understand.</span>
+                            <input
+                                name="media[]"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm"
+                                multiple
+                                data-upload-input
+                                data-upload-max-files="6"
+                                data-upload-max-image-bytes="12000000"
+                                data-upload-max-video-bytes="40000000"
+                                data-upload-max-total-bytes="60000000"
+                                data-upload-empty-message="Images or short videos can make the problem easier to understand."
+                            >
+                            <span class="field-help">Up to 6 files. Images up to 12 MB each, videos up to 40 MB each.</span>
+                            <div class="upload-feedback" data-upload-feedback>
+                                <p class="field-help upload-feedback-summary" data-upload-summary>Images or short videos can make the problem easier to understand.</p>
+                                <ul class="upload-feedback-list" data-upload-list hidden></ul>
+                            </div>
                         </label>
                         <label>Video links
                             <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">

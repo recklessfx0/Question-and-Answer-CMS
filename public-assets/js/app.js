@@ -329,20 +329,148 @@
         updateCount();
     });
 
-    document.querySelectorAll('[data-file-summary]').forEach((input) => {
+    const formatUploadBytes = (bytes) => {
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+            return '0 B';
+        }
+
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let value = bytes;
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024;
+            unitIndex += 1;
+        }
+
+        const precision = value >= 100 || unitIndex === 0 ? 0 : 1;
+        return value.toFixed(precision) + ' ' + units[unitIndex];
+    };
+
+    const uploadExtension = (name) => {
+        const parts = String(name || '').toLowerCase().split('.');
+        return parts.length > 1 ? parts.pop() || '' : '';
+    };
+
+    const uploadTypeCategory = (file) => {
+        const type = String(file.type || '').toLowerCase();
+        const extension = uploadExtension(file.name);
+        if (type.startsWith('image/')) {
+            return 'image';
+        }
+        if (type.startsWith('video/')) {
+            return 'video';
+        }
+        if (['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'].includes(extension)) {
+            return 'image';
+        }
+        if (['mp4', 'webm'].includes(extension)) {
+            return 'video';
+        }
+
+        return '';
+    };
+
+    document.querySelectorAll('input[data-upload-input]').forEach((input) => {
         if (!(input instanceof HTMLInputElement)) {
             return;
         }
-        const target = document.getElementById(input.dataset.fileSummary || '');
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        input.addEventListener('change', () => {
-            const count = input.files ? input.files.length : 0;
-            target.textContent = count === 0
-                ? 'Images or short videos can make the problem easier to understand.'
-                : count + ' file' + (count === 1 ? '' : 's') + ' selected.';
+
+        const feedback = input.closest('label')?.querySelector('[data-upload-feedback]')
+            || input.parentElement?.querySelector('[data-upload-feedback]')
+            || input.closest('form')?.querySelector('[data-upload-feedback]');
+        const summary = feedback instanceof HTMLElement ? feedback.querySelector('[data-upload-summary]') : null;
+        const list = feedback instanceof HTMLElement ? feedback.querySelector('[data-upload-list]') : null;
+        const emptyMessage = input.dataset.uploadEmptyMessage || 'Add images or short videos when they help.';
+        const maxFiles = Number(input.dataset.uploadMaxFiles || 6);
+        const maxImageBytes = Number(input.dataset.uploadMaxImageBytes || 12000000);
+        const maxVideoBytes = Number(input.dataset.uploadMaxVideoBytes || 40000000);
+        const maxTotalBytes = Number(input.dataset.uploadMaxTotalBytes || 60000000);
+
+        const renderFeedback = () => {
+            const files = Array.from(input.files || []);
+            const issues = [];
+            let totalBytes = 0;
+
+            if (summary instanceof HTMLElement) {
+                summary.classList.remove('is-error');
+            }
+            if (list instanceof HTMLElement) {
+                list.innerHTML = '';
+                list.hidden = true;
+            }
+
+            if (files.length === 0) {
+                input.setCustomValidity('');
+                if (summary instanceof HTMLElement) {
+                    summary.textContent = emptyMessage;
+                }
+                return;
+            }
+
+            if (files.length > maxFiles) {
+                issues.push('Select up to ' + maxFiles + ' files.');
+            }
+
+            files.forEach((file) => {
+                totalBytes += Number(file.size || 0);
+                const category = uploadTypeCategory(file);
+                const fileIssues = [];
+
+                if (category === '') {
+                    fileIssues.push('Unsupported type');
+                } else if (category === 'image' && file.size > maxImageBytes) {
+                    fileIssues.push('Image exceeds ' + formatUploadBytes(maxImageBytes));
+                } else if (category === 'video' && file.size > maxVideoBytes) {
+                    fileIssues.push('Video exceeds ' + formatUploadBytes(maxVideoBytes));
+                }
+
+                if (list instanceof HTMLElement) {
+                    const item = document.createElement('li');
+                    item.className = 'upload-feedback-item' + (fileIssues.length > 0 ? ' is-error' : '');
+
+                    const name = document.createElement('span');
+                    name.className = 'upload-feedback-name';
+                    name.textContent = file.name;
+
+                    const meta = document.createElement('span');
+                    meta.className = 'upload-feedback-meta';
+                    meta.textContent = fileIssues.length > 0
+                        ? fileIssues.join(', ')
+                        : formatUploadBytes(file.size);
+
+                    item.appendChild(name);
+                    item.appendChild(meta);
+                    list.appendChild(item);
+                    list.hidden = false;
+                }
+            });
+
+            if (totalBytes > maxTotalBytes) {
+                issues.push('Combined upload size exceeds ' + formatUploadBytes(maxTotalBytes) + '.');
+            }
+
+            const hasFileIssues = list instanceof HTMLElement && list.querySelector('.upload-feedback-item.is-error') !== null;
+            const errorMessage = issues[0] || (hasFileIssues ? 'Some selected files need attention.' : '');
+            input.setCustomValidity(errorMessage);
+
+            if (summary instanceof HTMLElement) {
+                if (errorMessage !== '') {
+                    summary.textContent = errorMessage;
+                    summary.classList.add('is-error');
+                } else {
+                    summary.textContent = files.length + ' file' + (files.length === 1 ? '' : 's') + ' selected · ' + formatUploadBytes(totalBytes) + ' total';
+                }
+            }
+        };
+
+        input.addEventListener('change', renderFeedback);
+        input.form?.addEventListener('submit', () => {
+            renderFeedback();
+            if (!input.checkValidity()) {
+                input.reportValidity();
+            }
         });
+        renderFeedback();
     });
 
     document.querySelectorAll('textarea[data-mentionable]').forEach((textarea) => {

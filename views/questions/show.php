@@ -281,10 +281,25 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                     <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
                     <div class="comment-compose-tools">
                         <label class="attachment-control">Attach media
-                            <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
+                            <input
+                                name="media[]"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm"
+                                multiple
+                                data-upload-input
+                                data-upload-max-files="6"
+                                data-upload-max-image-bytes="12000000"
+                                data-upload-max-video-bytes="40000000"
+                                data-upload-max-total-bytes="60000000"
+                                data-upload-empty-message="Attach images or short videos to support your clarification."
+                            >
                         </label>
                         <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
                         <button type="submit">Reply</button>
+                    </div>
+                    <div class="upload-feedback upload-feedback-inline" data-upload-feedback>
+                        <p class="field-help upload-feedback-summary" data-upload-summary>Attach images or short videos to support your clarification.</p>
+                        <ul class="upload-feedback-list" data-upload-list hidden></ul>
                     </div>
                 </form>
             </details>
@@ -426,10 +441,25 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                                     <textarea name="body" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
                                     <div class="comment-compose-tools">
                                         <label class="attachment-control">Attach media
-                                            <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
+                                            <input
+                                                name="media[]"
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm"
+                                                multiple
+                                                data-upload-input
+                                                data-upload-max-files="6"
+                                                data-upload-max-image-bytes="12000000"
+                                                data-upload-max-video-bytes="40000000"
+                                                data-upload-max-total-bytes="60000000"
+                                                data-upload-empty-message="Attach images or short videos to support your clarification."
+                                            >
                                         </label>
                                         <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
                                         <button type="submit">Reply</button>
+                                    </div>
+                                    <div class="upload-feedback upload-feedback-inline" data-upload-feedback>
+                                        <p class="field-help upload-feedback-summary" data-upload-summary>Attach images or short videos to support your clarification.</p>
+                                        <ul class="upload-feedback-list" data-upload-list hidden></ul>
                                     </div>
                                 </form>
                             </details>
@@ -456,7 +486,22 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
             </div>
             <div class="form-row form-row-actions">
                 <label>Media
-                    <input name="media[]" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm" multiple>
+                    <input
+                        name="media[]"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/avif,image/gif,video/mp4,video/webm"
+                        multiple
+                        data-upload-input
+                        data-upload-max-files="6"
+                        data-upload-max-image-bytes="12000000"
+                        data-upload-max-video-bytes="40000000"
+                        data-upload-max-total-bytes="60000000"
+                        data-upload-empty-message="Attach images or short videos that make the answer easier to follow."
+                    >
+                    <div class="upload-feedback" data-upload-feedback>
+                        <p class="field-help upload-feedback-summary" data-upload-summary>Attach images or short videos that make the answer easier to follow.</p>
+                        <ul class="upload-feedback-list" data-upload-list hidden></ul>
+                    </div>
                 </label>
                 <label>Video links
                     <input name="video_urls" maxlength="1000" placeholder="YouTube or Vimeo URL">
