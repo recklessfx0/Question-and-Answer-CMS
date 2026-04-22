@@ -488,7 +488,7 @@ final class UserModel
              FROM comments c
              LEFT JOIN answers a ON a.id = c.answer_id
              LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-             WHERE c.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (c.answer_id IS NULL OR a.id IS NOT NULL)',
+             WHERE c.user_id = :user' . $this->commentDeletedFilter('c') . ' AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (c.answer_id IS NULL OR a.id IS NOT NULL)',
             [':user' => $userId]
         );
 
@@ -532,6 +532,7 @@ final class UserModel
     public function recentActivity(int $userId, int $limit = 10): array
     {
         $approvalFilter = $this->approvalFilter('q');
+        $commentFilter = $this->commentDeletedFilter('c');
         return $this->db->fetchAll(
             "SELECT *
              FROM (
@@ -548,7 +549,7 @@ final class UserModel
                 FROM comments c
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                WHERE c.user_id = :comment_user AND q.deleted_at IS NULL{$approvalFilter} AND (c.answer_id IS NULL OR a.id IS NOT NULL)
+                WHERE c.user_id = :comment_user{$commentFilter} AND q.deleted_at IS NULL{$approvalFilter} AND (c.answer_id IS NULL OR a.id IS NOT NULL)
              ) activity
              ORDER BY created_at DESC
              LIMIT :limit",
@@ -570,6 +571,7 @@ final class UserModel
         $commentQuestionIn = $this->inParams($questionIds, 'participant_comment_question', $params);
         $commentAnswerIn = $this->inParams($questionIds, 'participant_comment_answer', $params);
         $approvalFilter = $this->approvalFilter('q');
+        $commentFilter = $this->commentDeletedFilter('c');
         $rows = $this->db->fetchAll(
             "SELECT activity.question_id, activity.user_id, u.username, u.avatar_path, MAX(activity.last_activity) AS last_activity
              FROM (
@@ -587,10 +589,11 @@ final class UserModel
                 LEFT JOIN answers a ON a.id = c.answer_id
                 LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
                 WHERE (c.question_id IN ({$commentQuestionIn}) OR a.question_id IN ({$commentAnswerIn}))
+                  {$commentFilter}
                   AND q.deleted_at IS NULL{$approvalFilter}
                   AND (c.answer_id IS NULL OR a.id IS NOT NULL)
              ) activity
-             JOIN users u ON u.id = activity.user_id
+             JOIN users u ON u.id = activity.user_id AND u.deleted_at IS NULL AND u.banned_at IS NULL
              WHERE activity.question_id IS NOT NULL
              GROUP BY activity.question_id, activity.user_id, u.username, u.avatar_path
              ORDER BY activity.question_id, last_activity DESC",
@@ -1006,5 +1009,21 @@ final class UserModel
         }
 
         return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+    }
+
+    private function commentDeletedFilter(string $alias): string
+    {
+        static $available = null;
+        if ($available === null) {
+            try {
+                $available = $this->db->fetch(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comments' AND COLUMN_NAME = 'deleted_at' LIMIT 1"
+                ) !== null;
+            } catch (Throwable) {
+                $available = false;
+            }
+        }
+
+        return $available ? ' AND ' . $alias . '.deleted_at IS NULL' : '';
     }
 }
