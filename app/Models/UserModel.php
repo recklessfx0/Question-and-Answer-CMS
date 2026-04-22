@@ -378,7 +378,7 @@ final class UserModel
                 $otherAdmin = $this->db->fetch(
                     'SELECT id
                      FROM users
-                     WHERE role = :role AND deleted_at IS NULL AND id <> :id
+                     WHERE role = :role AND deleted_at IS NULL AND banned_at IS NULL AND id <> :id
                      LIMIT 1
                      FOR UPDATE',
                     [':role' => 'administrator', ':id' => $id]
@@ -767,7 +767,7 @@ final class UserModel
     public function hasOtherAdministrator(int $id): bool
     {
         return $this->db->fetch(
-            'SELECT id FROM users WHERE role = "administrator" AND deleted_at IS NULL AND id <> :id LIMIT 1',
+            'SELECT id FROM users WHERE role = "administrator" AND deleted_at IS NULL AND banned_at IS NULL AND id <> :id LIMIT 1',
             [':id' => $id]
         ) !== null;
     }
