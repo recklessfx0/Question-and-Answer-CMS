@@ -831,6 +831,7 @@ final class QuestionModel
                  LEFT JOIN questions q ON q.id = COALESCE(p.question_id, a.question_id)
                  LEFT JOIN votes v ON v.post_type = :vote_type AND v.post_id = p.id AND v.user_id = :voter
                  WHERE p.id = :id
+                   ' . $this->commentDeletedFilter('p') . '
                    AND q.deleted_at IS NULL
                    AND (p.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
                  LIMIT 1' . $lock,
