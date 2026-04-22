@@ -127,7 +127,7 @@ final class HomeController extends Controller
     {
         $page = max(1, (int) ($params['page'] ?? 1));
         $perPage = 24;
-        $total = $this->users->count();
+        $total = $this->users->publicCount();
         if ($this->pageOutOfRange($page, $total, $perPage)) {
             return $this->view('errors/http', ['status' => 404, 'message' => 'Page not found'], 404);
         }

@@ -184,6 +184,13 @@ final class UserModel
         return (int) ($row['total'] ?? 0);
     }
 
+    public function publicCount(): int
+    {
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL AND banned_at IS NULL');
+
+        return (int) ($row['total'] ?? 0);
+    }
+
     /** @return array{top_reputation: int, total_answers: int, total_questions: int} */
     public function directorySummary(): array
     {
@@ -193,7 +200,8 @@ final class UserModel
                 (SELECT COUNT(*) FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS total_answers,
                 (SELECT COUNT(*) FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ') AS total_questions
              FROM users u
-             WHERE u.deleted_at IS NULL'
+             WHERE u.deleted_at IS NULL
+               AND u.banned_at IS NULL'
         );
 
         return [
@@ -725,6 +733,7 @@ final class UserModel
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
              LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
              WHERE u.deleted_at IS NULL
+               AND u.banned_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              ORDER BY u.reputation DESC, u.created_at DESC
              LIMIT :limit OFFSET :offset',
@@ -742,6 +751,7 @@ final class UserModel
              LEFT JOIN answers a ON a.user_id = u.id AND a.deleted_at IS NULL
              LEFT JOIN questions aq ON aq.id = a.question_id AND aq.deleted_at IS NULL' . $this->approvalFilter('aq') . '
              WHERE u.deleted_at IS NULL
+               AND u.banned_at IS NULL
              GROUP BY u.id, u.username, u.role, u.reputation, u.avatar_path, u.created_at
              HAVING COUNT(DISTINCT q.id) > 0
                 OR COUNT(DISTINCT CASE WHEN aq.id IS NOT NULL THEN a.id END) > 0
