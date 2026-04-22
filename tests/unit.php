@@ -51,6 +51,17 @@ try {
 }
 $assert($svgRejected, 'SVG uploads should reject spaced event handlers.');
 @unlink((string) $unsafeSvg);
+$payloadGuard = new ReflectionMethod($uploadService, 'assertNoExecutablePayload');
+$jpegBinary = tempnam(sys_get_temp_dir(), 'jpeg-bin-');
+file_put_contents((string) $jpegBinary, "\xFF\xD8\xFF\xE0" . str_repeat("A", 128) . "<%" . str_repeat("B", 128));
+$payloadAccepted = true;
+try {
+    $payloadGuard->invoke($uploadService, (string) $jpegBinary, 'image/jpeg');
+} catch (Throwable) {
+    $payloadAccepted = false;
+}
+$assert($payloadAccepted, 'Binary media should not be rejected for incidental short-tag byte sequences.');
+@unlink((string) $jpegBinary);
 
 $validator = (new \Core\Validator())->email('email', 'not-an-email');
 $assert(!$validator->passes(), 'Validator should reject invalid email.');

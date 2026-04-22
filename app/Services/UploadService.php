@@ -331,9 +331,12 @@ final class UploadService
             throw new RuntimeException('Upload is invalid.');
         }
 
-        $lower = strtolower($contents);
-        foreach (['<?php', '<?=', '<%', '#!/bin/', '#!/usr/bin/', 'this program cannot be run in dos mode'] as $needle) {
-            if (str_contains($lower, $needle)) {
+        // Scan only the leading bytes for script markers so normal binary media does not
+        // get rejected because compressed payload bytes coincidentally contain short tag
+        // sequences such as "<%".
+        $prefix = strtolower(substr($contents, 0, 4096));
+        foreach (['<?php', '<?=', '#!/bin/', '#!/usr/bin/', 'this program cannot be run in dos mode'] as $needle) {
+            if (str_contains($prefix, $needle)) {
                 throw new RuntimeException('Executable or script uploads are not allowed.');
             }
         }
