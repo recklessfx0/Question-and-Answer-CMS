@@ -380,14 +380,16 @@ final class AdminController extends Controller
     /** @param array<string, string> $params */
     public function deleteReportedContent(Request $request, array $params): Response
     {
-        $this->admin->deleteReportedContent($params['type'] ?? '', (int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        $deleted = $this->admin->deleteReportedContent($params['type'] ?? '', (int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Content removed.' : 'Content could not be removed.');
         return Response::redirect($this->adminRedirect($request, '/admin/reports'));
     }
 
     /** @param array<string, string> $params */
     public function closeQuestion(Request $request, array $params): Response
     {
-        $this->admin->closeQuestion((int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        $closed = $this->admin->closeQuestion((int) ($params['id'] ?? 0), (int) $this->session->get('user_id'));
+        $this->flash($closed ? 'success' : 'error', $closed ? 'Question closed.' : 'Question could not be closed.');
         return Response::redirect($this->adminRedirect($request, '/admin/reports'));
     }
 

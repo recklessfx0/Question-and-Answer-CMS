@@ -532,21 +532,32 @@ final class AdminService
         return true;
     }
 
-    public function deleteReportedContent(string $type, int $id, int $adminId): void
+    public function deleteReportedContent(string $type, int $id, int $adminId): bool
     {
-        if (!in_array($type, ['question', 'answer', 'comment'], true)) {
-            return;
+        if (!in_array($type, ['question', 'answer', 'comment'], true) || $id < 1) {
+            return false;
+        }
+
+        if ($this->questions->findPost($type, $id) === null) {
+            return false;
         }
 
         $affectedUserIds = $this->questions->softDelete($type, $id);
         $this->gamification->recalculateUsers($affectedUserIds);
         $this->audit->record($adminId, 'delete', $type, $id);
+
+        return true;
     }
 
-    public function closeQuestion(int $questionId, int $adminId): void
+    public function closeQuestion(int $questionId, int $adminId): bool
     {
-        $this->questions->closeQuestion($questionId);
+        if ($questionId < 1 || !$this->questions->closeQuestion($questionId)) {
+            return false;
+        }
+
         $this->audit->record($adminId, 'close', 'question', $questionId);
+
+        return true;
     }
 
     /** @param array<string, mixed>|null $icon */
