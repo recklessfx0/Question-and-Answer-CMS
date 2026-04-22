@@ -10,6 +10,7 @@ use PDOException;
 final class ReactionModel
 {
     private bool $schemaReady = false;
+    private ?bool $approvalColumnAvailable = null;
 
     public function __construct(private readonly Database $db) {}
 
@@ -278,8 +279,8 @@ final class ReactionModel
         $lock = $forUpdate ? ' FOR UPDATE' : '';
 
         return match ($postType) {
-            'question' => $this->db->fetch('SELECT user_id, title AS post_title, slug AS question_slug FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
-            'answer' => $this->db->fetch('SELECT a.user_id, q.title AS post_title, q.slug AS question_slug FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1' . $lock, [':id' => $postId]),
+            'question' => $this->db->fetch('SELECT user_id, title AS post_title, slug AS question_slug FROM questions q WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1' . $lock, [':id' => $postId]),
+            'answer' => $this->db->fetch('SELECT a.user_id, q.title AS post_title, q.slug AS question_slug FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1' . $lock, [':id' => $postId]),
             default => null,
         };
     }
@@ -351,5 +352,22 @@ final class ReactionModel
         }
 
         $this->schemaReady = true;
+    }
+
+    private function approvalFilter(string $alias): string
+    {
+        if ($this->approvalColumnAvailable !== null) {
+            return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+        }
+
+        try {
+            $this->approvalColumnAvailable = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'approval_status' LIMIT 1"
+            ) !== null;
+        } catch (\Throwable) {
+            $this->approvalColumnAvailable = false;
+        }
+
+        return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
     }
 }

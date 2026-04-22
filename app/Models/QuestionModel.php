@@ -786,7 +786,7 @@ final class QuestionModel
                 'SELECT a.id, a.question_id, a.user_id, a.is_accepted, q.user_id AS question_owner_id
                  FROM answers a
                  JOIN questions q ON q.id = a.question_id
-                 WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+                 WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                  LIMIT 1 FOR UPDATE',
                 [':id' => $answerId]
             );
@@ -818,7 +818,7 @@ final class QuestionModel
                  FROM answers p
                  JOIN questions q ON q.id = p.question_id
                  LEFT JOIN votes v ON v.post_type = :vote_type AND v.post_id = p.id AND v.user_id = :voter
-                 WHERE p.id = :id AND p.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1' . $lock,
+                 WHERE p.id = :id AND p.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1' . $lock,
                 [':vote_type' => $type, ':voter' => $voterId, ':id' => $postId]
             ),
             'comment' => $this->db->fetch(
@@ -829,7 +829,7 @@ final class QuestionModel
                  LEFT JOIN votes v ON v.post_type = :vote_type AND v.post_id = p.id AND v.user_id = :voter
                  WHERE p.id = :id
                    AND q.deleted_at IS NULL
-                   AND (p.answer_id IS NULL OR a.deleted_at IS NULL)
+                   AND (p.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
                  LIMIT 1' . $lock,
                 [':vote_type' => $type, ':voter' => $voterId, ':id' => $postId]
             ),
@@ -837,7 +837,7 @@ final class QuestionModel
                 'SELECT p.user_id, COALESCE(v.value, 0) AS current_vote
                  FROM questions p
                  LEFT JOIN votes v ON v.post_type = :vote_type AND v.post_id = p.id AND v.user_id = :voter
-                 WHERE p.id = :id AND p.deleted_at IS NULL LIMIT 1' . $lock,
+                 WHERE p.id = :id AND p.deleted_at IS NULL' . $this->approvalFilter('p') . ' LIMIT 1' . $lock,
                 [':vote_type' => $type, ':voter' => $voterId, ':id' => $postId]
             ),
             default => null,
@@ -910,14 +910,14 @@ final class QuestionModel
     public function flagTargetExists(string $type, int $postId): bool
     {
         $row = match ($type) {
-            'question' => $this->db->fetch('SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => $postId]),
-            'answer' => $this->db->fetch('SELECT a.id FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1', [':id' => $postId]),
+            'question' => $this->db->fetch('SELECT id FROM questions q WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1', [':id' => $postId]),
+            'answer' => $this->db->fetch('SELECT a.id FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1', [':id' => $postId]),
             'comment' => $this->db->fetch(
                 'SELECT c.id
                  FROM comments c
                  LEFT JOIN answers a ON a.id = c.answer_id
                  LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                 WHERE c.id = :id AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.deleted_at IS NULL)
+                 WHERE c.id = :id AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
                  LIMIT 1',
                 [':id' => $postId]
             ),
