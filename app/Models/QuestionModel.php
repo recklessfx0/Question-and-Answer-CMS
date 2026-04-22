@@ -917,11 +917,11 @@ final class QuestionModel
                  FROM comments c
                  LEFT JOIN answers a ON a.id = c.answer_id
                  LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                 WHERE c.id = :id AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
+                 WHERE c.id = :id AND c.deleted_at IS NULL AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
                  LIMIT 1',
                 [':id' => $postId]
             ),
-            'user' => $this->db->fetch('SELECT id FROM users WHERE id = :id LIMIT 1', [':id' => $postId]),
+            'user' => $this->db->fetch('SELECT id FROM users WHERE id = :id AND deleted_at IS NULL AND banned_at IS NULL LIMIT 1', [':id' => $postId]),
             default => null,
         };
 
@@ -996,6 +996,11 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function openFlags(int $limit = 100, int $offset = 0): array
     {
+        $approvalQuestion = $this->approvalFilter('q');
+        $approvalAnswerQuestion = $this->approvalFilter('aq');
+        $approvalCommentQuestion = $this->approvalFilter('cq');
+        $approvalCommentAnswerQuestion = $this->approvalFilter('caq');
+
         return $this->db->fetchAll(
             "SELECT f.*, reporter.username,
                     CASE
@@ -1015,15 +1020,28 @@ final class QuestionModel
                     target_user.username AS target_username
              FROM flags f
              JOIN users reporter ON reporter.id = f.user_id
-             LEFT JOIN questions q ON f.post_type = 'question' AND q.id = f.post_id
-             LEFT JOIN answers ans ON f.post_type = 'answer' AND ans.id = f.post_id
-             LEFT JOIN questions aq ON aq.id = ans.question_id
-             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id
-             LEFT JOIN questions cq ON cq.id = c.question_id
-             LEFT JOIN answers ca ON ca.id = c.answer_id
-             LEFT JOIN questions caq ON caq.id = ca.question_id
-             LEFT JOIN users target_user ON f.post_type = 'user' AND target_user.id = f.post_id
+             LEFT JOIN questions q ON f.post_type = 'question' AND q.id = f.post_id AND q.deleted_at IS NULL{$approvalQuestion}
+             LEFT JOIN answers ans ON f.post_type = 'answer' AND ans.id = f.post_id AND ans.deleted_at IS NULL
+             LEFT JOIN questions aq ON aq.id = ans.question_id AND aq.deleted_at IS NULL{$approvalAnswerQuestion}
+             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id AND c.deleted_at IS NULL
+             LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL{$approvalCommentQuestion}
+             LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
+             LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL{$approvalCommentAnswerQuestion}
+             LEFT JOIN users target_user ON f.post_type = 'user' AND target_user.id = f.post_id AND target_user.deleted_at IS NULL AND target_user.banned_at IS NULL
              WHERE f.status = 'open'
+               AND (
+                    (f.post_type = 'question' AND q.id IS NOT NULL)
+                    OR (f.post_type = 'answer' AND ans.id IS NOT NULL AND aq.id IS NOT NULL)
+                    OR (
+                        f.post_type = 'comment'
+                        AND c.id IS NOT NULL
+                        AND (
+                            (c.answer_id IS NULL AND cq.id IS NOT NULL)
+                            OR (c.answer_id IS NOT NULL AND ca.id IS NOT NULL AND caq.id IS NOT NULL)
+                        )
+                    )
+                    OR (f.post_type = 'user' AND target_user.id IS NOT NULL)
+               )
              ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset",
             [':limit' => $limit, ':offset' => $offset]
         );
@@ -1031,7 +1049,37 @@ final class QuestionModel
 
     public function countOpenFlags(): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM flags WHERE status = "open"');
+        $approvalQuestion = $this->approvalFilter('q');
+        $approvalAnswerQuestion = $this->approvalFilter('aq');
+        $approvalCommentQuestion = $this->approvalFilter('cq');
+        $approvalCommentAnswerQuestion = $this->approvalFilter('caq');
+
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total
+             FROM flags f
+             LEFT JOIN questions q ON f.post_type = 'question' AND q.id = f.post_id AND q.deleted_at IS NULL{$approvalQuestion}
+             LEFT JOIN answers ans ON f.post_type = 'answer' AND ans.id = f.post_id AND ans.deleted_at IS NULL
+             LEFT JOIN questions aq ON aq.id = ans.question_id AND aq.deleted_at IS NULL{$approvalAnswerQuestion}
+             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id AND c.deleted_at IS NULL
+             LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL{$approvalCommentQuestion}
+             LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
+             LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL{$approvalCommentAnswerQuestion}
+             LEFT JOIN users target_user ON f.post_type = 'user' AND target_user.id = f.post_id AND target_user.deleted_at IS NULL AND target_user.banned_at IS NULL
+             WHERE f.status = 'open'
+               AND (
+                    (f.post_type = 'question' AND q.id IS NOT NULL)
+                    OR (f.post_type = 'answer' AND ans.id IS NOT NULL AND aq.id IS NOT NULL)
+                    OR (
+                        f.post_type = 'comment'
+                        AND c.id IS NOT NULL
+                        AND (
+                            (c.answer_id IS NULL AND cq.id IS NOT NULL)
+                            OR (c.answer_id IS NOT NULL AND ca.id IS NOT NULL AND caq.id IS NOT NULL)
+                        )
+                    )
+                    OR (f.post_type = 'user' AND target_user.id IS NOT NULL)
+               )"
+        );
         return (int) ($row['total'] ?? 0);
     }
 
