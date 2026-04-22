@@ -145,7 +145,10 @@ final class QuestionController extends Controller
         $question = $this->questions->findBySlug($params['slug'] ?? '');
         if ($question !== null) {
             $parentId = $request->int('parent_id', 0, 0);
-            $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $posted = $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $this->flash($posted ? 'success' : 'error', $posted ? 'Clarification posted.' : 'Clarification could not be posted.');
+        } else {
+            $this->flash('error', 'Question not found.');
         }
 
         return $this->redirect('/question/' . ($params['slug'] ?? ''));
@@ -157,10 +160,12 @@ final class QuestionController extends Controller
         $answer = $this->questions->findAnswer((int) ($params['id'] ?? 0));
         if ($answer !== null) {
             $parentId = $request->int('parent_id', 0, 0);
-            $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $posted = $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $this->flash($posted ? 'success' : 'error', $posted ? 'Clarification posted.' : 'Clarification could not be posted.');
             return $this->redirect('/question/' . (string) $answer['question_slug'] . '#answer-' . (int) $answer['id']);
         }
 
+        $this->flash('error', 'Answer not found.');
         return $this->redirect('/');
     }
 
@@ -200,15 +205,16 @@ final class QuestionController extends Controller
     /** @param array<string, string> $params */
     public function accept(Request $request, array $params): Response
     {
-        $this->service->accept((int) ($params['id'] ?? 0));
+        $accepted = $this->service->accept((int) ($params['id'] ?? 0));
+        $this->flash($accepted ? 'success' : 'error', $accepted ? 'Accepted answer updated.' : 'Answer could not be accepted.');
         return Response::redirect($this->localReferer($request));
     }
 
     /** @param array<string, string> $params */
     public function flag(Request $request, array $params): Response
     {
-        $this->service->flag($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->string('reason', 240));
-        $this->flash('success', 'Flag submitted for review.');
+        $flagged = $this->service->flag($params['type'] ?? '', (int) ($params['id'] ?? 0), $request->string('reason', 240));
+        $this->flash($flagged ? 'success' : 'error', $flagged ? 'Flag submitted for review.' : 'Flag could not be submitted.');
         return Response::redirect($this->localReferer($request));
     }
 

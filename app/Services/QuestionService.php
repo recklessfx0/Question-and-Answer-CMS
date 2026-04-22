@@ -237,18 +237,19 @@ final class QuestionService
         return true;
     }
 
-    public function flag(string $type, int $postId, string $reason): void
+    public function flag(string $type, int $postId, string $reason): bool
     {
         if (!in_array($type, ['question', 'answer', 'comment', 'user'], true)) {
-            return;
+            return false;
         }
 
         $reason = excerpt($reason, 240);
         if ($postId < 1 || trim($reason) === '' || !$this->questions->flagTargetExists($type, $postId)) {
-            return;
+            return false;
         }
 
         $this->questions->flag($type, $postId, (int) $this->session->get('user_id'), $reason);
+        return true;
     }
 
     public function markdown(string $body): string
