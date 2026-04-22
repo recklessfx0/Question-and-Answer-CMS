@@ -1368,17 +1368,30 @@ final class QuestionModel
                     'SELECT q.id, q.title, q.body, q.slug, q.closed_at, q.duplicate_of_id,
                             dq.slug AS duplicate_slug, dq.title AS duplicate_title
                      FROM questions q
-                     LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL
-                     WHERE q.id = :id AND q.deleted_at IS NULL LIMIT 1',
+                     LEFT JOIN questions dq ON dq.id = q.duplicate_of_id AND dq.deleted_at IS NULL' . $this->approvalFilter('dq') . '
+                     WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' LIMIT 1',
                     [':id' => $id]
                 );
             }
 
-            return $this->db->fetch('SELECT id, title, body, slug, closed_at, NULL AS duplicate_of_id, NULL AS duplicate_slug, NULL AS duplicate_title FROM questions WHERE id = :id AND deleted_at IS NULL LIMIT 1', [':id' => $id]);
+            return $this->db->fetch(
+                'SELECT id, title, body, slug, closed_at, NULL AS duplicate_of_id, NULL AS duplicate_slug, NULL AS duplicate_title
+                 FROM questions q
+                 WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                 LIMIT 1',
+                [':id' => $id]
+            );
         }
 
         if ($type === 'answer') {
-            return $this->db->fetch('SELECT a.id, "" AS title, a.body, q.slug FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL LIMIT 1', [':id' => $id]);
+            return $this->db->fetch(
+                'SELECT a.id, "" AS title, a.body, q.slug
+                 FROM answers a
+                 JOIN questions q ON q.id = a.question_id
+                 WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                 LIMIT 1',
+                [':id' => $id]
+            );
         }
 
         if ($type === 'comment') {
@@ -1390,6 +1403,8 @@ final class QuestionModel
                  LEFT JOIN questions aq ON aq.id = a.question_id
                  WHERE c.id = :id' . $this->commentDeletedFilter('c') . ' AND COALESCE(q.deleted_at, aq.deleted_at) IS NULL
                    AND (c.answer_id IS NULL OR a.id IS NOT NULL)
+                   AND ((c.question_id IS NOT NULL' . $this->approvalFilter('q') . ')
+                        OR (c.answer_id IS NOT NULL' . $this->approvalFilter('aq') . '))
                  LIMIT 1',
                 [':id' => $id]
             );
