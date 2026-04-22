@@ -12,6 +12,7 @@ final class QuestionModel
     public const MAX_QUESTION_TAGS = 8;
 
     private ?bool $approvalColumnsAvailable = null;
+    private ?bool $commentDeletedColumnAvailable = null;
 
     public function __construct(private Database $db) {}
 
@@ -677,13 +678,15 @@ final class QuestionModel
 
     public function commentParentBelongsTo(string $type, int $postId, int $parentId): bool
     {
+        $commentFilter = $this->commentDeletedFilter();
+
         if ($type === 'answer') {
-            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND answer_id = :post AND deleted_at IS NULL LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
+            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND answer_id = :post' . $commentFilter . ' LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
             return $row !== null;
         }
 
         if ($type === 'question') {
-            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND question_id = :post AND deleted_at IS NULL LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
+            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND question_id = :post' . $commentFilter . ' LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
             return $row !== null;
         }
 
@@ -693,13 +696,13 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function commentsForQuestion(int $questionId): array
     {
-        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN users u ON u.id = c.user_id WHERE c.question_id = :id AND c.deleted_at IS NULL ORDER BY c.created_at ASC', [':id' => $questionId]);
+        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN users u ON u.id = c.user_id WHERE c.question_id = :id' . $this->commentDeletedFilter('c') . ' ORDER BY c.created_at ASC', [':id' => $questionId]);
     }
 
     /** @return array<int, array<string, mixed>> */
     public function commentsForAnswers(int $questionId): array
     {
-        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL JOIN users u ON u.id = c.user_id WHERE a.question_id = :id AND c.deleted_at IS NULL ORDER BY c.answer_id, c.created_at ASC', [':id' => $questionId]);
+        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL JOIN users u ON u.id = c.user_id WHERE a.question_id = :id' . $this->commentDeletedFilter('c') . ' ORDER BY c.answer_id, c.created_at ASC', [':id' => $questionId]);
     }
 
     /** @return array<string, mixed>|null */
@@ -917,7 +920,7 @@ final class QuestionModel
                  FROM comments c
                  LEFT JOIN answers a ON a.id = c.answer_id
                  LEFT JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id)
-                 WHERE c.id = :id AND c.deleted_at IS NULL AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
+                 WHERE c.id = :id' . $this->commentDeletedFilter('c') . ' AND q.deleted_at IS NULL AND (c.answer_id IS NULL OR a.id IS NOT NULL)' . $this->approvalFilter('q') . '
                  LIMIT 1',
                 [':id' => $postId]
             ),
@@ -1000,6 +1003,7 @@ final class QuestionModel
         $approvalAnswerQuestion = $this->approvalFilter('aq');
         $approvalCommentQuestion = $this->approvalFilter('cq');
         $approvalCommentAnswerQuestion = $this->approvalFilter('caq');
+        $commentFilter = $this->commentDeletedFilter('c');
 
         return $this->db->fetchAll(
             "SELECT f.*, reporter.username,
@@ -1023,7 +1027,7 @@ final class QuestionModel
              LEFT JOIN questions q ON f.post_type = 'question' AND q.id = f.post_id AND q.deleted_at IS NULL{$approvalQuestion}
              LEFT JOIN answers ans ON f.post_type = 'answer' AND ans.id = f.post_id AND ans.deleted_at IS NULL
              LEFT JOIN questions aq ON aq.id = ans.question_id AND aq.deleted_at IS NULL{$approvalAnswerQuestion}
-             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id AND c.deleted_at IS NULL
+             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id{$commentFilter}
              LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL{$approvalCommentQuestion}
              LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
              LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL{$approvalCommentAnswerQuestion}
@@ -1053,6 +1057,7 @@ final class QuestionModel
         $approvalAnswerQuestion = $this->approvalFilter('aq');
         $approvalCommentQuestion = $this->approvalFilter('cq');
         $approvalCommentAnswerQuestion = $this->approvalFilter('caq');
+        $commentFilter = $this->commentDeletedFilter('c');
 
         $row = $this->db->fetch(
             "SELECT COUNT(*) AS total
@@ -1060,7 +1065,7 @@ final class QuestionModel
              LEFT JOIN questions q ON f.post_type = 'question' AND q.id = f.post_id AND q.deleted_at IS NULL{$approvalQuestion}
              LEFT JOIN answers ans ON f.post_type = 'answer' AND ans.id = f.post_id AND ans.deleted_at IS NULL
              LEFT JOIN questions aq ON aq.id = ans.question_id AND aq.deleted_at IS NULL{$approvalAnswerQuestion}
-             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id AND c.deleted_at IS NULL
+             LEFT JOIN comments c ON f.post_type = 'comment' AND c.id = f.post_id{$commentFilter}
              LEFT JOIN questions cq ON cq.id = c.question_id AND cq.deleted_at IS NULL{$approvalCommentQuestion}
              LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
              LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL{$approvalCommentAnswerQuestion}
@@ -1604,6 +1609,23 @@ final class QuestionModel
         }
 
         return $available;
+    }
+
+    private function commentDeletedFilter(string $alias = 'comments'): string
+    {
+        if ($this->commentDeletedColumnAvailable !== null) {
+            return $this->commentDeletedColumnAvailable ? ' AND ' . $alias . '.deleted_at IS NULL' : '';
+        }
+
+        try {
+            $this->commentDeletedColumnAvailable = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comments' AND COLUMN_NAME = 'deleted_at' LIMIT 1"
+            ) !== null;
+        } catch (Throwable) {
+            $this->commentDeletedColumnAvailable = false;
+        }
+
+        return $this->commentDeletedColumnAvailable ? ' AND ' . $alias . '.deleted_at IS NULL' : '';
     }
 
     private function approvalFilter(string $alias = 'q'): string
