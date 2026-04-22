@@ -1352,7 +1352,7 @@ final class QuestionModel
     public function closeQuestion(int $id): bool
     {
         $updated = $this->db->query(
-            'UPDATE questions SET closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
+            'UPDATE questions q SET q.closed_at = COALESCE(q.closed_at, NOW()), q.updated_at = NOW() WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
             [':id' => $id]
         )->rowCount();
 
@@ -1423,7 +1423,7 @@ final class QuestionModel
 
         if ($duplicateOfId === null) {
             $updated = $this->db->query(
-                'UPDATE questions SET duplicate_of_id = NULL, updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
+                'UPDATE questions q SET q.duplicate_of_id = NULL, q.updated_at = NOW() WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
                 [':id' => $questionId]
             )->rowCount();
 
@@ -1435,7 +1435,7 @@ final class QuestionModel
         }
 
         $target = $this->db->fetch(
-            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter() . ' AND (duplicate_of_id IS NULL OR duplicate_of_id <> :question_id) LIMIT 1',
+            'SELECT q.id FROM questions q WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.duplicate_of_id IS NULL OR q.duplicate_of_id <> :question_id) LIMIT 1',
             [':id' => $duplicateOfId, ':question_id' => $questionId]
         );
         if ($target === null) {
@@ -1443,12 +1443,12 @@ final class QuestionModel
         }
 
         $this->db->execute(
-            'UPDATE questions SET duplicate_of_id = :duplicate_of_id, closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
+            'UPDATE questions q SET q.duplicate_of_id = :duplicate_of_id, q.closed_at = COALESCE(q.closed_at, NOW()), q.updated_at = NOW() WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
             [':duplicate_of_id' => $duplicateOfId, ':id' => $questionId]
         );
 
         return $this->db->fetch(
-            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter() . ' AND duplicate_of_id = :duplicate_of_id LIMIT 1',
+            'SELECT q.id FROM questions q WHERE q.id = :id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND q.duplicate_of_id = :duplicate_of_id LIMIT 1',
             [':id' => $questionId, ':duplicate_of_id' => $duplicateOfId]
         ) !== null;
     }
