@@ -45,7 +45,7 @@ final class UserController extends Controller
     public function profile(Request $request, array $params): Response
     {
         $user = $this->users->findByUsername($params['username'] ?? '');
-        if ($user === null) {
+        if ($user === null || !empty($user['deleted_at'])) {
             return $this->view('errors/http', ['status' => 404, 'message' => 'User not found'], 404);
         }
 
