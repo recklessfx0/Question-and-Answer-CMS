@@ -33,6 +33,13 @@ $mentionAltHtml = $markdown->toHtml('![hi @alice](/public-assets/images/uploads/
 $assert(str_contains($mentionAltHtml, 'alt="hi @alice"'), 'Markdown should not render mentions inside image alt text.');
 $mediaPaths = media_paths_from_markdown('![alt](/public-assets/images/uploads/demo.webp) [uploaded video](/public-assets/videos/uploads/demo.mp4)');
 $assert(count($mediaPaths) === 2 && in_array('/public-assets/videos/uploads/demo.mp4', $mediaPaths, true), 'Markdown media path extraction should include uploaded videos from the public video directory.');
+$avifPath = '/public-assets/images/uploads/test-avif-without-fallback.avif';
+@mkdir(BASE_PATH . '/public-assets/images/uploads', 0777, true);
+file_put_contents(BASE_PATH . $avifPath, 'fake-avif');
+$avifHtml = uploaded_image($avifPath, '', 'Uploaded image');
+$assert(str_contains($avifHtml, 'type="image/avif"'), 'AVIF uploads should expose an AVIF source.');
+$assert(!str_contains($avifHtml, 'type="image/webp"'), 'AVIF uploads should not reference a missing WEBP fallback.');
+@unlink(BASE_PATH . $avifPath);
 
 $uploadService = new \App\Services\UploadService();
 $svgGuard = new ReflectionMethod($uploadService, 'assertSafeSvg');
@@ -62,6 +69,23 @@ try {
 }
 $assert($payloadAccepted, 'Binary media should not be rejected for incidental short-tag byte sequences.');
 @unlink((string) $jpegBinary);
+$imageGuard = new ReflectionMethod($uploadService, 'assertSafeImage');
+if (extension_loaded('gd') && function_exists('imagecreatetruecolor') && function_exists('imagepng')) {
+    $largeImage = imagecreatetruecolor(7000, 1000);
+    if ($largeImage instanceof \GdImage) {
+        $largePath = tempnam(sys_get_temp_dir(), 'wide-png-');
+        imagepng($largeImage, (string) $largePath);
+        imagedestroy($largeImage);
+        $wideAccepted = true;
+        try {
+            $imageGuard->invoke($uploadService, (string) $largePath, 'image/png');
+        } catch (Throwable) {
+            $wideAccepted = false;
+        }
+        $assert($wideAccepted, 'Large but reasonable photo dimensions should be accepted.');
+        @unlink((string) $largePath);
+    }
+}
 
 $validator = (new \Core\Validator())->email('email', 'not-an-email');
 $assert(!$validator->passes(), 'Validator should reject invalid email.');

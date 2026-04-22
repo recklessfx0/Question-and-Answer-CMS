@@ -10,6 +10,9 @@ final class UploadService
 {
     private const DEFAULT_IMAGE_DIRECTORY = 'public-assets/images/uploads';
     private const DEFAULT_VIDEO_DIRECTORY = 'public-assets/videos/uploads';
+    private const MAX_IMAGE_WIDTH = 12_000;
+    private const MAX_IMAGE_HEIGHT = 12_000;
+    private const MAX_IMAGE_PIXELS = 50_000_000;
     private const MAX_IMAGE_BYTES = 8_000_000;
     private const MAX_LOGO_BYTES = 2_000_000;
     private const MAX_SOCIAL_IMAGE_BYTES = 5_000_000;
@@ -220,7 +223,13 @@ final class UploadService
             throw new RuntimeException('Upload is not a valid image.');
         }
 
-        if ((int) $imageInfo[0] > 6000 || (int) $imageInfo[1] > 6000) {
+        $width = (int) ($imageInfo[0] ?? 0);
+        $height = (int) ($imageInfo[1] ?? 0);
+        if (
+            $width > self::MAX_IMAGE_WIDTH
+            || $height > self::MAX_IMAGE_HEIGHT
+            || ($width * $height) > self::MAX_IMAGE_PIXELS
+        ) {
             throw new RuntimeException('Image dimensions are too large.');
         }
 

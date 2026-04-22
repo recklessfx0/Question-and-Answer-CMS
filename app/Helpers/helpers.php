@@ -232,7 +232,12 @@ function uploaded_image(string $path, string $class = '', string $alt = '', arra
 
     if ($extension === 'avif') {
         $fallback = substr($pathOnly, 0, -5) . '.webp';
-        return '<picture><source srcset="' . h($pathOnly) . '" type="image/avif"><source srcset="' . h($fallback) . '" type="image/webp">' . $image . '</picture>';
+        $fallbackFile = BASE_PATH . $fallback;
+        if (is_file($fallbackFile)) {
+            return '<picture><source srcset="' . h($pathOnly) . '" type="image/avif"><source srcset="' . h($fallback) . '" type="image/webp">' . $image . '</picture>';
+        }
+
+        return '<picture><source srcset="' . h($pathOnly) . '" type="image/avif">' . $image . '</picture>';
     }
 
     if ($extension === 'webp') {
