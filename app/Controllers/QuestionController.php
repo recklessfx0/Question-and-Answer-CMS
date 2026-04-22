@@ -205,8 +205,14 @@ final class QuestionController extends Controller
     /** @param array<string, string> $params */
     public function accept(Request $request, array $params): Response
     {
-        $accepted = $this->service->accept((int) ($params['id'] ?? 0));
+        $answerId = (int) ($params['id'] ?? 0);
+        $answer = $this->questions->findAnswer($answerId);
+        $accepted = $this->service->accept($answerId);
         $this->flash($accepted ? 'success' : 'error', $accepted ? 'Accepted answer updated.' : 'Answer could not be accepted.');
+        if (is_array($answer) && !empty($answer['question_slug'])) {
+            return Response::redirect('/question/' . (string) $answer['question_slug'] . '#answer-' . $answerId);
+        }
+
         return Response::redirect($this->localReferer($request));
     }
 
