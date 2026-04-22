@@ -17,6 +17,7 @@ $notifications = new \App\Models\NotificationModel($database);
 $users = new \App\Models\UserModel($database);
 $settings = new \App\Models\SettingsModel($database);
 $mail = new \App\Services\MailService($settings, $config);
+$approvalColumnAvailable = null;
 
 $redactedJob = static function (array $job): array {
     $copy = $job;
@@ -69,6 +70,27 @@ $logProcessed = static function (array $job) use ($redactedJob): void {
 
 $createNotification = static function (int $userId, string $type, array $payload, int $windowSeconds = 86400) use ($notifications): void {
     $notifications->createUniqueRecent($userId, $type, $payload, $windowSeconds);
+};
+
+$supportsQuestionApproval = static function () use ($database, &$approvalColumnAvailable): bool {
+    if ($approvalColumnAvailable !== null) {
+        return $approvalColumnAvailable;
+    }
+
+    try {
+        $approvalColumnAvailable = $database->fetch(
+            "SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'questions'
+               AND COLUMN_NAME = 'approval_status'
+             LIMIT 1"
+        ) !== null;
+    } catch (\Throwable) {
+        $approvalColumnAvailable = false;
+    }
+
+    return $approvalColumnAvailable;
 };
 
 while (true) {
@@ -126,15 +148,18 @@ while (true) {
 
         if ($name === 'NotifyModerators') {
             $approvalEnabled = setting_enabled($settings->all(), 'question_approval_enabled');
-            $pendingQuestion = $database->fetch(
-                'SELECT id
-                 FROM questions
-                 WHERE id = :id
-                   AND deleted_at IS NULL
-                   AND approval_status = "pending"
-                 LIMIT 1',
-                [':id' => (int) ($payload['question_id'] ?? 0)]
-            );
+            $pendingQuestion = null;
+            if ($approvalEnabled && $supportsQuestionApproval()) {
+                $pendingQuestion = $database->fetch(
+                    'SELECT id
+                     FROM questions
+                     WHERE id = :id
+                       AND deleted_at IS NULL
+                       AND approval_status = "pending"
+                     LIMIT 1',
+                    [':id' => (int) ($payload['question_id'] ?? 0)]
+                );
+            }
 
             if ($approvalEnabled && $pendingQuestion !== null) {
                 foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator") AND deleted_at IS NULL AND banned_at IS NULL') as $moderator) {
