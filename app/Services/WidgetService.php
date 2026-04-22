@@ -278,6 +278,7 @@ final class WidgetService
             'SELECT username, avatar_path
              FROM users
              WHERE deleted_at IS NULL
+               AND banned_at IS NULL
              ORDER BY created_at DESC
              LIMIT :limit',
             [':limit' => $limit]
@@ -306,7 +307,7 @@ final class WidgetService
             'SELECT a.id, a.body, a.votes, q.title AS question_title, q.slug AS question_slug, u.username
              FROM answers a
              JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
-             JOIN users u ON u.id = a.user_id
+             JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL AND u.banned_at IS NULL
              WHERE a.deleted_at IS NULL AND a.is_accepted = 1
              ORDER BY a.votes DESC, a.created_at DESC
              LIMIT :limit',
@@ -324,7 +325,7 @@ final class WidgetService
                     COALESCE(a.votes, 0) + COALESCE(reactions.reaction_score, 0) AS score
              FROM answers a
              JOIN questions q ON q.id = a.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
-             JOIN users u ON u.id = a.user_id
+             JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL AND u.banned_at IS NULL
              LEFT JOIN (
                 SELECT pr.post_id, COUNT(*) AS reaction_count, COALESCE(SUM(rt.reputation_delta), 0) AS reaction_score
                 FROM post_reactions pr
@@ -389,6 +390,7 @@ final class WidgetService
              LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
              LEFT JOIN questions caq ON caq.id = ca.question_id AND caq.deleted_at IS NULL' . $this->approvalFilter('caq') . '
              WHERE u.deleted_at IS NULL
+               AND u.banned_at IS NULL
              GROUP BY u.id, u.username, u.avatar_path, u.reputation
              HAVING activity_score > 0
              ORDER BY activity_score DESC, u.reputation DESC, u.created_at DESC
@@ -409,7 +411,7 @@ final class WidgetService
                  LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                  JOIN questions q ON q.id = COALESCE(c.question_id, a.question_id) AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                  WHERE c.answer_id IS NULL OR a.id IS NOT NULL) AS clarifications,
-                (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users'
+                (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND banned_at IS NULL) AS users'
         ) ?? [];
 
         return [
