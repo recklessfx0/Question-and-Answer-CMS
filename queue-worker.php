@@ -15,7 +15,8 @@ $config = require BASE_PATH . '/config/app.php';
 $database = new \Core\Database(require BASE_PATH . '/config/database.php');
 $notifications = new \App\Models\NotificationModel($database);
 $users = new \App\Models\UserModel($database);
-$mail = new \App\Services\MailService(new \App\Models\SettingsModel($database), $config);
+$settings = new \App\Models\SettingsModel($database);
+$mail = new \App\Services\MailService($settings, $config);
 
 $redactedJob = static function (array $job): array {
     $copy = $job;
@@ -124,8 +125,21 @@ while (true) {
         }
 
         if ($name === 'NotifyModerators') {
-            foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator") AND deleted_at IS NULL AND banned_at IS NULL') as $moderator) {
-                $createNotification((int) $moderator['id'], 'New question', ['message' => 'A new question was posted.', 'url' => '/moderator'], 86400);
+            $approvalEnabled = setting_enabled($settings->all(), 'question_approval_enabled');
+            $pendingQuestion = $database->fetch(
+                'SELECT id
+                 FROM questions
+                 WHERE id = :id
+                   AND deleted_at IS NULL
+                   AND approval_status = "pending"
+                 LIMIT 1',
+                [':id' => (int) ($payload['question_id'] ?? 0)]
+            );
+
+            if ($approvalEnabled && $pendingQuestion !== null) {
+                foreach ($database->fetchAll('SELECT id FROM users WHERE role IN ("moderator", "administrator") AND deleted_at IS NULL AND banned_at IS NULL') as $moderator) {
+                    $createNotification((int) $moderator['id'], 'New question', ['message' => 'A new question is awaiting approval.', 'url' => '/moderator'], 86400);
+                }
             }
         }
 

@@ -56,7 +56,9 @@ final class QuestionService
         $approvalStatus = $requiresApproval ? 'pending' : 'approved';
         [$id, $slug] = $this->createQuestionWithUniqueSlug($userId, $categoryId, $title, $body, $meta, $approvalStatus);
         $this->questions->attachTags($id, preg_split('/[,#]+/', $tags) ?: []);
-        $this->queueNotification('NotifyModerators', ['question_id' => $id]);
+        if ($requiresApproval) {
+            $this->queueNotification('NotifyModerators', ['question_id' => $id]);
+        }
         if (!$requiresApproval) {
             $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in ' . $title, '/question/' . $slug);
             $this->gamification->award($userId, 3, 'question_created', 'question', $id);
