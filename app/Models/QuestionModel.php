@@ -660,7 +660,7 @@ final class QuestionModel
             'SELECT a.*, q.slug AS question_slug, q.title AS question_title
              FROM answers a
              JOIN questions q ON q.id = a.question_id
-             WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL
+             WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
              LIMIT 1',
             [':id' => $id]
         );
