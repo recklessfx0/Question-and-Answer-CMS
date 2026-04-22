@@ -51,7 +51,7 @@
         <?php $window = is_array($pagination['window'] ?? null) ? $pagination['window'] : []; ?>
         <?php if ($window !== [] && (int) $window[0] > 1): ?>
             <a href="/notifications">1</a>
-            <?php if ((int) $window[0] > 2): ?><span>…</span><?php endif; ?>
+            <?php if ((int) $window[0] > 2): ?><span>&hellip;</span><?php endif; ?>
         <?php endif; ?>
         <?php foreach ($window as $pageNumber): ?>
             <?php $target = (int) $pageNumber; ?>
@@ -63,7 +63,7 @@
             <?php endif; ?>
         <?php endforeach; ?>
         <?php if ($window !== [] && (int) end($window) < (int) ($pagination['total_pages'] ?? 1)): ?>
-            <?php if ((int) end($window) < (int) ($pagination['total_pages'] ?? 1) - 1): ?><span>…</span><?php endif; ?>
+            <?php if ((int) end($window) < (int) ($pagination['total_pages'] ?? 1) - 1): ?><span>&hellip;</span><?php endif; ?>
             <?php $last = (int) $pagination['total_pages']; ?>
             <a href="<?= h('/notifications?page=' . $last) ?>"><?= $last ?></a>
         <?php endif; ?>
