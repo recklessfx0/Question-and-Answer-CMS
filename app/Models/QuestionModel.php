@@ -1352,7 +1352,7 @@ final class QuestionModel
     public function closeQuestion(int $id): bool
     {
         $updated = $this->db->query(
-            'UPDATE questions SET closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            'UPDATE questions SET closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
             [':id' => $id]
         )->rowCount();
 
@@ -1422,12 +1422,12 @@ final class QuestionModel
         }
 
         if ($duplicateOfId === null) {
-            $this->db->execute(
-                'UPDATE questions SET duplicate_of_id = NULL, updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            $updated = $this->db->query(
+                'UPDATE questions SET duplicate_of_id = NULL, updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
                 [':id' => $questionId]
-            );
+            )->rowCount();
 
-            return true;
+            return $updated > 0;
         }
 
         if ($duplicateOfId < 1 || $duplicateOfId === $questionId) {
@@ -1443,11 +1443,14 @@ final class QuestionModel
         }
 
         $this->db->execute(
-            'UPDATE questions SET duplicate_of_id = :duplicate_of_id, closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL',
+            'UPDATE questions SET duplicate_of_id = :duplicate_of_id, closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter(),
             [':duplicate_of_id' => $duplicateOfId, ':id' => $questionId]
         );
 
-        return true;
+        return $this->db->fetch(
+            'SELECT id FROM questions WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter() . ' AND duplicate_of_id = :duplicate_of_id LIMIT 1',
+            [':id' => $questionId, ':duplicate_of_id' => $duplicateOfId]
+        ) !== null;
     }
 
     /** @return array<string, int> */
