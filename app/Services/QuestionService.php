@@ -17,6 +17,8 @@ use RuntimeException;
 
 final class QuestionService
 {
+    private const MAX_POST_MEDIA_TOTAL_BYTES = 60_000_000;
+
     public function __construct(
         private QuestionModel $questions,
         private Session $session,
@@ -33,7 +35,8 @@ final class QuestionService
     /** @return array{ok: bool, slug: string, errors: array<string, string>, pending?: bool} */
     public function ask(string $title, string $body, string $tags, ?int $categoryId = null, ?array $media = null, string $videoUrls = ''): array
     {
-        $body = $this->appendMedia($body, $media);
+        $mediaResult = $this->appendMedia($body, $media);
+        $body = $mediaResult['body'];
         $body = $this->appendExternalVideos($body, $videoUrls);
         $validator = (new Validator())
             ->required('title', $title)
@@ -41,8 +44,13 @@ final class QuestionService
             ->required('body', $body)
             ->length('body', $body, 30, 20000);
 
-        if (!$validator->passes()) {
-            return ['ok' => false, 'slug' => '', 'errors' => $validator->errors()];
+        $errors = $validator->errors();
+        if ($mediaResult['errors'] !== []) {
+            $errors = array_merge($errors, $mediaResult['errors']);
+        }
+
+        if (!$validator->passes() || $errors !== []) {
+            return ['ok' => false, 'slug' => '', 'errors' => $errors];
         }
 
         $meta = excerpt($body, 155);
@@ -67,21 +75,27 @@ final class QuestionService
         return ['ok' => true, 'slug' => $slug, 'errors' => [], 'pending' => $requiresApproval];
     }
 
-    public function answer(int $questionId, string $body, ?array $media = null, string $videoUrls = ''): bool
+    /** @return array{ok: bool, errors: array<string, string>} */
+    public function answer(int $questionId, string $body, ?array $media = null, string $videoUrls = ''): array
     {
         if ((int) $this->session->get('user_id') < 1) {
-            return false;
+            return ['ok' => false, 'errors' => ['Sign in to post an answer.']];
         }
 
         if (!$this->questions->isQuestionOpen($questionId)) {
-            return false;
+            return ['ok' => false, 'errors' => ['This question is closed to new answers.']];
         }
 
-        $body = $this->appendMedia($body, $media);
+        $mediaResult = $this->appendMedia($body, $media);
+        $body = $mediaResult['body'];
         $body = $this->appendExternalVideos($body, $videoUrls);
         $validator = (new Validator())->required('body', $body)->length('body', $body, 10, 20000);
-        if (!$validator->passes()) {
-            return false;
+        $errors = $validator->errors();
+        if ($mediaResult['errors'] !== []) {
+            $errors = array_merge($errors, $mediaResult['errors']);
+        }
+        if (!$validator->passes() || $errors !== []) {
+            return ['ok' => false, 'errors' => $errors !== [] ? $errors : ['Write a more complete answer.']];
         }
 
         $userId = (int) $this->session->get('user_id');
@@ -93,39 +107,45 @@ final class QuestionService
         }
         $this->gamification->award($userId, 5, 'answer_created', 'answer', $id);
 
-        return true;
+        return ['ok' => true, 'errors' => []];
     }
 
-    public function comment(string $type, int $postId, string $body, ?int $parentId = null, ?array $media = null, string $videoUrls = ''): bool
+    /** @return array{ok: bool, errors: array<string, string>} */
+    public function comment(string $type, int $postId, string $body, ?int $parentId = null, ?array $media = null, string $videoUrls = ''): array
     {
         if ((int) $this->session->get('user_id') < 1) {
-            return false;
+            return ['ok' => false, 'errors' => ['Sign in to post a clarification.']];
         }
 
         if (!in_array($type, ['question', 'answer'], true)) {
-            return false;
+            return ['ok' => false, 'errors' => ['Clarification target is invalid.']];
         }
 
         if ($type === 'question' && !$this->questions->isQuestionOpen($postId)) {
-            return false;
+            return ['ok' => false, 'errors' => ['This question is closed to new clarifications.']];
         }
 
         if ($type === 'answer') {
             $answer = $this->questions->findAnswer($postId);
             if ($answer === null || !$this->questions->isQuestionOpen((int) $answer['question_id'])) {
-                return false;
+                return ['ok' => false, 'errors' => ['This answer is no longer available for clarifications.']];
             }
         }
 
-        $body = $this->appendMedia($body, $media);
+        $mediaResult = $this->appendMedia($body, $media);
+        $body = $mediaResult['body'];
         $body = $this->appendExternalVideos($body, $videoUrls);
         $validator = (new Validator())->required('body', $body)->length('body', $body, 3, 6000);
-        if (!$validator->passes()) {
-            return false;
+        $errors = $validator->errors();
+        if ($mediaResult['errors'] !== []) {
+            $errors = array_merge($errors, $mediaResult['errors']);
+        }
+        if (!$validator->passes() || $errors !== []) {
+            return ['ok' => false, 'errors' => $errors !== [] ? $errors : ['Clarification could not be posted.']];
         }
 
         if ($parentId !== null && !$this->questions->commentParentBelongsTo($type, $postId, $parentId)) {
-            return false;
+            return ['ok' => false, 'errors' => ['The selected clarification thread is no longer available.']];
         }
 
         $userId = (int) $this->session->get('user_id');
@@ -184,7 +204,7 @@ final class QuestionService
             $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) ($answer['question_title'] ?? 'a question'), $url, $notifiedUserIds);
         }
         $this->gamification->award($userId, 1, 'clarification_created', 'comment', $id);
-        return true;
+        return ['ok' => true, 'errors' => []];
     }
 
     /** @return array{votes: int, current_vote: int}|null */
@@ -292,29 +312,36 @@ final class QuestionService
         throw new RuntimeException('Unable to create a unique question URL.');
     }
 
-    private function appendMedia(string $body, ?array $media): string
+    /** @return array{body: string, errors: array<string, string>} */
+    private function appendMedia(string $body, ?array $media): array
     {
         if ($media === null) {
-            return $body;
+            return ['body' => $body, 'errors' => []];
         }
 
         $attachments = [];
+        $errors = [];
+        $attemptedUploads = 0;
         $totalBytes = 0;
-        $maxTotalBytes = 20_000_000; // 20 MB combined cap across all uploads in one post
 
         foreach ($this->uploadList($media) as $file) {
             if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
                 continue;
             }
 
+            $attemptedUploads++;
             $totalBytes += (int) ($file['size'] ?? 0);
-            if ($totalBytes > $maxTotalBytes) {
+            if ($totalBytes > self::MAX_POST_MEDIA_TOTAL_BYTES) {
+                $errors['media'] = 'The total media upload size is too large.';
                 break;
             }
 
             try {
                 $path = $this->uploads->storeMedia($file);
-            } catch (RuntimeException) {
+            } catch (RuntimeException $e) {
+                if ($attachments === [] && !isset($errors['media'])) {
+                    $errors['media'] = $e->getMessage();
+                }
                 continue;
             }
 
@@ -325,10 +352,13 @@ final class QuestionService
         }
 
         if ($attachments === []) {
-            return $body;
+            return [
+                'body' => $body,
+                'errors' => $attemptedUploads > 0 ? ($errors !== [] ? $errors : ['media' => 'Media files could not be uploaded.']) : [],
+            ];
         }
 
-        return rtrim($body) . "\n\n" . implode("\n\n", $attachments);
+        return ['body' => rtrim($body) . "\n\n" . implode("\n\n", $attachments), 'errors' => []];
     }
 
     private function appendExternalVideos(string $body, string $videoUrls): string

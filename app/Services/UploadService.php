@@ -8,35 +8,30 @@ use RuntimeException;
 
 final class UploadService
 {
+    private const DEFAULT_IMAGE_DIRECTORY = 'public-assets/images/uploads';
+    private const DEFAULT_VIDEO_DIRECTORY = 'public-assets/videos/uploads';
+    private const MAX_IMAGE_BYTES = 8_000_000;
+    private const MAX_LOGO_BYTES = 2_000_000;
+    private const MAX_SOCIAL_IMAGE_BYTES = 5_000_000;
+    private const MAX_POST_IMAGE_BYTES = 12_000_000;
+    private const MAX_POST_VIDEO_BYTES = 40_000_000;
+
     /** @param array<string, mixed> $file */
-    public function storeImage(array $file, string $directory = 'public-assets/images/uploads'): string
+    public function storeImage(array $file, string $directory = self::DEFAULT_IMAGE_DIRECTORY, ?int $maxBytes = null): string
     {
         $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/avif' => 'avif', 'image/gif' => 'gif'];
-        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 2_000_000);
+        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, $maxBytes ?? self::MAX_IMAGE_BYTES);
         if (!isset($extensions[$mime])) {
             throw new RuntimeException('Unsupported file type.');
         }
 
-        $this->assertSafeImage($tmp, $mime);
-        $targetDir = $this->targetDirectory($directory);
-
-        $baseName = bin2hex(random_bytes(16));
-        // Preserve GIFs as GIFs so animated uploads do not get flattened by GD re-encoding.
-        $converted = $mime === 'image/gif' ? null : $this->storeModernFormats($tmp, $mime, $targetDir, $baseName);
-        if ($converted !== null) {
-            return '/' . trim($directory, '/') . '/' . $converted;
-        }
-
-        $name = $baseName . '.' . $extensions[$mime];
-        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
-
-        return '/' . trim($directory, '/') . '/' . $name;
+        return $this->storeValidatedImage($tmp, $mime, $directory, $extensions);
     }
 
     /** @param array<string, mixed> $file */
     public function storeLogo(array $file, string $directory = 'public-assets/images/logos'): string
     {
-        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 2_000_000);
+        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, self::MAX_LOGO_BYTES);
         if ($mime === 'image/svg+xml') {
             $this->assertSafeSvg($tmp);
             $targetDir = $this->targetDirectory($directory);
@@ -46,49 +41,46 @@ final class UploadService
             return '/' . trim($directory, '/') . '/' . $name;
         }
 
-        return $this->storeImage($file, $directory);
+        return $this->storeImage($file, $directory, self::MAX_LOGO_BYTES);
     }
 
     /** @param array<string, mixed> $file */
     public function storeSocialImage(array $file, string $directory = 'public-assets/images/social'): string
     {
         $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
-        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 2_000_000);
+        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, self::MAX_SOCIAL_IMAGE_BYTES);
         if (!isset($extensions[$mime])) {
             throw new RuntimeException('Social sharing images must be JPG, PNG, WEBP, or GIF.');
         }
 
-        $this->assertSafeImage($tmp, $mime);
-        $targetDir = $this->targetDirectory($directory);
-        $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
-
-        return '/' . trim($directory, '/') . '/' . $name;
+        return $this->storeValidatedImage($tmp, $mime, $directory, $extensions);
     }
 
     /** @param array<string, mixed> $file */
-    public function storeMedia(array $file, string $directory = 'public-assets/images/uploads'): string
+    public function storeMedia(array $file, string $imageDirectory = self::DEFAULT_IMAGE_DIRECTORY, string $videoDirectory = self::DEFAULT_VIDEO_DIRECTORY): string
     {
-        ['tmp' => $tmp, 'mime' => $mime] = $this->validatedUpload($file, 12_000_000);
+        ['tmp' => $tmp, 'mime' => $mime, 'size' => $size] = $this->validatedUpload($file, max(self::MAX_POST_IMAGE_BYTES, self::MAX_POST_VIDEO_BYTES));
         if (str_starts_with($mime, 'image/')) {
-            return $this->storeImage($file, $directory);
+            if ($size > self::MAX_POST_IMAGE_BYTES) {
+                throw new RuntimeException('Image uploads must be 12 MB or smaller.');
+            }
+
+            return $this->storeValidatedImage($tmp, $mime, $imageDirectory, ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/avif' => 'avif', 'image/gif' => 'gif']);
         }
 
         $extensions = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
         if (!isset($extensions[$mime])) {
             throw new RuntimeException('Unsupported file type.');
         }
+        if ($size > self::MAX_POST_VIDEO_BYTES) {
+            throw new RuntimeException('Video uploads must be 40 MB or smaller.');
+        }
 
         $this->assertSafeVideo($tmp, $mime);
-        $targetDir = $this->targetDirectory($directory);
-
-        $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
-
-        return '/' . trim($directory, '/') . '/' . $name;
+        return $this->storeValidatedVideo($tmp, $mime, $videoDirectory, $extensions);
     }
 
-    /** @param array<string, mixed> $file @return array{tmp: string, mime: string, original_name: string} */
+    /** @param array<string, mixed> $file @return array{tmp: string, mime: string, original_name: string, size: int} */
     private function validatedUpload(array $file, int $maxBytes): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -117,7 +109,42 @@ final class UploadService
 
         $this->assertNoExecutablePayload($tmp, $mime);
 
-        return ['tmp' => $tmp, 'mime' => $mime, 'original_name' => $originalName];
+        return ['tmp' => $tmp, 'mime' => $mime, 'original_name' => $originalName, 'size' => (int) ($file['size'] ?? 0)];
+    }
+
+    /** @param array<string, string> $extensions */
+    private function storeValidatedImage(string $tmp, string $mime, string $directory, array $extensions): string
+    {
+        if (!isset($extensions[$mime])) {
+            throw new RuntimeException('Unsupported file type.');
+        }
+
+        $this->assertSafeImage($tmp, $mime);
+        $targetDir = $this->targetDirectory($directory);
+        $baseName = bin2hex(random_bytes(16));
+        $converted = $mime === 'image/gif' ? null : $this->storeModernFormats($tmp, $mime, $targetDir, $baseName);
+        if ($converted !== null) {
+            return '/' . trim($directory, '/') . '/' . $converted;
+        }
+
+        $name = $baseName . '.' . $extensions[$mime];
+        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
+
+        return '/' . trim($directory, '/') . '/' . $name;
+    }
+
+    /** @param array<string, string> $extensions */
+    private function storeValidatedVideo(string $tmp, string $mime, string $directory, array $extensions): string
+    {
+        if (!isset($extensions[$mime])) {
+            throw new RuntimeException('Unsupported file type.');
+        }
+
+        $targetDir = $this->targetDirectory($directory);
+        $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
+        $this->moveUpload($tmp, $targetDir . DIRECTORY_SEPARATOR . $name);
+
+        return '/' . trim($directory, '/') . '/' . $name;
     }
 
     private function storeModernFormats(string $tmp, string $mime, string $targetDir, string $baseName): ?string

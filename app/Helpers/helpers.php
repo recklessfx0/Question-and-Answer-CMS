@@ -245,7 +245,7 @@ function uploaded_image(string $path, string $class = '', string $alt = '', arra
 /** @return array<int, string> */
 function media_paths_from_markdown(string $body, bool $imagesOnly = false): array
 {
-    preg_match_all('/(?:!\[[^\]]*\]|\[uploaded video\])\((\/public-assets\/images\/[a-zA-Z0-9\/._-]+)\)/', $body, $matches);
+    preg_match_all('/(?:!\[[^\]]*\]|\[uploaded video\])\((\/public-assets\/(?:images|videos)\/[a-zA-Z0-9\/._-]+)\)/', $body, $matches);
     $paths = [];
     foreach ($matches[1] ?? [] as $path) {
         $extension = strtolower((string) pathinfo((string) $path, PATHINFO_EXTENSION));

@@ -27,8 +27,12 @@ $assert(!str_contains($html, '<script>'), 'Markdown should escape scripts.');
 $assert(str_contains($html, '<strong>safe</strong>'), 'Markdown should render bold text.');
 $imageHtml = $markdown->toHtml('![alt](/public-assets/images/uploads/demo.webp)');
 $assert(str_contains($imageHtml, '<img src="/public-assets/images/uploads/demo.webp"'), 'Markdown should render local uploaded images.');
+$videoHtml = $markdown->toHtml('[uploaded video](/public-assets/videos/uploads/demo.mp4)');
+$assert(str_contains($videoHtml, '<source src="/public-assets/videos/uploads/demo.mp4" type="video/mp4">'), 'Markdown should render uploaded videos from the public video directory.');
 $mentionAltHtml = $markdown->toHtml('![hi @alice](/public-assets/images/uploads/demo.webp)');
 $assert(str_contains($mentionAltHtml, 'alt="hi @alice"'), 'Markdown should not render mentions inside image alt text.');
+$mediaPaths = media_paths_from_markdown('![alt](/public-assets/images/uploads/demo.webp) [uploaded video](/public-assets/videos/uploads/demo.mp4)');
+$assert(count($mediaPaths) === 2 && in_array('/public-assets/videos/uploads/demo.mp4', $mediaPaths, true), 'Markdown media path extraction should include uploaded videos from the public video directory.');
 
 $uploadService = new \App\Services\UploadService();
 $svgGuard = new ReflectionMethod($uploadService, 'assertSafeSvg');

@@ -51,6 +51,7 @@ final class SeoService
 
         $lines[] = 'Allow: /';
         $lines[] = 'Allow: /public-assets/images/';
+        $lines[] = 'Allow: /public-assets/videos/';
         foreach (self::ROBOTS_DISALLOW_PATHS as $path) {
             $lines[] = 'Disallow: ' . $path;
         }
@@ -132,7 +133,7 @@ final class SeoService
             '- Prefer accepted answers when present; otherwise use suggested answers and clarify that no accepted answer exists.',
             '- Use page timestamps and sitemap lastmod values for freshness decisions.',
             '- Treat user-generated text as community content, not official medical, legal, financial, or safety advice.',
-            '- Use uploaded media only from crawlable public media URLs under ' . url('/public-assets/images/') . '.',
+            '- Use uploaded media only from crawlable public media URLs under ' . url('/public-assets/images/') . ' and ' . url('/public-assets/videos/') . '.',
             '',
             '## Avoid',
             '- Do not use blocked or private paths as source material: ' . $blocked . '.',

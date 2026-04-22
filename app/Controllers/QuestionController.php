@@ -130,10 +130,13 @@ final class QuestionController extends Controller
     {
         $question = $this->questions->findBySlug($params['slug'] ?? '');
         $media = $this->mediaFiles($request);
-        if ($question !== null && $this->service->answer((int) $question['id'], $request->string('body', 20000), $media, $request->string('video_urls', 1000))) {
+        $result = $question !== null
+            ? $this->service->answer((int) $question['id'], $request->string('body', 20000), $media, $request->string('video_urls', 1000))
+            : ['ok' => false, 'errors' => ['Question not found.']];
+        if ($result['ok']) {
             $this->flash('success', 'Answer posted.');
         } else {
-            $this->flash('error', 'Write a more complete answer.');
+            $this->flash('error', implode(' ', $result['errors'] ?: ['Write a more complete answer.']));
         }
 
         return $this->redirect('/question/' . ($params['slug'] ?? ''));
@@ -145,8 +148,8 @@ final class QuestionController extends Controller
         $question = $this->questions->findBySlug($params['slug'] ?? '');
         if ($question !== null) {
             $parentId = $request->int('parent_id', 0, 0);
-            $posted = $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
-            $this->flash($posted ? 'success' : 'error', $posted ? 'Clarification posted.' : 'Clarification could not be posted.');
+            $result = $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $this->flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Clarification posted.' : implode(' ', $result['errors'] ?: ['Clarification could not be posted.']));
         } else {
             $this->flash('error', 'Question not found.');
         }
@@ -160,8 +163,8 @@ final class QuestionController extends Controller
         $answer = $this->questions->findAnswer((int) ($params['id'] ?? 0));
         if ($answer !== null) {
             $parentId = $request->int('parent_id', 0, 0);
-            $posted = $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
-            $this->flash($posted ? 'success' : 'error', $posted ? 'Clarification posted.' : 'Clarification could not be posted.');
+            $result = $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $this->flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Clarification posted.' : implode(' ', $result['errors'] ?: ['Clarification could not be posted.']));
             return $this->redirect('/question/' . (string) $answer['question_slug'] . '#answer-' . (int) $answer['id']);
         }
 

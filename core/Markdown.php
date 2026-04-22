@@ -44,7 +44,7 @@ final class Markdown
             $escaped
         ) ?? $escaped;
         $escaped = preg_replace_callback(
-            '/\[uploaded video\]\((\/public-assets\/images\/[a-zA-Z0-9\/._-]+\.(?:mp4|webm))\)/',
+            '/\[uploaded video\]\((\/public-assets\/(?:images|videos)\/[a-zA-Z0-9\/._-]+\.(?:mp4|webm))\)/',
             static function (array $matches) use (&$htmlBlocks): string {
                 $path = $matches[1];
                 $type = str_ends_with(strtolower($path), '.webm') ? 'video/webm' : 'video/mp4';
@@ -224,7 +224,7 @@ final class Markdown
 
     private function isMediaBlock(string $block): bool
     {
-        return preg_match('/^(?:<a class="media-link[^"]*" href="\/public-assets\/images\/[^"]+" data-media-popup="1">.*<\/a>|<div class="video-embed">.*<\/div>)$/s', $block) === 1;
+        return preg_match('/^(?:<a class="media-link[^"]*" href="\/public-assets\/(?:images|videos)\/[^"]+" data-media-popup="1">.*<\/a>|<div class="video-embed">.*<\/div>)$/s', $block) === 1;
     }
 
     /** @param array<int, string> $html @param array<int, string> $gallery */
