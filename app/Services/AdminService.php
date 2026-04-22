@@ -274,6 +274,9 @@ final class AdminService
 
         $updated = $this->users->setBanned($userId, $banned);
         if ($updated) {
+            if ($banned) {
+                $this->users->removeEngagementFootprint($userId);
+            }
             $this->audit->record($actorId, $banned ? 'user_ban' : 'user_unban', 'user', $userId);
         }
 

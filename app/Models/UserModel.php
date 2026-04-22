@@ -653,6 +653,18 @@ final class UserModel
         return $updated > 0;
     }
 
+    public function removeEngagementFootprint(int $userId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        $this->db->transaction(function () use ($userId): void {
+            $this->removeUserVotes($userId);
+            $this->db->execute('DELETE FROM post_reactions WHERE user_id = :user', [':user' => $userId]);
+        });
+    }
+
     /** @return array<string, mixed>|null */
     public function adminDelete(int $id, bool $keepContent): ?array
     {
