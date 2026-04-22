@@ -101,7 +101,7 @@ final class QuestionModel
                 UNION ALL
                 SELECT COALESCE(c.question_id, a.question_id) AS question_id, COALESCE(c.votes, 0) AS vote_total
                 FROM comments c
-                LEFT JOIN answers a ON a.id = c.answer_id
+                LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                 WHERE ((c.question_id IN ({$voteCommentQuestionIn}) OR a.question_id IN ({$voteCommentAnswerIn})){$commentFilter})
              ) vote_totals
              WHERE question_id IS NOT NULL
@@ -131,7 +131,7 @@ final class QuestionModel
                 UNION ALL
                 SELECT COALESCE(c.question_id, a.question_id) AS question_id, c.user_id, c.created_at AS last_activity
                 FROM comments c
-                LEFT JOIN answers a ON a.id = c.answer_id
+                LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                 WHERE ((c.question_id IN ({$commentQuestionIn}) OR a.question_id IN ({$commentAnswerIn})){$commentFilter})
              ) activity
              JOIN users u ON u.id = activity.user_id AND u.deleted_at IS NULL AND u.banned_at IS NULL
@@ -172,7 +172,7 @@ final class QuestionModel
                 UNION ALL
                 SELECT COALESCE(c.question_id, a.question_id) AS question_id, c.body, c.created_at
                 FROM comments c
-                LEFT JOIN answers a ON a.id = c.answer_id
+                LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                 WHERE ((c.question_id IN ({$mediaCommentQuestionIn}) OR a.question_id IN ({$mediaCommentAnswerIn})){$commentFilter})
              ) media
              ORDER BY created_at DESC",
@@ -214,7 +214,7 @@ final class QuestionModel
                 UNION ALL
                 SELECT COALESCE(c.question_id, a.question_id) AS question_id, DATE(c.created_at) AS activity_day
                 FROM comments c
-                LEFT JOIN answers a ON a.id = c.answer_id
+                LEFT JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL
                 WHERE ((c.question_id IN ({$dayCommentQuestionIn}) OR a.question_id IN ({$dayCommentAnswerIn})){$commentFilter}) AND c.created_at >= :activity_since_comment
              ) activity_days
              GROUP BY question_id, activity_day",
