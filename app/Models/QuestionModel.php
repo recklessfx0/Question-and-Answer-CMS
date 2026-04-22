@@ -714,7 +714,7 @@ final class QuestionModel
              LEFT JOIN questions q ON q.id = c.question_id
              LEFT JOIN answers a ON a.id = c.answer_id
              LEFT JOIN questions aq ON aq.id = a.question_id
-             WHERE c.id = :id LIMIT 1',
+             WHERE c.id = :id' . $this->commentDeletedFilter('c') . ' LIMIT 1',
             [':id' => $id]
         );
     }
