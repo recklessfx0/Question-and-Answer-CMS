@@ -74,6 +74,10 @@ $normalizedGeneric = $mimeNormalizer->invoke($uploadService, 'application/octet-
 $assert($normalizedGeneric === '', 'Generic MIME guesses should fall through to deeper file sniffing.');
 $normalizedJpeg = $mimeNormalizer->invoke($uploadService, 'image/jpeg', __FILE__);
 $assert($normalizedJpeg === 'image/jpeg', 'Supported MIME guesses should still be accepted.');
+$uploadErrorMessage = new ReflectionMethod($uploadService, 'uploadErrorMessage');
+$assert($uploadErrorMessage->invoke($uploadService, UPLOAD_ERR_INI_SIZE) === 'Upload is too large.', 'PHP size-limit upload errors should surface a size-specific message.');
+$assert($uploadErrorMessage->invoke($uploadService, UPLOAD_ERR_PARTIAL) === 'Upload was interrupted. Please try again.', 'Partial uploads should surface an interruption message.');
+$assert($uploadErrorMessage->invoke($uploadService, UPLOAD_ERR_NO_FILE) === 'Choose a file to upload.', 'Missing uploads should surface a choose-file message.');
 $imageGuard = new ReflectionMethod($uploadService, 'assertSafeImage');
 if (extension_loaded('gd') && function_exists('imagecreatetruecolor') && function_exists('imagepng')) {
     $largeImage = imagecreatetruecolor(7000, 1000);

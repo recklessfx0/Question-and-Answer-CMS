@@ -86,8 +86,9 @@ final class UploadService
     /** @param array<string, mixed> $file @return array{tmp: string, mime: string, original_name: string, size: int} */
     private function validatedUpload(array $file, int $maxBytes): array
     {
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Upload failed.');
+        $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException($this->uploadErrorMessage($error));
         }
 
         // Reject oversized uploads before touching the contents.
@@ -113,6 +114,19 @@ final class UploadService
         $this->assertNoExecutablePayload($tmp, $mime);
 
         return ['tmp' => $tmp, 'mime' => $mime, 'original_name' => $originalName, 'size' => (int) ($file['size'] ?? 0)];
+    }
+
+    private function uploadErrorMessage(int $error): string
+    {
+        return match ($error) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Upload is too large.',
+            UPLOAD_ERR_PARTIAL => 'Upload was interrupted. Please try again.',
+            UPLOAD_ERR_NO_FILE => 'Choose a file to upload.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Upload is temporarily unavailable on the server.',
+            UPLOAD_ERR_CANT_WRITE => 'The server could not store the uploaded file.',
+            UPLOAD_ERR_EXTENSION => 'The upload was blocked by a server extension.',
+            default => 'Upload failed.',
+        };
     }
 
     /** @param array<string, string> $extensions */
