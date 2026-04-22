@@ -678,12 +678,12 @@ final class QuestionModel
     public function commentParentBelongsTo(string $type, int $postId, int $parentId): bool
     {
         if ($type === 'answer') {
-            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND answer_id = :post LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
+            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND answer_id = :post AND deleted_at IS NULL LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
             return $row !== null;
         }
 
         if ($type === 'question') {
-            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND question_id = :post LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
+            $row = $this->db->fetch('SELECT id FROM comments WHERE id = :parent AND question_id = :post AND deleted_at IS NULL LIMIT 1', [':parent' => $parentId, ':post' => $postId]);
             return $row !== null;
         }
 
@@ -693,13 +693,13 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function commentsForQuestion(int $questionId): array
     {
-        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN users u ON u.id = c.user_id WHERE c.question_id = :id ORDER BY c.created_at ASC', [':id' => $questionId]);
+        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN users u ON u.id = c.user_id WHERE c.question_id = :id AND c.deleted_at IS NULL ORDER BY c.created_at ASC', [':id' => $questionId]);
     }
 
     /** @return array<int, array<string, mixed>> */
     public function commentsForAnswers(int $questionId): array
     {
-        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN answers a ON a.id = c.answer_id JOIN users u ON u.id = c.user_id WHERE a.question_id = :id ORDER BY c.answer_id, c.created_at ASC', [':id' => $questionId]);
+        return $this->db->fetchAll('SELECT c.*, u.username, u.avatar_path FROM comments c JOIN answers a ON a.id = c.answer_id AND a.deleted_at IS NULL JOIN users u ON u.id = c.user_id WHERE a.question_id = :id AND c.deleted_at IS NULL ORDER BY c.answer_id, c.created_at ASC', [':id' => $questionId]);
     }
 
     /** @return array<string, mixed>|null */
