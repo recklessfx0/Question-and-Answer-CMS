@@ -32,4 +32,35 @@ final class SettingsModel
 
         return $settings;
     }
+
+    /** @param array<int, string> $keys @return array<string, string> */
+    public function updatedAtByKeys(array $keys): array
+    {
+        $keys = array_values(array_unique(array_filter(array_map('strval', $keys), static fn (string $key): bool => $key !== '')));
+        if ($keys === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+        foreach ($keys as $index => $key) {
+            $param = ':key' . $index;
+            $params[$param] = $key;
+            $placeholders[] = $param;
+        }
+
+        $rows = $this->db->fetchAll(
+            'SELECT `key`, updated_at
+             FROM settings
+             WHERE `key` IN (' . implode(',', $placeholders) . ')',
+            $params
+        );
+
+        $timestamps = [];
+        foreach ($rows as $row) {
+            $timestamps[(string) $row['key']] = (string) ($row['updated_at'] ?? '');
+        }
+
+        return $timestamps;
+    }
 }

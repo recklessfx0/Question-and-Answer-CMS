@@ -395,6 +395,7 @@ final class SeoService
         $categories = $this->categories->sitemapCategories();
         $tags = $this->questions->sitemapTags();
         $users = $this->users->sitemapUsers();
+        $staticPages = $this->configuredStaticPages();
 
         $entries = [
             $this->sitemapIndexEntry(url('/page-sitemap.xml'), $this->latestLastmod([
@@ -402,6 +403,7 @@ final class SeoService
                 $this->latestLastmod($categories),
                 $this->latestLastmod($tags),
                 $this->latestLastmod($users),
+                $this->latestLastmod($staticPages),
             ])),
             $this->sitemapIndexEntry(url('/post-sitemap.xml'), $this->latestLastmod($questions)),
             $this->sitemapIndexEntry(url('/category-sitemap.xml'), $this->latestLastmod($categories)),
@@ -423,11 +425,13 @@ final class SeoService
         $categories = $this->categories->sitemapCategories();
         $tags = $this->questions->sitemapTags();
         $users = $this->users->sitemapUsers();
+        $staticPages = $this->configuredStaticPages();
         $siteLastmod = $this->latestLastmod([
             $this->latestLastmod($questions),
             $this->latestLastmod($categories),
             $this->latestLastmod($tags),
             $this->latestLastmod($users),
+            $this->latestLastmod($staticPages),
         ]);
         $entries = [
             $this->sitemapUrl(url('/'), $siteLastmod),
@@ -435,7 +439,7 @@ final class SeoService
             $this->sitemapUrl(url('/tags'), $this->latestLastmod($tags)),
             $this->sitemapUrl(url('/users'), $this->latestLastmod($users)),
         ];
-        foreach ($this->configuredStaticPages() as $page) {
+        foreach ($staticPages as $page) {
             $entries[] = $this->sitemapUrl(url($page['path']), $page['updated_at']);
         }
 
@@ -838,6 +842,10 @@ final class SeoService
     {
         try {
             $settings = $this->settings->all();
+            $timestamps = $this->settings->updatedAtByKeys(array_values(array_unique(array_merge(
+                array_map(static fn (array $page): string => $page['description_key'], self::STATIC_PAGES),
+                array_map(static fn (array $page): string => $page['body_key'], self::STATIC_PAGES),
+            ))));
         } catch (\Throwable) {
             return [];
         }
@@ -852,7 +860,10 @@ final class SeoService
 
             $pages[] = [
                 'path' => $page['path'],
-                'updated_at' => null,
+                'updated_at' => $this->latestLastmod([
+                    $timestamps[$page['description_key']] ?? null,
+                    $timestamps[$page['body_key']] ?? null,
+                ]),
             ];
         }
 
