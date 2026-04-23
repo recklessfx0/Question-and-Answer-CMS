@@ -1003,7 +1003,7 @@ final class QuestionModel
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function sitemapQuestions(): array
+    public function sitemapQuestions(int $limit = 50000, int $offset = 0): array
     {
         return $this->db->fetchAll(
             'SELECT q.id, q.slug, q.body, q.updated_at
@@ -1019,7 +1019,8 @@ final class QuestionModel
                    )
                )
              ORDER BY q.updated_at DESC
-             LIMIT 50000'
+             LIMIT :limit OFFSET :offset',
+            [':limit' => $limit, ':offset' => $offset]
         );
     }
 

@@ -445,18 +445,29 @@ final class SeoService
     public function postSitemap(): string
     {
         $entries = [];
-        $questions = $this->questions->sitemapQuestions();
-        $mediaBodies = $this->questions->sitemapMediaBodies(array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions));
-        foreach ($questions as $question) {
-            $mediaBody = implode("\n\n", array_merge(
-                [(string) ($question['body'] ?? '')],
-                $mediaBodies[(int) ($question['id'] ?? 0)] ?? []
-            ));
-            $entries[] = $this->sitemapUrl(
-                url('/question/' . (string) $question['slug']),
-                (string) $question['updated_at'],
-                $this->absoluteMediaUrls($mediaBody, true)
-            );
+        $batchSize = 500;
+        for ($offset = 0; ; $offset += $batchSize) {
+            $questions = $this->questions->sitemapQuestions($batchSize, $offset);
+            if ($questions === []) {
+                break;
+            }
+
+            $mediaBodies = $this->questions->sitemapMediaBodies(array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions));
+            foreach ($questions as $question) {
+                $mediaBody = implode("\n\n", array_merge(
+                    [(string) ($question['body'] ?? '')],
+                    $mediaBodies[(int) ($question['id'] ?? 0)] ?? []
+                ));
+                $entries[] = $this->sitemapUrl(
+                    url('/question/' . (string) $question['slug']),
+                    (string) $question['updated_at'],
+                    $this->absoluteMediaUrls($mediaBody, true)
+                );
+            }
+
+            if (count($questions) < $batchSize) {
+                break;
+            }
         }
 
         return $this->sitemapUrlset($entries, true);
