@@ -95,7 +95,9 @@ final class QuestionController extends Controller
         }
         $duplicateSlug = (string) ($question['duplicate_slug'] ?? '');
         $canonicalUrl = $duplicateSlug !== '' ? url('/question/' . $duplicateSlug) : url('/question/' . (string) $question['slug']);
-        $schema = $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $canonicalUrl, $questionComments, $answerComments);
+        $schema = $duplicateSlug === ''
+            ? $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $canonicalUrl, $questionComments, $answerComments)
+            : '';
         $ogImage = $this->seo->firstImageFromBodies((string) $question['body'], ...array_map(static fn (array $answer): string => (string) $answer['body'], $answers));
         $thinUnanswered = count($answers) === 0 && mb_strlen(trim(strip_tags((string) $question['body']))) < 180;
         $tags = $this->questions->tags((int) $question['id']);
