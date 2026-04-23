@@ -5,7 +5,7 @@
 </section>
 <section class="directory-grid">
     <?php foreach ($tags as $tag): ?>
-        <a class="directory-card" href="/tag/<?= h((string) $tag['slug']) ?>">
+<a class="directory-card" href="<?= h(localized_path('/tag/' . (string) $tag['slug'])) ?>">
             <strong>#<?= h((string) $tag['name']) ?></strong>
             <span><?= (int) $tag['question_count'] ?> questions</span>
         </a>

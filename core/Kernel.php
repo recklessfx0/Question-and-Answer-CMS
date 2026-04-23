@@ -22,6 +22,10 @@ final class Kernel
             $this->container->get(Session::class)->start();
             $this->syncAuthenticatedUser();
             $this->container->get(TranslationService::class)->boot($request);
+            $localeRedirect = $this->normalizedLocaleRedirect($request);
+            if ($localeRedirect !== null) {
+                return $localeRedirect;
+            }
 
             $cached = $this->pageCacheLookup($request);
             if ($cached !== null) {
@@ -133,6 +137,33 @@ final class Kernel
         $contentType = $response->headers()['Content-Type'] ?? '';
 
         return $this->canAttemptPageCache($request) && $response->status() === 200 && str_contains($contentType, 'text/html');
+    }
+
+    private function normalizedLocaleRedirect(Request $request): ?Response
+    {
+        if (!$request->isGet()) {
+            return null;
+        }
+
+        $parts = parse_url($request->uri);
+        if (!is_array($parts)) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '/');
+        $query = [];
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            parse_str((string) $parts['query'], $query);
+        }
+        unset($query['lang']);
+
+        $target = localized_path($request->path . ($query !== [] ? '?' . http_build_query($query) : ''));
+        $current = $path . (isset($parts['query']) && $parts['query'] !== '' ? '?' . (string) $parts['query'] : '');
+        if ($target === $current) {
+            return null;
+        }
+
+        return Response::redirect($target, 301);
     }
 
     private function errorResponse(int $status, string $message): Response

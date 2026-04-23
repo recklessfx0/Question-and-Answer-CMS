@@ -71,7 +71,7 @@ $renderReactions = static function (string $type, int $id) use ($authUser, $csrf
                     </button>
                 </form>
             <?php else: ?>
-                <a class="reaction-button reaction-pill" href="/register" title="<?= h($name) ?>" data-reaction-weight="<?= (int) ($reaction['reputation_delta'] ?? 0) ?>">
+                <a class="reaction-button reaction-pill" href="<?= h(localized_path('/register')) ?>" title="<?= h($name) ?>" data-reaction-weight="<?= (int) ($reaction['reputation_delta'] ?? 0) ?>">
                     <?php if ($iconPath !== ''): ?>
                         <?= uploaded_image($iconPath, 'reaction-icon', $name . ' reaction icon') ?>
                     <?php else: ?>
@@ -138,7 +138,7 @@ $renderComment = static function (array $comment, string $composerId, string $ac
             <header class="comment-head">
                 <span class="comment-author-wrap">
                     <?php if (!empty($comment['avatar_path'])): ?><?= uploaded_image((string) $comment['avatar_path'], 'avatar', (string) $comment['username'] . ' avatar') ?><?php endif; ?>
-                    <a class="comment-author" href="/user/<?= rawurlencode((string) $comment['username']) ?>"><?= h((string) $comment['username']) ?></a>
+                    <a class="comment-author" href="<?= h(localized_path('/user/' . rawurlencode((string) $comment['username']))) ?>"><?= h((string) $comment['username']) ?></a>
                 </span>
                 <span class="comment-date"><?= h((string) ($comment['created_at'] ?? '')) ?></span>
             </header>
@@ -204,9 +204,9 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
 <?php endif; ?>
 <article class="question-detail">
     <nav class="breadcrumbs" aria-label="Breadcrumb">
-        <a href="/">Questions</a>
+        <a href="<?= h(localized_path('/')) ?>">Questions</a>
         <?php if (!empty($question['category_slug'])): ?>
-            / <a href="/category/<?= h((string) $question['category_slug']) ?>"><?= h((string) $question['category_name']) ?></a>
+            / <a href="<?= h(localized_path('/category/' . (string) $question['category_slug'])) ?>"><?= h((string) $question['category_name']) ?></a>
         <?php endif; ?>
     </nav>
     <header class="question-header">
@@ -229,7 +229,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
         <?php if (is_array($duplicateCanonical ?? null)): ?>
             <aside class="duplicate-notice">
                 <strong>Marked as duplicate</strong>
-                <span>Canonical discussion: <a href="/question/<?= h((string) $duplicateCanonical['slug']) ?>"><?= h((string) (($duplicateCanonical['title'] ?? '') ?: $duplicateCanonical['slug'])) ?></a></span>
+                <span>Canonical discussion: <a href="<?= h(localized_path('/question/' . (string) $duplicateCanonical['slug'])) ?>"><?= h((string) (($duplicateCanonical['title'] ?? '') ?: $duplicateCanonical['slug'])) ?></a></span>
             </aside>
         <?php endif; ?>
         <?php if (!empty($question['closed_at'])): ?>
@@ -244,18 +244,18 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
             <div class="question-content-meta">
                 <div class="question-meta-left">
                     <?php if (!empty($question['category_slug'])): ?>
-                        <p class="meta question-category-meta">Category <a href="/category/<?= h((string) $question['category_slug']) ?>"><?= h((string) $question['category_name']) ?></a></p>
+                        <p class="meta question-category-meta">Category <a href="<?= h(localized_path('/category/' . (string) $question['category_slug'])) ?>"><?= h((string) $question['category_name']) ?></a></p>
                     <?php endif; ?>
                     <?php if ($tags !== []): ?>
                         <div class="tags question-meta-tags">
                             <?php foreach ($tags as $tag): ?>
-                                <a href="/tag/<?= h((string) $tag['slug']) ?>">#<?= h((string) $tag['name']) ?></a>
+                                <a href="<?= h(localized_path('/tag/' . (string) $tag['slug'])) ?>">#<?= h((string) $tag['name']) ?></a>
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                 </div>
                 <div class="question-meta-right">
-                    <p class="meta question-asked-meta">Asked by <a href="/user/<?= rawurlencode((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
+                    <p class="meta question-asked-meta">Asked by <a href="<?= h(localized_path('/user/' . rawurlencode((string) $question['username']))) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
                     <div class="post-actions question-report-actions">
                         <?php $renderShareLink($questionShareUrl, $questionShareTitle, t('questions.share.question', 'Share question')); ?>
                         <?php if (is_array($authUser)): ?><?php $renderReportButton('question', (int) $question['id'], 'Report question'); ?><?php endif; ?>
@@ -323,7 +323,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                 $hasAnswers   = $answerCount > 0;
                 $statusClass  = $hasAccepted ? 'related-answers-accepted' : ($hasAnswers ? 'related-answers-open' : 'related-answers-none');
             ?>
-                <a class="related-item" href="/question/<?= h((string) $item['slug']) ?>">
+                            <a class="related-item" href="<?= h(localized_path('/question/' . (string) $item['slug'])) ?>">
                     <div class="related-item-counters">
                         <span class="related-counter related-counter-votes" title="<?= (int) $votes ?> vote<?= $votes !== 1 ? 's' : '' ?>">
                             <strong><?= (int) $votes ?></strong>
@@ -377,11 +377,11 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                     <?php $renderReactions('answer', (int) $answer['id']); ?>
                     <p class="meta">
                         <?php if (!empty($answer['avatar_path'])): ?><?= uploaded_image((string) $answer['avatar_path'], 'avatar', (string) $answer['username'] . ' avatar') ?><?php endif; ?>
-                        Answered by <a href="/user/<?= rawurlencode((string) $answer['username']) ?>"><?= h((string) $answer['username']) ?></a> &middot; <?= h((string) $answer['created_at']) ?>
+                    Answered by <a href="<?= h(localized_path('/user/' . rawurlencode((string) $answer['username']))) ?>"><?= h((string) $answer['username']) ?></a> &middot; <?= h((string) $answer['created_at']) ?>
                     </p>
                     <?php if (!empty($answer['verified_at'])): ?>
                         <p class="meta verified-review">
-                            Reviewed by <a href="/user/<?= rawurlencode((string) $answer['verified_by_username']) ?>"><?= h((string) $answer['verified_by_username']) ?></a> &middot; <?= h((string) $answer['verified_at']) ?>
+                    Reviewed by <a href="<?= h(localized_path('/user/' . rawurlencode((string) $answer['verified_by_username']))) ?>"><?= h((string) $answer['verified_by_username']) ?></a> &middot; <?= h((string) $answer['verified_at']) ?>
                             <?php if (!empty($answer['review_note'])): ?><br><?= h((string) $answer['review_note']) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>
@@ -513,7 +513,7 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
 <?php elseif (is_array($authUser)): ?>
     <p class="flash">This question is closed to new answers.</p>
 <?php else: ?>
-    <p><a href="/login">Sign in</a> to answer.</p>
+            <p><a href="<?= h(localized_path('/login')) ?>">Sign in</a> to answer.</p>
 <?php endif; ?>
 <?php if ($hasDynamicWidgets): ?>
         </div>

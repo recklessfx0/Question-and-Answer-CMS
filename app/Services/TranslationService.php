@@ -115,6 +115,17 @@ final class TranslationService
             return $default;
         }
 
+        $pathLanguage = strtolower(trim($request->locale));
+        if ($pathLanguage !== '') {
+            if (isset($available[$pathLanguage])) {
+                return $pathLanguage;
+            }
+            $pathPrimary = strtok($pathLanguage, '-');
+            if (is_string($pathPrimary) && isset($available[$pathPrimary])) {
+                return $pathPrimary;
+            }
+        }
+
         $queryLanguage = strtolower((string) ($request->get['lang'] ?? ''));
         if (isset($available[$queryLanguage])) {
             return $queryLanguage;

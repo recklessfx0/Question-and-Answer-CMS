@@ -16,7 +16,7 @@ function csp_nonce(): string
 function t(string $key, string $fallback = '', array $replace = []): string
 {
     $translator = $GLOBALS['translator'] ?? null;
-    if ($translator instanceof \App\Services\TranslationService) {
+    if (is_object($translator) && method_exists($translator, 'get')) {
         return $translator->get($key, $fallback, $replace);
     }
 
@@ -26,7 +26,7 @@ function t(string $key, string $fallback = '', array $replace = []): string
 function current_language(): string
 {
     $translator = $GLOBALS['translator'] ?? null;
-    if ($translator instanceof \App\Services\TranslationService) {
+    if (is_object($translator) && method_exists($translator, 'languageCode')) {
         return $translator->languageCode();
     }
 
@@ -36,7 +36,7 @@ function current_language(): string
 function default_language(): string
 {
     $translator = $GLOBALS['translator'] ?? null;
-    if ($translator instanceof \App\Services\TranslationService) {
+    if (is_object($translator) && method_exists($translator, 'defaultLanguageCode')) {
         return $translator->defaultLanguageCode();
     }
 
@@ -47,7 +47,7 @@ function default_language(): string
 function active_languages(): array
 {
     $translator = $GLOBALS['translator'] ?? null;
-    if ($translator instanceof \App\Services\TranslationService) {
+    if (is_object($translator) && method_exists($translator, 'activeLanguages')) {
         return $translator->activeLanguages();
     }
 
@@ -72,11 +72,10 @@ function localized_url(string $url, string $languageCode, ?string $defaultLangua
         parse_str((string) $parts['query'], $query);
     }
 
-    if ($languageCode === '' || strtolower($languageCode) === strtolower($defaultLanguageCode)) {
-        unset($query['lang']);
-    } else {
-        $query['lang'] = strtolower($languageCode);
-    }
+    unset($query['lang']);
+
+    $path = (string) ($parts['path'] ?? '');
+    $path = localized_route_path($path, $languageCode, $defaultLanguageCode);
 
     $rebuilt = '';
     if (isset($parts['scheme'])) {
@@ -95,7 +94,7 @@ function localized_url(string $url, string $languageCode, ?string $defaultLangua
     if (isset($parts['port'])) {
         $rebuilt .= ':' . (int) $parts['port'];
     }
-    $rebuilt .= (string) ($parts['path'] ?? '');
+    $rebuilt .= $path;
     if ($query !== []) {
         $rebuilt .= '?' . http_build_query($query);
     }
@@ -104,6 +103,69 @@ function localized_url(string $url, string $languageCode, ?string $defaultLangua
     }
 
     return $rebuilt !== '' ? $rebuilt : $url;
+}
+
+function localized_path(string $path, ?string $languageCode = null, ?string $defaultLanguageCode = null): string
+{
+    $languageCode ??= current_language();
+    $defaultLanguageCode ??= default_language();
+    $localized = localized_url(url($path), $languageCode, $defaultLanguageCode);
+    $parts = parse_url($localized);
+    if (!is_array($parts)) {
+        return $path;
+    }
+
+    $result = (string) ($parts['path'] ?? $path);
+    if (isset($parts['query']) && $parts['query'] !== '') {
+        $result .= '?' . (string) $parts['query'];
+    }
+    if (isset($parts['fragment']) && $parts['fragment'] !== '') {
+        $result .= '#' . (string) $parts['fragment'];
+    }
+
+    return $result;
+}
+
+function localized_route_path(string $path, string $languageCode, ?string $defaultLanguageCode = null): string
+{
+    $defaultLanguageCode ??= default_language();
+    $path = '/' . ltrim((string) parse_url($path, PHP_URL_PATH), '/');
+    if ($path === '//') {
+        $path = '/';
+    }
+
+    if (!is_localizable_path($path)) {
+        return $path;
+    }
+
+    $languageCode = strtolower(trim($languageCode));
+    $defaultLanguageCode = strtolower(trim($defaultLanguageCode));
+    $strippedPath = preg_replace('#^/([a-z]{2,3}(?:-[a-z0-9]{2,8})?)(?=/|$)#i', '', $path) ?? $path;
+    $strippedPath = $strippedPath === '' ? '/' : $strippedPath;
+
+    if ($languageCode === '' || $languageCode === $defaultLanguageCode) {
+        return $strippedPath;
+    }
+
+    return '/' . $languageCode . ($strippedPath === '/' ? '' : $strippedPath);
+}
+
+function is_localizable_path(string $path): bool
+{
+    foreach ([
+        '/public-assets/',
+        '/robots.txt',
+        '/llms.txt',
+        '/llms-full.txt',
+        '/sitemap',
+        '/image-sitemap.xml',
+    ] as $prefix) {
+        if (str_starts_with($path, $prefix)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function site_url(): string

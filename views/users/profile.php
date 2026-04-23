@@ -15,7 +15,7 @@ $renderParticipants = static function (array $participants): void {
     ?>
     <div class="profile-participants" aria-label="Participants">
         <?php foreach ($participants as $participant): ?>
-            <a class="profile-participant" href="/user/<?= rawurlencode((string) ($participant['username'] ?? '')) ?>" title="<?= h((string) ($participant['username'] ?? '')) ?>">
+            <a class="profile-participant" href="<?= h(localized_path('/user/' . rawurlencode((string) ($participant['username'] ?? '')))) ?>" title="<?= h((string) ($participant['username'] ?? '')) ?>">
                 <?php if (!empty($participant['avatar_path'])): ?>
                     <?= uploaded_image((string) $participant['avatar_path'], 'profile-participant-avatar', (string) $participant['username'] . ' avatar') ?>
                 <?php else: ?>
@@ -114,8 +114,8 @@ $renderParticipants = static function (array $participants): void {
                 <?php
                 $isTag = (string) ($topic['topic_type'] ?? '') === 'tag';
                 $href = $isTag
-                    ? '/tag/' . rawurlencode((string) ($topic['slug'] ?? ''))
-                    : '/category/' . rawurlencode((string) ($topic['slug'] ?? ''));
+                    ? localized_path('/tag/' . rawurlencode((string) ($topic['slug'] ?? '')))
+                    : localized_path('/category/' . rawurlencode((string) ($topic['slug'] ?? '')));
                 ?>
                 <a href="<?= h($href) ?>"><?= h((string) ($topic['name'] ?? '')) ?></a>
             <?php endforeach; ?>
@@ -136,7 +136,7 @@ $renderParticipants = static function (array $participants): void {
             <?php $participants = $participantsByQuestion[(int) ($item['question_id'] ?? 0)] ?? []; ?>
             <article class="profile-stream-item profile-stream-item-activity">
                 <div class="profile-stream-body">
-                    <h3><a href="/question/<?= h((string) $item['slug']) ?>"><?= h((string) $item['title']) ?></a></h3>
+                    <h3><a href="<?= h(localized_path('/question/' . (string) $item['slug'])) ?>"><?= h((string) $item['title']) ?></a></h3>
                     <p><?= h(excerpt((string) $item['summary'], 170)) ?></p>
                     <div class="profile-stream-meta">
                         <span><?= h($formatDate($item['created_at'] ?? 'now')) ?></span>
@@ -166,7 +166,7 @@ $renderParticipants = static function (array $participants): void {
                     <span>votes</span>
                 </div>
                 <div class="profile-stream-body">
-                    <h3><a href="/question/<?= h((string) $question['slug']) ?>"><?= h((string) $question['title']) ?></a></h3>
+                    <h3><a href="<?= h(localized_path('/question/' . (string) $question['slug'])) ?>"><?= h((string) $question['title']) ?></a></h3>
                     <p><?= h(excerpt((string) $question['body'], 170)) ?></p>
                     <div class="profile-stream-meta">
                         <span><?= (int) ($question['answer_count'] ?? 0) ?> answers</span>
@@ -197,7 +197,7 @@ $renderParticipants = static function (array $participants): void {
                     <span>votes</span>
                 </div>
                 <div class="profile-stream-body">
-                    <h3><a href="/question/<?= h((string) $answer['question_slug']) ?>#answer-<?= (int) $answer['id'] ?>"><?= h((string) $answer['question_title']) ?></a></h3>
+                    <h3><a href="<?= h(localized_path('/question/' . (string) $answer['question_slug'])) ?>#answer-<?= (int) $answer['id'] ?>"><?= h((string) $answer['question_title']) ?></a></h3>
                     <p><?= h(excerpt((string) $answer['body'], 170)) ?></p>
                     <div class="profile-stream-meta">
                         <span><?= (int) $answer['is_accepted'] === 1 ? 'Accepted answer' : 'Answer' ?></span>

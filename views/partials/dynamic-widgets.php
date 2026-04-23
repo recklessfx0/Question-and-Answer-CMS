@@ -44,7 +44,7 @@ $initial = static function (string $name): string {
                     <?php elseif ($type === 'categories'): ?>
                         <div class="dynamic-link-list">
                             <?php foreach ($items as $item): ?>
-                                <a href="/category/<?= h((string) $item['slug']) ?>">
+                <a href="<?= h(localized_path('/category/' . (string) $item['slug'])) ?>">
                                     <span class="dynamic-link-title"><?= h((string) $item['name']) ?></span>
                                     <strong class="dynamic-count-badge"><?= (int) ($item['count'] ?? 0) ?></strong>
                                 </a>
@@ -54,7 +54,7 @@ $initial = static function (string $name): string {
                         <div class="dynamic-user-list">
                             <?php foreach ($items as $item): ?>
                                 <?php $username = (string) ($item['username'] ?? ''); ?>
-                                <a href="/user/<?= rawurlencode($username) ?>">
+                <a href="<?= h(localized_path('/user/' . rawurlencode($username))) ?>">
                                     <span class="dynamic-avatar">
                                         <?php if (!empty($item['avatar_path'])): ?>
                                             <?= uploaded_image((string) $item['avatar_path'], '', $username . ' avatar') ?>
@@ -86,7 +86,7 @@ $initial = static function (string $name): string {
                     <?php elseif (in_array($type, ['accepted_answers', 'community_answers'], true)): ?>
                         <div class="dynamic-story-list">
                             <?php foreach ($items as $item): ?>
-                                <a href="/question/<?= h((string) $item['question_slug']) ?>#answer-<?= (int) ($item['id'] ?? 0) ?>">
+                <a href="<?= h(localized_path('/question/' . (string) $item['question_slug'])) ?>#answer-<?= (int) ($item['id'] ?? 0) ?>">
                                     <strong><?= h((string) ($item['question_title'] ?? '')) ?></strong>
                                     <span class="dynamic-story-excerpt"><?= h(excerpt((string) ($item['body'] ?? ''), 110)) ?></span>
                                     <small class="dynamic-story-meta">
@@ -103,7 +103,7 @@ $initial = static function (string $name): string {
                     <?php else: ?>
                         <div class="dynamic-story-list">
                             <?php foreach ($items as $item): ?>
-                                <a href="/question/<?= h((string) $item['slug']) ?>">
+                <a href="<?= h(localized_path('/question/' . (string) $item['slug'])) ?>">
                                     <strong><?= h((string) ($item['title'] ?? '')) ?></strong>
                                     <small class="dynamic-story-meta">
                                         <span><?= (int) ($item['answer_count'] ?? 0) ?> <?= h(t('widgets.answers', 'answers')) ?></span>

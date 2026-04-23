@@ -11,6 +11,7 @@ final class Request
         public string $method,
         public string $uri,
         public string $path,
+        public string $locale,
         public array $get,
         public array $post,
         public array $files,
@@ -22,6 +23,12 @@ final class Request
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $path = parse_url($uri, PHP_URL_PATH);
         $path = is_string($path) && $path !== '' ? '/' . trim($path, '/') : '/';
+        $locale = '';
+        if ($path !== '/' && preg_match('#^/([a-z]{2,3}(?:-[a-z0-9]{2,8})?)(?:/|$)#i', $path, $matches) === 1) {
+            $locale = strtolower((string) ($matches[1] ?? ''));
+            $trimmed = substr($path, strlen((string) $matches[0]) - 1);
+            $path = $trimmed !== '' ? $trimmed : '/';
+        }
         $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
         if ($method === 'POST' && isset($_POST['_method'])) {
@@ -31,7 +38,7 @@ final class Request
             }
         }
 
-        return new self($method, $uri, $path === '//' ? '/' : $path, $_GET, $_POST, $_FILES, $_SERVER);
+        return new self($method, $uri, $path === '//' ? '/' : $path, $locale, $_GET, $_POST, $_FILES, $_SERVER);
     }
 
     public function isGet(): bool

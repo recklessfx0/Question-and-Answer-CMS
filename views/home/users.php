@@ -125,7 +125,7 @@ $sortOptions = [
     ?>
     <a
         class="user-card"
-        href="/user/<?= h(rawurlencode($username)) ?>"
+href="<?= h(localized_path('/user/' . rawurlencode($username))) ?>"
         data-reputation="<?= $rep ?>"
         data-answers="<?= $answers ?>"
         data-questions="<?= $questions ?>"

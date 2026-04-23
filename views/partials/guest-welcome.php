@@ -7,7 +7,7 @@
             <p><?= h((string) ($welcome['message'] ?? '')) ?></p>
         </div>
         <div class="guest-welcome-action">
-            <a class="button guest-welcome-button" href="/register"><?= h((string) ($welcome['button_label'] ?? t('widgets.welcome.register', 'Register'))) ?></a>
+<a class="button guest-welcome-button" href="<?= h(localized_path('/register')) ?>"><?= h((string) ($welcome['button_label'] ?? t('widgets.welcome.register', 'Register'))) ?></a>
         </div>
     </section>
 <?php endif; ?>

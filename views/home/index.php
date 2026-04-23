@@ -22,14 +22,14 @@ $widgetZone = '';
             <?php if (!empty($subcategories) && is_array($subcategories)): ?>
                 <div class="hub-links" aria-label="Subcategories">
                     <?php foreach ($subcategories as $subcategory): ?>
-                        <a href="/category/<?= h((string) $subcategory['slug']) ?>"><?= h((string) $subcategory['name']) ?></a>
+                        <a href="<?= h(localized_path('/category/' . (string) $subcategory['slug'])) ?>"><?= h((string) $subcategory['name']) ?></a>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
             <?php if (!empty($relatedTags) && is_array($relatedTags)): ?>
                 <div class="hub-links" aria-label="Popular tags in this category">
                     <?php foreach ($relatedTags as $relatedTag): ?>
-                        <a href="/tag/<?= h((string) $relatedTag['slug']) ?>">#<?= h((string) $relatedTag['name']) ?></a>
+                        <a href="<?= h(localized_path('/tag/' . (string) $relatedTag['slug'])) ?>">#<?= h((string) $relatedTag['name']) ?></a>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
@@ -40,19 +40,19 @@ $widgetZone = '';
             <?php if (!empty($relatedTags) && is_array($relatedTags)): ?>
                 <div class="hub-links" aria-label="Related tags">
                     <?php foreach ($relatedTags as $relatedTag): ?>
-                        <a href="/tag/<?= h((string) $relatedTag['slug']) ?>">#<?= h((string) $relatedTag['name']) ?></a>
+                        <a href="<?= h(localized_path('/tag/' . (string) $relatedTag['slug'])) ?>">#<?= h((string) $relatedTag['name']) ?></a>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>
     <?php endif; ?>
     <nav class="landing-tabs" aria-label="Question navigation">
-        <a href="/activity">All activity</a>
-        <a href="/questions">Questions</a>
-        <a href="/unanswered">Unanswered</a>
-        <a href="/tags">Tags</a>
-        <a href="/users">Users</a>
-        <a href="/ask">Ask a Question</a>
+        <a href="<?= h(localized_path('/activity')) ?>">All activity</a>
+        <a href="<?= h(localized_path('/questions')) ?>">Questions</a>
+        <a href="<?= h(localized_path('/unanswered')) ?>">Unanswered</a>
+        <a href="<?= h(localized_path('/tags')) ?>">Tags</a>
+        <a href="<?= h(localized_path('/users')) ?>">Users</a>
+        <a href="<?= h(localized_path('/ask')) ?>">Ask a Question</a>
     </nav>
 </section>
 
@@ -88,22 +88,22 @@ $widgetZone = '';
                 </div>
             </div>
             <div class="question-summary">
-                <h2><a href="/question/<?= h((string) $question['slug']) ?>"><?= h((string) $question['title']) ?></a></h2>
+                <h2><a href="<?= h(localized_path('/question/' . (string) $question['slug'])) ?>"><?= h((string) $question['title']) ?></a></h2>
                 <p><?= h(excerpt((string) $question['body'], 180)) ?></p>
                 <?php if (!empty($question['card_tags']) && is_array($question['card_tags'])): ?>
                     <?php $cardTags = array_slice($question['card_tags'], 0, 8); ?>
                     <div class="question-card-tags" aria-label="Question tags">
                         <?php foreach ($cardTags as $tag): ?>
-                            <a href="/tag/<?= h((string) $tag['slug']) ?>">#<?= h((string) $tag['name']) ?></a>
+                            <a href="<?= h(localized_path('/tag/' . (string) $tag['slug'])) ?>">#<?= h((string) $tag['name']) ?></a>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
                 <div class="question-card-footer">
                     <div class="question-card-meta">
                         <?php if (!empty($question['category_slug'])): ?>
-                            <p class="meta">Category <a href="/category/<?= h((string) $question['category_slug']) ?>"><?= h((string) $question['category_name']) ?></a></p>
+                            <p class="meta">Category <a href="<?= h(localized_path('/category/' . (string) $question['category_slug'])) ?>"><?= h((string) $question['category_name']) ?></a></p>
                         <?php endif; ?>
-                        <p class="meta">Asked by <a href="/user/<?= rawurlencode((string) $question['username']) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
+                        <p class="meta">Asked by <a href="<?= h(localized_path('/user/' . rawurlencode((string) $question['username']))) ?>"><?= h((string) $question['username']) ?></a> &middot; <?= h((string) $question['created_at']) ?></p>
                     </div>
                     <?php if ($latestMedia !== []): ?>
                         <div class="card-media-strip" aria-label="Latest uploaded content">
@@ -125,7 +125,7 @@ $widgetZone = '';
                 <aside class="question-activity-panel" aria-label="Latest question activity">
                     <div class="activity-grid" aria-label="Latest activity users">
                         <?php foreach ($activityUsers as $activityUser): ?>
-                            <a class="activity-icon" href="/user/<?= rawurlencode((string) $activityUser['username']) ?>" title="<?= h((string) $activityUser['username']) ?>">
+                            <a class="activity-icon" href="<?= h(localized_path('/user/' . rawurlencode((string) $activityUser['username']))) ?>" title="<?= h((string) $activityUser['username']) ?>">
                                 <?php if (!empty($activityUser['avatar_path'])): ?>
                                     <?= uploaded_image((string) $activityUser['avatar_path'], '', (string) $activityUser['username'] . ' avatar') ?>
                                 <?php else: ?>
@@ -157,7 +157,7 @@ $widgetZone = '';
         <?php if (!empty($pagination['previous'])): ?><a href="<?= h((string) $pagination['previous']) ?>" rel="prev">Previous</a><?php endif; ?>
         <?php $window = is_array($pagination['window'] ?? null) ? $pagination['window'] : []; ?>
         <?php if ($window !== [] && (int) $window[0] > 1): ?>
-            <a href="<?= h((string) ($pagination['query_mode'] ?? false ? $pagination['base'] : rtrim((string) $pagination['base'], '/'))) ?>">1</a>
+            <a href="<?= h(localized_path((string) ($pagination['query_mode'] ?? false ? $pagination['base'] : rtrim((string) $pagination['base'], '/')))) ?>">1</a>
             <?php if ((int) $window[0] > 2): ?><span>...</span><?php endif; ?>
         <?php endif; ?>
         <?php foreach ($window as $pageNumber): ?>
@@ -170,13 +170,13 @@ $widgetZone = '';
             <?php if ($target === (int) ($pagination['current'] ?? 1)): ?>
                 <span aria-current="page"><?= $target ?></span>
             <?php else: ?>
-                <a href="<?= h($href) ?>"><?= $target ?></a>
+                <a href="<?= h(localized_path($href)) ?>"><?= $target ?></a>
             <?php endif; ?>
         <?php endforeach; ?>
         <?php if ($window !== [] && (int) end($window) < (int) ($pagination['total_pages'] ?? 1)): ?>
             <?php if ((int) end($window) < (int) ($pagination['total_pages'] ?? 1) - 1): ?><span>...</span><?php endif; ?>
             <?php $last = (int) $pagination['total_pages']; ?>
-            <a href="<?= h(!empty($pagination['query_mode']) ? (string) $pagination['base'] . '&page=' . $last : rtrim((string) $pagination['base'], '/') . '/page/' . $last) ?>"><?= $last ?></a>
+            <a href="<?= h(localized_path(!empty($pagination['query_mode']) ? (string) $pagination['base'] . '&page=' . $last : rtrim((string) $pagination['base'], '/') . '/page/' . $last)) ?>"><?= $last ?></a>
         <?php endif; ?>
         <?php if (!empty($pagination['next'])): ?><a href="<?= h((string) $pagination['next']) ?>" rel="next">Next</a><?php endif; ?>
     </nav>

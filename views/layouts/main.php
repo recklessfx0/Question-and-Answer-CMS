@@ -136,35 +136,35 @@ if (isset($schemas) && is_array($schemas)) {
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">
+    <a class="brand" href="<?= h(localized_path('/')) ?>">
         <?php if ($siteLogoPath !== ''): ?>
             <?= uploaded_image($siteLogoPath, 'site-logo', (string) $site) ?>
         <?php endif; ?>
         <span><?= h($site) ?></span>
     </a>
-    <form class="search" action="/search" role="search">
+    <form class="search" action="<?= h(localized_path('/search')) ?>" role="search">
         <label class="sr-only" for="q"><?= h(t('layout.search.label', 'Search')) ?></label>
         <input id="q" name="q" value="<?= h($query ?? '') ?>" placeholder="<?= h(t('layout.search.placeholder', 'Search questions')) ?>">
     </form>
     <nav aria-label="Primary">
-        <a href="/ask"><?= h(t('layout.nav.ask', 'Ask')) ?></a>
+        <a href="<?= h(localized_path('/ask')) ?>"><?= h(t('layout.nav.ask', 'Ask')) ?></a>
         <?php if (is_array($authUser)): ?>
-            <a href="/user/<?= h((string) $authUser['username']) ?>"><?= h((string) $authUser['username']) ?></a>
-            <a href="/notifications"><?= h(t('layout.nav.notifications', 'Notifications')) ?></a>
-            <a href="/settings/profile"><?= h(t('layout.nav.settings', 'Settings')) ?></a>
+            <a href="<?= h(localized_path('/user/' . (string) $authUser['username'])) ?>"><?= h((string) $authUser['username']) ?></a>
+            <a href="<?= h(localized_path('/notifications')) ?>"><?= h(t('layout.nav.notifications', 'Notifications')) ?></a>
+            <a href="<?= h(localized_path('/settings/profile')) ?>"><?= h(t('layout.nav.settings', 'Settings')) ?></a>
             <?php if (in_array(active_role($authUser), ['moderator', 'administrator'], true)): ?>
-                <a href="/moderator"><?= h(t('layout.nav.moderate', 'Moderate')) ?></a>
+                <a href="<?= h(localized_path('/moderator')) ?>"><?= h(t('layout.nav.moderate', 'Moderate')) ?></a>
             <?php endif; ?>
             <?php if (active_role($authUser) === 'administrator'): ?>
-                <a href="/admin"><?= h(t('layout.nav.admin', 'Admin')) ?></a>
+                <a href="<?= h(localized_path('/admin')) ?>"><?= h(t('layout.nav.admin', 'Admin')) ?></a>
             <?php endif; ?>
-            <form method="post" action="/logout" class="inline">
+            <form method="post" action="<?= h(localized_path('/logout')) ?>" class="inline">
                 <?= $csrf->field('/logout') ?>
                 <button type="submit"><?= h(t('layout.nav.sign_out', 'Sign out')) ?></button>
             </form>
         <?php else: ?>
-            <a href="/login"><?= h(t('layout.nav.sign_in', 'Sign in')) ?></a>
-            <a href="/register"><?= h(t('layout.nav.register', 'Register')) ?></a>
+            <a href="<?= h(localized_path('/login')) ?>"><?= h(t('layout.nav.sign_in', 'Sign in')) ?></a>
+            <a href="<?= h(localized_path('/register')) ?>"><?= h(t('layout.nav.register', 'Register')) ?></a>
         <?php endif; ?>
     </nav>
 </header>
@@ -178,17 +178,17 @@ if (isset($schemas) && is_array($schemas)) {
 </main>
 <footer class="site-footer">
     <nav class="footer-links" aria-label="<?= h(t('layout.footer.discovery', 'Discovery links')) ?>">
-        <a href="/sitemap.xml"><?= h(t('layout.footer.sitemap', 'Sitemap')) ?></a>
-        <a href="/robots.txt"><?= h(t('layout.footer.robots', 'Robots')) ?></a>
-        <a href="/llms.txt">llms.txt</a>
-        <a href="/llms-full.txt">llms-full.txt</a>
+        <a href="<?= h(url('/sitemap.xml')) ?>"><?= h(t('layout.footer.sitemap', 'Sitemap')) ?></a>
+        <a href="<?= h(url('/robots.txt')) ?>"><?= h(t('layout.footer.robots', 'Robots')) ?></a>
+        <a href="<?= h(url('/llms.txt')) ?>">llms.txt</a>
+        <a href="<?= h(url('/llms-full.txt')) ?>">llms-full.txt</a>
     </nav>
     <nav class="footer-links" aria-label="<?= h(t('layout.footer.info', 'Site information')) ?>">
-        <a href="/about"><?= h(t('layout.footer.about', 'About')) ?></a>
-        <a href="/contact"><?= h(t('layout.footer.contact', 'Contact')) ?></a>
-        <a href="/privacy"><?= h(t('layout.footer.privacy', 'Privacy')) ?></a>
-        <a href="/terms"><?= h(t('layout.footer.terms', 'Terms')) ?></a>
-        <a href="/community-guidelines"><?= h(t('layout.footer.guidelines', 'Guidelines')) ?></a>
+        <a href="<?= h(localized_path('/about')) ?>"><?= h(t('layout.footer.about', 'About')) ?></a>
+        <a href="<?= h(localized_path('/contact')) ?>"><?= h(t('layout.footer.contact', 'Contact')) ?></a>
+        <a href="<?= h(localized_path('/privacy')) ?>"><?= h(t('layout.footer.privacy', 'Privacy')) ?></a>
+        <a href="<?= h(localized_path('/terms')) ?>"><?= h(t('layout.footer.terms', 'Terms')) ?></a>
+        <a href="<?= h(localized_path('/community-guidelines')) ?>"><?= h(t('layout.footer.guidelines', 'Guidelines')) ?></a>
     </nav>
     <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. <?= h(t('layout.footer.copyright', 'All rights reserved.')) ?></p>
 </footer>

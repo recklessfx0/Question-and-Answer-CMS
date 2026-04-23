@@ -15,6 +15,10 @@ final class Response
 
     public static function redirect(string $to, int $status = 302): self
     {
+        if ($to !== '' && $to[0] === '/' && function_exists('localized_path')) {
+            $to = localized_path($to);
+        }
+
         return new self('', $status, ['Location' => $to]);
     }
 
