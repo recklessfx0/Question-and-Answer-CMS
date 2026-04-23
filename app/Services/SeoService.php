@@ -736,6 +736,8 @@ final class SeoService
     /** @param array<int, string> $lines */
     private function sitemapDocument(array $lines): string
     {
+        array_splice($lines, 1, 0, '<?xml-stylesheet type="text/xsl" href="' . xml_h(url('/sitemap.xsl')) . '"?>');
+
         return implode("\n", $lines);
     }
 
