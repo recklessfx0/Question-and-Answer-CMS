@@ -108,7 +108,7 @@ final class QuestionController extends Controller
             'canonical' => $canonicalUrl,
             'ogType' => 'article',
             'ogImage' => $ogImage,
-            'robots' => $duplicateSlug === '' && $thinUnanswered ? 'noindex,follow' : null,
+            'robots' => $duplicateSlug !== '' || $thinUnanswered ? 'noindex,follow' : null,
             'authorName' => (string) ($question['username'] ?? ''),
             'publishedAt' => (string) ($question['created_at'] ?? ''),
             'modifiedAt' => (string) ($question['updated_at'] ?? $question['created_at'] ?? ''),
