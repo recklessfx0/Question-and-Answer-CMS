@@ -11,6 +11,7 @@ use Throwable;
 final class CategoryModel
 {
     private ?bool $approvalColumnAvailable = null;
+    private ?bool $duplicateColumnAvailable = null;
 
     public function __construct(private Database $db) {}
 
@@ -108,7 +109,7 @@ final class CategoryModel
             'SELECT c.slug, COALESCE(MAX(q.updated_at), c.updated_at, c.created_at) AS updated_at
              FROM categories c
              LEFT JOIN categories child ON child.parent_id = c.id
-             JOIN questions q ON q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = c.id OR q.category_id = child.id)
+             JOIN questions q ON q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.category_id = c.id OR q.category_id = child.id)
              GROUP BY c.id, c.slug, c.updated_at, c.created_at
              ORDER BY updated_at DESC
              LIMIT 50000'
@@ -183,5 +184,22 @@ final class CategoryModel
         }
 
         return $this->approvalColumnAvailable ? ' AND ' . $alias . '.approval_status = "approved"' : '';
+    }
+
+    private function canonicalQuestionFilter(string $alias): string
+    {
+        if ($this->duplicateColumnAvailable !== null) {
+            return $this->duplicateColumnAvailable ? ' AND ' . $alias . '.duplicate_of_id IS NULL' : '';
+        }
+
+        try {
+            $this->duplicateColumnAvailable = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'questions' AND COLUMN_NAME = 'duplicate_of_id' LIMIT 1"
+            ) !== null;
+        } catch (Throwable) {
+            $this->duplicateColumnAvailable = false;
+        }
+
+        return $this->duplicateColumnAvailable ? ' AND ' . $alias . '.duplicate_of_id IS NULL' : '';
     }
 }

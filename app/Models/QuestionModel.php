@@ -25,7 +25,7 @@ final class QuestionModel
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY q.id
              ORDER BY q.created_at DESC
              LIMIT :limit OFFSET :offset',
@@ -35,7 +35,7 @@ final class QuestionModel
 
     public function countLatest(): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q'));
+        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM questions q WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q'));
         return (int) ($row['total'] ?? 0);
     }
 
@@ -250,7 +250,7 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':query_title' => $pattern, ':query_body' => $pattern, ':limit' => $limit, ':offset' => $offset]
         );
@@ -263,7 +263,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)',
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)',
             [':query_title' => $pattern, ':query_body' => $pattern]
         );
 
@@ -292,7 +292,7 @@ final class QuestionModel
             'SELECT q.title, q.slug, q.views, q.votes, COUNT(DISTINCT a.id) AS answer_count
              FROM questions q
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (' . implode(' OR ', $conditions) . ')
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (' . implode(' OR ', $conditions) . ')
              GROUP BY q.id, q.title, q.slug, q.views, q.votes
              ORDER BY answer_count DESC, q.votes DESC, q.views DESC, q.created_at DESC
              LIMIT :limit',
@@ -309,7 +309,7 @@ final class QuestionModel
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY q.id
              HAVING COUNT(a.id) = 0
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
@@ -322,7 +322,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
                AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL)'
         );
 
@@ -336,7 +336,7 @@ final class QuestionModel
             'SELECT t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro, COUNT(DISTINCT q.id) AS question_count
              FROM tags t
              LEFT JOIN question_tags qt ON qt.tag_id = t.id
-             LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro
              ORDER BY question_count DESC, t.name ASC LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]
@@ -356,11 +356,11 @@ final class QuestionModel
             'SELECT t.*,
                     (SELECT COUNT(DISTINCT q.id)
                      FROM question_tags qt
-                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
                      WHERE qt.tag_id = t.id) AS question_count,
                     (SELECT MAX(q.updated_at)
                      FROM question_tags qt
-                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                     JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
                      WHERE qt.tag_id = t.id) AS updated_at
              FROM tags t
              WHERE t.slug = :slug
@@ -378,7 +378,7 @@ final class QuestionModel
              JOIN question_tags qt1 ON qt1.tag_id = t1.id
              JOIN question_tags qt2 ON qt2.question_id = qt1.question_id
              JOIN tags t2 ON t2.id = qt2.tag_id
-             JOIN questions q ON q.id = qt2.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             JOIN questions q ON q.id = qt2.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              WHERE t1.slug = :slug AND t2.slug <> :exclude_slug
              GROUP BY t2.id, t2.name, t2.slug
              ORDER BY overlap DESC, t2.name ASC
@@ -427,7 +427,7 @@ final class QuestionModel
              FROM tags t
              JOIN question_tags qt ON qt.tag_id = t.id
              JOIN questions q ON q.id = qt.question_id
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
                AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
              GROUP BY t.id, t.name, t.slug
              ORDER BY question_count DESC, t.name ASC
@@ -446,7 +446,7 @@ final class QuestionModel
              JOIN tags t ON t.id = qt.tag_id
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':slug' => $slug, ':limit' => $limit, ':offset' => $offset]
         );
@@ -459,7 +459,7 @@ final class QuestionModel
              FROM questions q
              JOIN question_tags qt ON qt.question_id = q.id
              JOIN tags t ON t.id = qt.tag_id
-             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
+             WHERE t.slug = :slug AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q'),
             [':slug' => $slug]
         );
 
@@ -469,7 +469,7 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function byUser(int $userId, int $limit = 30): array
     {
-        return $this->db->fetchAll('SELECT * FROM questions q WHERE q.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . ' ORDER BY q.created_at DESC LIMIT :limit', [':user' => $userId, ':limit' => $limit]);
+        return $this->db->fetchAll('SELECT * FROM questions q WHERE q.user_id = :user AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' ORDER BY q.created_at DESC LIMIT :limit', [':user' => $userId, ':limit' => $limit]);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -480,7 +480,7 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))
              ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
             [':category' => $categoryId, ':child_parent' => $categoryId, ':limit' => $limit, ':offset' => $offset]
         );
@@ -491,7 +491,7 @@ final class QuestionModel
         $row = $this->db->fetch(
             'SELECT COUNT(*) AS total
              FROM questions q
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))',
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.category_id = :category OR q.category_id IN (SELECT id FROM categories WHERE parent_id = :child_parent))',
             [':category' => $categoryId, ':child_parent' => $categoryId]
         );
 
@@ -971,8 +971,6 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function related(int $questionId, int $limit = 4): array
     {
-        $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
-
         return $this->db->fetchAll(
             'SELECT q.id, q.title, q.slug,
                     COALESCE(q.votes, 0) AS votes,
@@ -986,8 +984,7 @@ final class QuestionModel
                     qt.tag_id IS NOT NULL
                     OR (current_question.category_id IS NOT NULL AND q.category_id = current_question.category_id)
                )
-               AND q.id <> :exclude_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
-               ' . $duplicateFilter . '
+               AND q.id <> :exclude_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY q.id, q.title, q.slug, q.votes, q.created_at
              ORDER BY tag_overlap DESC, has_accepted DESC, answer_count DESC, q.votes DESC, q.created_at DESC
              LIMIT :limit',
@@ -998,13 +995,10 @@ final class QuestionModel
     /** @return array<int, array<string, mixed>> */
     public function sitemapQuestions(): array
     {
-        $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
-
         return $this->db->fetchAll(
             'SELECT q.id, q.slug, q.body, q.updated_at
              FROM questions q
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
-               ' . $duplicateFilter . '
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
                AND (
                    CHAR_LENGTH(TRIM(q.body)) >= 180
                    OR EXISTS (
@@ -1072,7 +1066,7 @@ final class QuestionModel
             'SELECT t.slug, COALESCE(MAX(q.updated_at), MAX(t.created_at), NOW()) AS updated_at
              FROM tags t
              JOIN question_tags qt ON qt.tag_id = t.id
-             JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+             JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY t.id, t.slug
              ORDER BY updated_at DESC
              LIMIT 50000'
@@ -1792,6 +1786,11 @@ final class QuestionModel
         }
 
         return $available;
+    }
+
+    private function canonicalQuestionFilter(string $alias): string
+    {
+        return $this->duplicateColumnAvailable() ? ' AND ' . $alias . '.duplicate_of_id IS NULL' : '';
     }
 
     private function commentDeletedFilter(string $alias = 'comments'): string
