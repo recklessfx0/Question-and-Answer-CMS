@@ -32,6 +32,14 @@ final class SeoService
         '/flag/',
         '/answer/',
     ];
+    /** @var array<string, array{description_key: string, body_key: string, path: string}> */
+    private const STATIC_PAGES = [
+        'about' => ['description_key' => 'about_description', 'body_key' => 'about_body', 'path' => '/about'],
+        'contact' => ['description_key' => 'contact_description', 'body_key' => 'contact_body', 'path' => '/contact'],
+        'privacy' => ['description_key' => 'privacy_description', 'body_key' => 'privacy_body', 'path' => '/privacy'],
+        'terms' => ['description_key' => 'terms_description', 'body_key' => 'terms_body', 'path' => '/terms'],
+        'community-guidelines' => ['description_key' => 'guidelines_description', 'body_key' => 'guidelines_body', 'path' => '/community-guidelines'],
+    ];
 
     public function __construct(
         private QuestionModel $questions,
@@ -421,18 +429,17 @@ final class SeoService
             $this->latestLastmod($tags),
             $this->latestLastmod($users),
         ]);
-
-        return $this->sitemapUrlset([
+        $entries = [
             $this->sitemapUrl(url('/'), $siteLastmod),
             $this->sitemapUrl(url('/unanswered'), $this->latestLastmod($questions)),
             $this->sitemapUrl(url('/tags'), $this->latestLastmod($tags)),
             $this->sitemapUrl(url('/users'), $this->latestLastmod($users)),
-            $this->sitemapUrl(url('/about'), $siteLastmod),
-            $this->sitemapUrl(url('/contact'), $siteLastmod),
-            $this->sitemapUrl(url('/privacy'), $siteLastmod),
-            $this->sitemapUrl(url('/terms'), $siteLastmod),
-            $this->sitemapUrl(url('/community-guidelines'), $siteLastmod),
-        ]);
+        ];
+        foreach ($this->configuredStaticPages() as $page) {
+            $entries[] = $this->sitemapUrl(url($page['path']), $page['updated_at']);
+        }
+
+        return $this->sitemapUrlset($entries);
     }
 
     public function postSitemap(): string
@@ -813,5 +820,31 @@ final class SeoService
         }
 
         return $path !== '' && str_starts_with($path, $prefix) ? $path : '';
+    }
+
+    /** @return array<int, array{path: string, updated_at: string|null}> */
+    public function configuredStaticPages(): array
+    {
+        try {
+            $settings = $this->settings->all();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $pages = [];
+        foreach (self::STATIC_PAGES as $page) {
+            $description = trim((string) ($settings[$page['description_key']] ?? ''));
+            $body = trim((string) ($settings[$page['body_key']] ?? ''));
+            if ($description === '' && $body === '') {
+                continue;
+            }
+
+            $pages[] = [
+                'path' => $page['path'],
+                'updated_at' => null,
+            ];
+        }
+
+        return $pages;
     }
 }

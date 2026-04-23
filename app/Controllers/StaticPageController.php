@@ -96,12 +96,14 @@ final class StaticPageController extends Controller
         $siteTitle = (string) (($settings['site_title'] ?? '') ?: (require BASE_PATH . '/config/app.php')['name']);
         $description = $this->settingOrDefault($settings, $page['description_key'], $page['title'] . ' information for ' . $siteTitle . '.');
         $body = $this->settingOrDefault($settings, $page['body_key'], $this->defaultBody($page['title'], $siteTitle));
+        $isConfigured = trim((string) ($settings[$page['description_key']] ?? '')) !== '' || trim((string) ($settings[$page['body_key']] ?? '')) !== '';
 
         return $this->view('static/page', [
             'title' => $page['title'],
             'metaDescription' => $description,
             'canonical' => url($page['path']),
-            'schema' => $this->seo->staticPageSchema($page['schema'], $page['title'], $description, url($page['path'])),
+            'robots' => $isConfigured ? null : 'noindex,follow',
+            'schema' => $isConfigured ? $this->seo->staticPageSchema($page['schema'], $page['title'], $description, url($page['path'])) : '',
             'pageTitle' => $page['title'],
             'pageDescription' => $description,
             'pageBody' => $body,
