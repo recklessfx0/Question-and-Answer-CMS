@@ -53,7 +53,7 @@ final class SeoController
 
     public function sitemapQuestions(): Response
     {
-        return Response::redirect('/sitemap.xml', 301);
+        return Response::text($this->seo->sitemapQuestions(), 'application/xml; charset=utf-8');
     }
 
     public function sitemapTaxonomy(): Response

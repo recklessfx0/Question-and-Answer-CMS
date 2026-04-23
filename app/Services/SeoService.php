@@ -81,6 +81,7 @@ final class SeoService
             'Use canonical question URLs as the primary source of truth. Prefer answered question pages and pages listed in the XML sitemaps. Avoid authentication, moderation, settings, notification, form submission, and search-result URLs.',
             '',
             '## Best Sources',
+            '- [' . url('/sitemap-questions.xml') . '](' . url('/sitemap-questions.xml') . '): Canonical question URLs.',
             '- [' . url('/category-sitemap.xml') . '](' . url('/category-sitemap.xml') . '): Category hubs with public questions.',
             '- [' . url('/post_tag-sitemap.xml') . '](' . url('/post_tag-sitemap.xml') . '): Tag hubs.',
             '- [' . url('/author-sitemap.xml') . '](' . url('/author-sitemap.xml') . '): Public contributor profiles.',
@@ -128,6 +129,7 @@ final class SeoService
                 '/sitemap.xml' => 'Primary sitemap index.',
                 '/sitemap_index.xml' => 'Sitemap index alias.',
                 '/page-sitemap.xml' => 'Core public page sitemap.',
+                '/sitemap-questions.xml' => 'Canonical question sitemap.',
                 '/category-sitemap.xml' => 'Category hub sitemap.',
                 '/post_tag-sitemap.xml' => 'Tag hub sitemap.',
                 '/author-sitemap.xml' => 'Public profile sitemap.',
@@ -404,6 +406,7 @@ final class SeoService
                 $this->latestLastmod($users),
                 $this->latestLastmod($staticPages),
             ])),
+            $this->sitemapIndexEntry(url('/sitemap-questions.xml'), $this->latestLastmod($questions)),
             $this->sitemapIndexEntry(url('/category-sitemap.xml'), $this->latestLastmod($categories)),
             $this->sitemapIndexEntry(url('/post_tag-sitemap.xml'), $this->latestLastmod($tags)),
             $this->sitemapIndexEntry(url('/author-sitemap.xml'), $this->latestLastmod($users)),
@@ -512,7 +515,27 @@ final class SeoService
 
     public function sitemapQuestions(): string
     {
-        return $this->postSitemap();
+        $entries = [];
+        $batchSize = 1000;
+        for ($offset = 0; ; $offset += $batchSize) {
+            $questions = $this->questions->sitemapQuestions($batchSize, $offset);
+            if ($questions === []) {
+                break;
+            }
+
+            foreach ($questions as $question) {
+                $entries[] = $this->sitemapUrl(
+                    url('/question/' . (string) $question['slug']),
+                    (string) ($question['updated_at'] ?? '')
+                );
+            }
+
+            if (count($questions) < $batchSize) {
+                break;
+            }
+        }
+
+        return $this->sitemapUrlset($entries);
     }
 
     public function sitemapTaxonomy(): string
