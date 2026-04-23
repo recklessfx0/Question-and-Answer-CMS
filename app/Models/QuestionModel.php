@@ -338,6 +338,7 @@ final class QuestionModel
              LEFT JOIN question_tags qt ON qt.tag_id = t.id
              LEFT JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY t.id, t.name, t.slug, t.description, t.seo_title, t.seo_description, t.intro
+             HAVING COUNT(DISTINCT q.id) > 0
              ORDER BY question_count DESC, t.name ASC LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]
         );
@@ -345,7 +346,16 @@ final class QuestionModel
 
     public function countTags(): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS total FROM tags');
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS total
+             FROM (
+                 SELECT t.id
+                 FROM tags t
+                 JOIN question_tags qt ON qt.tag_id = t.id
+                 JOIN questions q ON q.id = qt.question_id AND q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
+                 GROUP BY t.id
+             ) public_tags'
+        );
         return (int) ($row['total'] ?? 0);
     }
 
