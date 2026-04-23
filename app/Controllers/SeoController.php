@@ -28,7 +28,7 @@ final class SeoController
 
     public function postSitemap(): Response
     {
-        return Response::text($this->seo->postSitemap(), 'application/xml; charset=utf-8');
+        return Response::redirect('/sitemap.xml', 301);
     }
 
     public function categorySitemap(): Response
@@ -53,7 +53,7 @@ final class SeoController
 
     public function sitemapQuestions(): Response
     {
-        return Response::text($this->seo->sitemapQuestions(), 'application/xml; charset=utf-8');
+        return Response::redirect('/sitemap.xml', 301);
     }
 
     public function sitemapTaxonomy(): Response
