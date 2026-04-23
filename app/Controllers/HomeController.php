@@ -168,17 +168,19 @@ final class HomeController extends Controller
         $pagination = $this->pagination('/tag/' . rawurlencode($slug), $page, $total);
         $baseTitle = (string) (($tag['seo_title'] ?? '') ?: ('Questions tagged ' . (string) $tag['name']));
         $baseDescription = (string) (($tag['seo_description'] ?? '') ?: ((int) ($tag['question_count'] ?? 0) . ' community questions tagged ' . (string) $tag['name'] . '.'));
+        $relatedTags = $this->questions->relatedTags((string) $tag['slug']);
+        $indexableTag = $this->taxonomyIndexable($total, (string) (($tag['intro'] ?? '') ?: ($tag['description'] ?? '')), count($relatedTags));
 
         return $this->view('home/index', [
             'title' => $page > 1 ? $baseTitle . ' - Page ' . $page : $baseTitle,
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $pageCanonical,
-            'robots' => $total < 1 ? 'noindex,follow' : null,
-            'schema' => $this->seo->itemListSchema('Questions tagged ' . (string) $tag['name'], $pageCanonical, $questions, $baseDescription, [(string) $tag['name']], (string) $tag['name']),
+            'robots' => $indexableTag ? null : 'noindex,follow',
+            'schema' => $indexableTag ? $this->seo->itemListSchema('Questions tagged ' . (string) $tag['name'], $pageCanonical, $questions, $baseDescription, [(string) $tag['name']], (string) $tag['name']) : '',
             'questions' => $questions,
             'tag' => (string) $tag['slug'],
             'tagInfo' => $tag,
-            'relatedTags' => $this->questions->relatedTags((string) $tag['slug']),
+            'relatedTags' => $relatedTags,
             'page' => $page,
             'pagination' => $pagination,
         ]);
@@ -203,21 +205,35 @@ final class HomeController extends Controller
         $pagination = $this->pagination('/category/' . rawurlencode((string) $category['slug']), $page, $total);
         $baseTitle = (string) (($category['seo_title'] ?? '') ?: $category['name']);
         $baseDescription = (string) (($category['seo_description'] ?? '') ?: ($category['description'] ?: 'Questions in ' . (string) $category['name'] . '.'));
+        $subcategories = $this->categories->children((int) $category['id']);
         $relatedTags = $this->questions->popularTagsForCategory((int) $category['id']);
+        $indexableCategory = $this->taxonomyIndexable($total, (string) (($category['intro'] ?? '') ?: ($category['description'] ?? '')), count($relatedTags) + count($subcategories));
 
         return $this->view('home/index', [
             'title' => $page > 1 ? $baseTitle . ' - Page ' . $page : $baseTitle,
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $pageCanonical,
-            'robots' => $total < 1 ? 'noindex,follow' : null,
-            'schema' => $this->seo->itemListSchema((string) $category['name'], $pageCanonical, $questions, $baseDescription, array_map(static fn (array $tag): string => (string) ($tag['name'] ?? ''), $relatedTags), (string) $category['name']),
+            'robots' => $indexableCategory ? null : 'noindex,follow',
+            'schema' => $indexableCategory ? $this->seo->itemListSchema((string) $category['name'], $pageCanonical, $questions, $baseDescription, array_map(static fn (array $tag): string => (string) ($tag['name'] ?? ''), $relatedTags), (string) $category['name']) : '',
             'questions' => $questions,
             'category' => $category,
-            'subcategories' => $this->categories->children((int) $category['id']),
+            'subcategories' => $subcategories,
             'relatedTags' => $relatedTags,
             'page' => $page,
             'pagination' => $pagination,
         ]);
+    }
+
+    private function taxonomyIndexable(int $total, string $supportingText = '', int $supportingLinks = 0): bool
+    {
+        if ($total < 1) {
+            return false;
+        }
+        if ($total >= 3) {
+            return true;
+        }
+
+        return trim($supportingText) !== '' || $supportingLinks >= 3;
     }
 
     /** @return array{current: int, total_pages: int, total_items: int, base: string, query_mode: bool, window: array<int, int>, previous: string|null, next: string|null} */

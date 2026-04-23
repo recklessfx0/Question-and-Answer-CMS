@@ -245,14 +245,26 @@ final class QuestionModel
     {
         $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
         $pattern = '%' . $escaped . '%';
+        $prefixPattern = $escaped . '%';
+        $exact = trim($query);
         return $this->db->fetchAll(
-            'SELECT q.*, u.username, c.name AS category_name, c.slug AS category_slug
+            'SELECT q.*, u.username, c.name AS category_name, c.slug AS category_slug,
+                    CASE
+                        WHEN LOWER(q.title) = LOWER(:query_exact) THEN 5
+                        WHEN q.title LIKE :query_prefix THEN 4
+                        WHEN q.title LIKE :query_title THEN 3
+                        WHEN q.body LIKE :query_body THEN 1
+                        ELSE 0
+                    END AS relevance_score,
+                    (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL) AS answer_count,
+                    EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL AND a.is_accepted = 1) AS has_accepted,
+                    EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL AND a.verified_at IS NOT NULL) AS has_verified
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
              WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)
-             ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset',
-            [':query_title' => $pattern, ':query_body' => $pattern, ':limit' => $limit, ':offset' => $offset]
+             ORDER BY relevance_score DESC, has_accepted DESC, has_verified DESC, answer_count DESC, q.votes DESC, q.views DESC, q.updated_at DESC, q.created_at DESC LIMIT :limit OFFSET :offset',
+            [':query_exact' => $exact, ':query_prefix' => $prefixPattern, ':query_title' => $pattern, ':query_body' => $pattern, ':limit' => $limit, ':offset' => $offset]
         );
     }
 

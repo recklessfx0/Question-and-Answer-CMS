@@ -79,8 +79,8 @@ final class UserController extends Controller
             : '';
 
         return $this->view('users/profile', [
-            'title' => (string) $user['username'],
-            'metaDescription' => 'Profile and activity for ' . (string) $user['username'] . '.',
+            'title' => $this->seo->profileTitle($user, $rank),
+            'metaDescription' => $this->seo->profileMetaDescription($user, $stats, $rank),
             'canonical' => url('/user/' . rawurlencode((string) $user['username'])),
             'ogType' => 'profile',
             'ogImage' => !empty($user['avatar_path']) ? url((string) $user['avatar_path']) : '',

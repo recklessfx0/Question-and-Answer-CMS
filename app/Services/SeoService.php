@@ -12,6 +12,7 @@ use Core\Markdown;
 
 final class SeoService
 {
+    private const MAX_MEDIA_URLS_PER_ENTRY = 12;
     /** @var array<int, string> */
     private const AI_CRAWLERS = [
         'GPTBot',
@@ -465,7 +466,7 @@ final class SeoService
                 $entries[] = $this->sitemapUrl(
                     url('/question/' . (string) $question['slug']),
                     (string) $question['updated_at'],
-                    $this->absoluteMediaUrls($mediaBody, true)
+                    $this->safeAbsoluteMediaUrls($mediaBody, true)
                 );
             }
 
@@ -629,7 +630,21 @@ final class SeoService
     /** @return array<int, string> */
     private function absoluteMediaUrls(string $body, bool $imagesOnly = false): array
     {
-        return array_map(static fn (string $path): string => url($path), media_paths_from_markdown($body, $imagesOnly));
+        return array_slice(
+            array_map(static fn (string $path): string => url($path), media_paths_from_markdown($body, $imagesOnly)),
+            0,
+            self::MAX_MEDIA_URLS_PER_ENTRY
+        );
+    }
+
+    /** @return array<int, string> */
+    private function safeAbsoluteMediaUrls(string $body, bool $imagesOnly = false): array
+    {
+        try {
+            return $this->absoluteMediaUrls($body, $imagesOnly);
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function firstImageFromBodies(string ...$bodies): ?string
@@ -660,12 +675,20 @@ final class SeoService
     public function profileSchema(array $profile, array $stats, array $rank, array $badges): string
     {
         $profileUrl = url('/user/' . rawurlencode((string) $profile['username']));
+        $statsSummary = [];
+        foreach (['questions' => 'questions', 'answers' => 'answers', 'comments' => 'clarifications'] as $key => $label) {
+            $value = (int) ($stats[$key] ?? 0);
+            if ($value > 0) {
+                $statsSummary[] = $value . ' ' . $label;
+            }
+        }
+        $summarySuffix = $statsSummary !== [] ? ' Active across ' . implode(', ', $statsSummary) . '.' : '';
         $person = [
             '@id' => $profileUrl . '#person',
             '@type' => 'Person',
             'name' => (string) $profile['username'],
             'url' => $profileUrl,
-            'description' => trim((string) ($profile['bio'] ?? '')) !== '' ? excerpt((string) $profile['bio'], 240) : 'Community contributor.',
+            'description' => trim((string) ($profile['bio'] ?? '')) !== '' ? excerpt((string) $profile['bio'], 240) . $summarySuffix : 'Community contributor.' . $summarySuffix,
         ];
 
         if (!empty($profile['avatar_path'])) {
@@ -705,6 +728,54 @@ final class SeoService
         ];
 
         return $this->jsonLd($schema);
+    }
+
+    /** @param array<string, mixed> $profile @param array<string, int> $stats @param array<string, mixed> $rank */
+    public function profileMetaDescription(array $profile, array $stats, array $rank): string
+    {
+        $parts = [];
+        $expertise = trim((string) ($profile['expertise'] ?? ''));
+        $credentials = trim((string) ($profile['credentials'] ?? ''));
+        $bio = trim((string) ($profile['bio'] ?? ''));
+        if ($expertise !== '') {
+            $parts[] = $expertise;
+        }
+        if ($credentials !== '') {
+            $parts[] = $credentials;
+        }
+        if ($bio !== '') {
+            $parts[] = excerpt($bio, 110);
+        }
+        $activity = [];
+        foreach (['questions' => 'questions', 'answers' => 'answers', 'comments' => 'clarifications'] as $key => $label) {
+            $value = (int) ($stats[$key] ?? 0);
+            if ($value > 0) {
+                $activity[] = $value . ' ' . $label;
+            }
+        }
+        if ($activity !== []) {
+            $parts[] = 'Activity: ' . implode(', ', $activity) . '.';
+        }
+        if (!empty($rank['title'])) {
+            $parts[] = 'Level ' . (int) ($rank['level'] ?? 1) . ' ' . (string) $rank['title'] . '.';
+        }
+
+        return excerpt(trim(implode(' ', $parts)) !== '' ? trim(implode(' ', $parts)) : 'Profile and community activity.', 155);
+    }
+
+    /** @param array<string, mixed> $profile @param array<string, mixed> $rank */
+    public function profileTitle(array $profile, array $rank): string
+    {
+        $username = (string) ($profile['username'] ?? 'Member');
+        $expertise = trim((string) ($profile['expertise'] ?? ''));
+        if ($expertise !== '') {
+            return $username . ' - ' . excerpt($expertise, 55);
+        }
+        if (!empty($rank['title'])) {
+            return $username . ' - Level ' . (int) ($rank['level'] ?? 1) . ' ' . (string) $rank['title'];
+        }
+
+        return $username;
     }
 
     /** @param array<int, array<string, mixed>> $questions */
