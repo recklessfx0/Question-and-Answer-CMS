@@ -27,7 +27,7 @@ final class QuestionModel
              LEFT JOIN answers a ON a.question_id = q.id AND a.deleted_at IS NULL
              WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . '
              GROUP BY q.id
-             ORDER BY q.created_at DESC
+             ORDER BY q.updated_at DESC, q.created_at DESC
              LIMIT :limit OFFSET :offset',
             [':limit' => $limit, ':offset' => $offset]
         );
