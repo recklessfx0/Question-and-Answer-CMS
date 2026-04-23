@@ -252,6 +252,8 @@ final class ReactionModel
                 return null;
             }
 
+            $this->touchQuestionForTarget($postType, $postId);
+
             return [
                 'target_user_id' => $targetUserId,
                 'reputation_delta' => $delta,
@@ -271,6 +273,31 @@ final class ReactionModel
     private function validPostType(string $postType): bool
     {
         return in_array($postType, ['question', 'answer'], true);
+    }
+
+    private function touchQuestionForTarget(string $postType, int $postId): void
+    {
+        if ($postId < 1) {
+            return;
+        }
+
+        if ($postType === 'question') {
+            $this->db->execute(
+                'UPDATE questions SET updated_at = NOW() WHERE id = :id AND deleted_at IS NULL' . $this->approvalFilter('questions'),
+                [':id' => $postId]
+            );
+            return;
+        }
+
+        if ($postType === 'answer') {
+            $this->db->execute(
+                'UPDATE questions q
+                 JOIN answers a ON a.question_id = q.id
+                 SET q.updated_at = NOW()
+                 WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL' . $this->approvalFilter('q'),
+                [':id' => $postId]
+            );
+        }
     }
 
     /** @return array<string, mixed>|null */

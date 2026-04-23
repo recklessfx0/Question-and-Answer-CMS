@@ -791,6 +791,11 @@ final class QuestionModel
             $total = $this->db->fetch('SELECT COALESCE(SUM(value), 0) AS total FROM votes WHERE post_type = :type AND post_id = :post', [':type' => $type, ':post' => $postId]);
             $updatedAt = $table === 'comments' ? '' : ', updated_at = NOW()';
             $this->db->execute("UPDATE {$table} SET votes = :votes{$updatedAt} WHERE id = :id", [':votes' => (int) ($total['total'] ?? 0), ':id' => $postId]);
+            if ($type === 'answer') {
+                $this->touchQuestionForAnswer($postId);
+            } elseif ($type === 'comment') {
+                $this->touchQuestionForComment($postId);
+            }
 
             return [
                 'user_id' => $ownerUserId,
