@@ -438,12 +438,13 @@ final class SeoService
     public function postSitemap(): string
     {
         $entries = [];
-        foreach ($this->questions->sitemapQuestions() as $question) {
-            $mediaBody = implode("\n\n", [
-                (string) ($question['body'] ?? ''),
-                (string) ($question['answer_bodies'] ?? ''),
-                (string) ($question['comment_bodies'] ?? ''),
-            ]);
+        $questions = $this->questions->sitemapQuestions();
+        $mediaBodies = $this->questions->sitemapMediaBodies(array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions));
+        foreach ($questions as $question) {
+            $mediaBody = implode("\n\n", array_merge(
+                [(string) ($question['body'] ?? '')],
+                $mediaBodies[(int) ($question['id'] ?? 0)] ?? []
+            ));
             $entries[] = $this->sitemapUrl(
                 url('/question/' . (string) $question['slug']),
                 (string) $question['updated_at'],

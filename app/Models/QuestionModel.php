@@ -967,22 +967,9 @@ final class QuestionModel
     public function sitemapQuestions(): array
     {
         $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
-        $commentFilter = $this->commentDeletedFilter('c');
 
         return $this->db->fetchAll(
-            'SELECT q.slug, q.body, q.updated_at,
-                    COALESCE((
-                        SELECT GROUP_CONCAT(a.body SEPARATOR "\n")
-                        FROM answers a
-                        WHERE a.question_id = q.id
-                          AND a.deleted_at IS NULL
-                    ), "") AS answer_bodies,
-                    COALESCE((
-                        SELECT GROUP_CONCAT(c.body SEPARATOR "\n")
-                        FROM comments c
-                        LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
-                        WHERE (c.question_id = q.id OR ca.question_id = q.id)' . $commentFilter . '
-                    ), "") AS comment_bodies
+            'SELECT q.id, q.slug, q.body, q.updated_at
              FROM questions q
              WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                ' . $duplicateFilter . '
@@ -998,6 +985,52 @@ final class QuestionModel
              ORDER BY q.updated_at DESC
              LIMIT 50000'
         );
+    }
+
+    /** @param array<int, int> $questionIds @return array<int, array<int, string>> */
+    public function sitemapMediaBodies(array $questionIds): array
+    {
+        $questionIds = array_values(array_unique(array_filter(array_map('intval', $questionIds), static fn (int $id): bool => $id > 0)));
+        if ($questionIds === []) {
+            return [];
+        }
+
+        $bodies = [];
+        $commentFilter = $this->commentDeletedFilter('c');
+        foreach (array_chunk($questionIds, 400) as $chunkIndex => $chunk) {
+            $params = [':media_path' => '%/public-assets/images/%'];
+            $answerIn = $this->inParams($chunk, 'sitemap_answer_' . $chunkIndex . '_', $params);
+            $commentQuestionIn = $this->inParams($chunk, 'sitemap_comment_question_' . $chunkIndex . '_', $params);
+            $commentAnswerIn = $this->inParams($chunk, 'sitemap_comment_answer_' . $chunkIndex . '_', $params);
+            $rows = $this->db->fetchAll(
+                "SELECT question_id, body
+                 FROM (
+                    SELECT a.question_id, a.body
+                    FROM answers a
+                    WHERE a.deleted_at IS NULL
+                      AND a.question_id IN ({$answerIn})
+                      AND a.body LIKE :media_path
+                    UNION ALL
+                    SELECT COALESCE(c.question_id, ca.question_id) AS question_id, c.body
+                    FROM comments c
+                    LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
+                    WHERE (c.question_id IN ({$commentQuestionIn}) OR ca.question_id IN ({$commentAnswerIn})){$commentFilter}
+                      AND c.body LIKE :media_path
+                 ) media
+                 WHERE question_id IS NOT NULL",
+                $params
+            );
+
+            foreach ($rows as $row) {
+                $questionId = (int) ($row['question_id'] ?? 0);
+                if ($questionId < 1) {
+                    continue;
+                }
+                $bodies[$questionId][] = (string) ($row['body'] ?? '');
+            }
+        }
+
+        return $bodies;
     }
 
     /** @return array<int, array<string, mixed>> */
