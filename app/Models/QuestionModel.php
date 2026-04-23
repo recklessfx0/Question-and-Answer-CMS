@@ -967,9 +967,22 @@ final class QuestionModel
     public function sitemapQuestions(): array
     {
         $duplicateFilter = $this->duplicateColumnAvailable() ? 'AND q.duplicate_of_id IS NULL' : '';
+        $commentFilter = $this->commentDeletedFilter('c');
 
         return $this->db->fetchAll(
-            'SELECT q.slug, q.body, q.updated_at
+            'SELECT q.slug, q.body, q.updated_at,
+                    COALESCE((
+                        SELECT GROUP_CONCAT(a.body SEPARATOR "\n")
+                        FROM answers a
+                        WHERE a.question_id = q.id
+                          AND a.deleted_at IS NULL
+                    ), "") AS answer_bodies,
+                    COALESCE((
+                        SELECT GROUP_CONCAT(c.body SEPARATOR "\n")
+                        FROM comments c
+                        LEFT JOIN answers ca ON ca.id = c.answer_id AND ca.deleted_at IS NULL
+                        WHERE (c.question_id = q.id OR ca.question_id = q.id)' . $commentFilter . '
+                    ), "") AS comment_bodies
              FROM questions q
              WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . '
                ' . $duplicateFilter . '

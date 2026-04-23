@@ -439,10 +439,15 @@ final class SeoService
     {
         $entries = [];
         foreach ($this->questions->sitemapQuestions() as $question) {
+            $mediaBody = implode("\n\n", [
+                (string) ($question['body'] ?? ''),
+                (string) ($question['answer_bodies'] ?? ''),
+                (string) ($question['comment_bodies'] ?? ''),
+            ]);
             $entries[] = $this->sitemapUrl(
                 url('/question/' . (string) $question['slug']),
                 (string) $question['updated_at'],
-                $this->absoluteMediaUrls((string) ($question['body'] ?? ''), true)
+                $this->absoluteMediaUrls($mediaBody, true)
             );
         }
 
