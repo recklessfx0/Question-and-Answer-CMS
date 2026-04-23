@@ -651,7 +651,10 @@ final class QuestionModel
     public function addAnswer(int $questionId, int $userId, string $body): int
     {
         $this->db->execute('INSERT INTO answers (question_id, user_id, body, votes, is_accepted, created_at, updated_at) VALUES (:question, :user, :body, 0, 0, NOW(), NOW())', [':question' => $questionId, ':user' => $userId, ':body' => $body]);
-        return $this->db->lastInsertId();
+        $answerId = $this->db->lastInsertId();
+        $this->touchQuestion($questionId);
+
+        return $answerId;
     }
 
     /** @return array<string, mixed>|null */
@@ -674,7 +677,28 @@ final class QuestionModel
         }
         $column = $type === 'answer' ? 'answer_id' : 'question_id';
         $this->db->execute("INSERT INTO comments ({$column}, parent_id, user_id, body, votes, created_at) VALUES (:post, :parent, :user, :body, 0, NOW())", [':post' => $postId, ':parent' => $parentId, ':user' => $userId, ':body' => $body]);
-        return $this->db->lastInsertId();
+        $commentId = $this->db->lastInsertId();
+        $type === 'answer' ? $this->touchQuestionForAnswer($postId) : $this->touchQuestion($postId);
+
+        return $commentId;
+    }
+
+    private function touchQuestion(int $questionId): void
+    {
+        $this->db->execute('UPDATE questions SET updated_at = NOW() WHERE id = :id AND deleted_at IS NULL', [':id' => $questionId]);
+    }
+
+    private function touchQuestionForAnswer(int $answerId): void
+    {
+        $this->db->execute(
+            'UPDATE questions q
+             JOIN answers a ON a.question_id = q.id
+             SET q.updated_at = NOW()
+             WHERE a.id = :answer
+               AND a.deleted_at IS NULL
+               AND q.deleted_at IS NULL',
+            [':answer' => $answerId]
+        );
     }
 
     public function commentParentBelongsTo(string $type, int $postId, int $parentId): bool
