@@ -6,7 +6,7 @@ DirectoryIndex index.php
     RewriteRule ^(?:app|config|core|database|helpers|services|storage|uploads|views)(?:/|$) - [F,L]
     RewriteRule ^public-assets/.*\.(?:php|phtml|phar)$ - [F,L]
     RewriteRule ^(?:queue-worker\.php|README\.md|PATCHES-2026-04-13\.txt)$ - [F,L]
-    RewriteRule ^(robots\.txt|llms(?:-full)?\.txt|sitemap(?:_index)?\.xml)$ index.php [L]
+    RewriteRule ^(robots\.txt|llms(?:-full)?\.txt|sitemap(?:_index)?\.xml|page-sitemap\.xml|post-sitemap\.xml|category-sitemap\.xml|post_tag-sitemap\.xml|author-sitemap\.xml|sitemap-pages\.xml|sitemap-questions\.xml|sitemap-taxonomy\.xml|sitemap-users\.xml)$ index.php [L]
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
