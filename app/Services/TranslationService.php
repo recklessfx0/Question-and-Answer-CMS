@@ -17,6 +17,10 @@ final class TranslationService
     private array $translations = [];
 
     private string $languageCode = 'en';
+    private string $defaultLanguageCode = 'en';
+
+    /** @var array<int, array<string, mixed>> */
+    private array $activeLanguages = [];
 
     public function __construct(private readonly LanguageModel $languages)
     {
@@ -30,10 +34,14 @@ final class TranslationService
             $this->ensureDefaultsSeeded();
             $active = $this->languages->all(true);
             $default = $this->languages->defaultLanguage();
-            $this->languageCode = $this->chooseLanguage($request, $active, is_array($default) ? (string) $default['code'] : 'en');
+            $this->activeLanguages = $active;
+            $this->defaultLanguageCode = is_array($default) ? (string) $default['code'] : 'en';
+            $this->languageCode = $this->chooseLanguage($request, $active, $this->defaultLanguageCode);
             $this->translations = array_replace($this->defaults, $this->languages->translationsForCode($this->languageCode));
         } catch (Throwable) {
             $this->languageCode = 'en';
+            $this->defaultLanguageCode = 'en';
+            $this->activeLanguages = [];
             $this->translations = $this->defaults;
         }
 
@@ -53,6 +61,17 @@ final class TranslationService
     public function languageCode(): string
     {
         return $this->languageCode;
+    }
+
+    public function defaultLanguageCode(): string
+    {
+        return $this->defaultLanguageCode;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function activeLanguages(): array
+    {
+        return $this->activeLanguages;
     }
 
     private function ensureDefaultsSeeded(): void

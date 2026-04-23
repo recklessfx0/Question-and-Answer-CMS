@@ -56,6 +56,11 @@ final class SeoController
         return Response::text($this->seo->sitemapQuestions(), 'application/xml; charset=utf-8');
     }
 
+    public function imageSitemap(): Response
+    {
+        return Response::text($this->seo->imageSitemap(), 'application/xml; charset=utf-8');
+    }
+
     public function sitemapTaxonomy(): Response
     {
         return Response::text($this->seo->sitemapTaxonomy(), 'application/xml; charset=utf-8');

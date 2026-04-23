@@ -49,6 +49,11 @@ final class HomeController extends Controller
             'metaDescription' => $page > 1 ? $baseDescription . ' Page ' . $page . '.' : $baseDescription,
             'canonical' => $canonical,
             'schema' => $this->seo->itemListSchema($landingHeading, $canonical, $questions, $baseDescription, [], 'Community questions'),
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                ]),
+            ],
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -93,6 +98,12 @@ final class HomeController extends Controller
             'metaDescription' => $page > 1 ? 'Questions still waiting for an answer, page ' . $page . '.' : 'Questions still waiting for an answer.',
             'canonical' => $canonical,
             'schema' => $this->seo->itemListSchema('Unanswered Questions', $canonical, $questions, 'Questions still waiting for an answer.', [], 'Unanswered questions'),
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => 'Unanswered', 'url' => url('/unanswered')],
+                ]),
+            ],
             'questions' => $questions,
             'page' => $page,
             'pagination' => $pagination,
@@ -117,6 +128,12 @@ final class HomeController extends Controller
             'canonical' => $canonical,
             'robots' => $total < 1 ? 'noindex,follow' : null,
             'schema' => $this->seo->tagDirectorySchema($tags, $canonical),
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => 'Tags', 'url' => url('/tags')],
+                ]),
+            ],
             'tags' => $tags,
             'page' => $page,
             'pagination' => $pagination,
@@ -142,6 +159,12 @@ final class HomeController extends Controller
             'metaDescription' => 'Browse community members.',
             'canonical' => $canonical,
             'schema' => $this->seo->userDirectorySchema($users, $canonical),
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => 'Users', 'url' => url('/users')],
+                ]),
+            ],
             'summary' => $summary,
             'users' => $users,
             'page' => $page,
@@ -177,6 +200,13 @@ final class HomeController extends Controller
             'canonical' => $pageCanonical,
             'robots' => $indexableTag ? null : 'noindex,follow',
             'schema' => $indexableTag ? $this->seo->itemListSchema('Questions tagged ' . (string) $tag['name'], $pageCanonical, $questions, $baseDescription, [(string) $tag['name']], (string) $tag['name']) : '',
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => 'Tags', 'url' => url('/tags')],
+                    ['name' => (string) $tag['name'], 'url' => $pageCanonical],
+                ]),
+            ],
             'questions' => $questions,
             'tag' => (string) $tag['slug'],
             'tagInfo' => $tag,
@@ -215,6 +245,12 @@ final class HomeController extends Controller
             'canonical' => $pageCanonical,
             'robots' => $indexableCategory ? null : 'noindex,follow',
             'schema' => $indexableCategory ? $this->seo->itemListSchema((string) $category['name'], $pageCanonical, $questions, $baseDescription, array_map(static fn (array $tag): string => (string) ($tag['name'] ?? ''), $relatedTags), (string) $category['name']) : '',
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => (string) $category['name'], 'url' => $pageCanonical],
+                ]),
+            ],
             'questions' => $questions,
             'category' => $category,
             'subcategories' => $subcategories,

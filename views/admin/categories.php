@@ -2,6 +2,7 @@
 <?php require BASE_PATH . '/views/admin/_nav.php'; ?>
 <?php
 $allCategories = is_array($allCategories ?? null) ? $allCategories : $categories;
+$categorySeoWarnings = is_array($categorySeoWarnings ?? null) ? $categorySeoWarnings : [];
 $currentPage = max(1, (int) ($adminPage ?? 1));
 $returnTo = '/admin/categories' . ($currentPage > 1 ? '?page=' . $currentPage : '');
 ?>
@@ -32,15 +33,43 @@ $returnTo = '/admin/categories' . ($currentPage > 1 ? '?page=' . $currentPage : 
                 </select>
             </label>
         </div>
-        <label>Description <textarea name="description" rows="2" maxlength="240" placeholder="Short category summary…"></textarea></label>
+        <label>Description <textarea name="description" rows="2" maxlength="240" placeholder="Short category summary..."></textarea></label>
         <div class="form-row">
-            <label>SEO Title <input name="seo_title" maxlength="120" autocomplete="off" placeholder="Best questions about growing…"></label>
-            <label>SEO Description <input name="seo_description" maxlength="180" autocomplete="off" placeholder="Browse solved questions and expert answers…"></label>
+            <label>SEO Title <input name="seo_title" maxlength="120" autocomplete="off" placeholder="Best questions about growing..."></label>
+            <label>SEO Description <input name="seo_description" maxlength="180" autocomplete="off" placeholder="Browse solved questions and expert answers..."></label>
         </div>
-        <label>Intro Content <textarea name="intro" rows="4" maxlength="4000" placeholder="Helpful intro for this category hub…"></textarea></label>
+        <label>Intro Content <textarea name="intro" rows="4" maxlength="4000" placeholder="Helpful intro for this category hub..."></textarea></label>
         <div class="admin-form-actions"><button type="submit">Add Category</button></div>
     </form>
 </section>
+
+<?php if ($categorySeoWarnings !== []): ?>
+    <section class="admin-panel">
+        <div class="admin-section-head">
+            <h2>Taxonomy warnings</h2>
+            <p class="meta">These category names look close enough to compete with each other in search.</p>
+        </div>
+        <div class="admin-record-list">
+            <?php foreach ($categories as $category): ?>
+                <?php $warnings = $categorySeoWarnings[(int) ($category['id'] ?? 0)] ?? []; ?>
+                <?php if ($warnings === []): continue; endif; ?>
+                <article class="admin-record">
+                    <div class="admin-record-summary">
+                        <div>
+                            <h3><?= h((string) $category['name']) ?></h3>
+                            <p class="meta">Review naming and intro copy for this category.</p>
+                        </div>
+                    </div>
+                    <ul class="admin-inline-list">
+                        <?php foreach ($warnings as $warning): ?>
+                            <li><?= h($warning) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <section class="admin-management">
     <div class="admin-section-head">
@@ -49,6 +78,7 @@ $returnTo = '/admin/categories' . ($currentPage > 1 ? '?page=' . $currentPage : 
     </div>
     <div class="admin-record-list">
         <?php foreach ($categories as $category): ?>
+            <?php $warnings = $categorySeoWarnings[(int) ($category['id'] ?? 0)] ?? []; ?>
             <article class="admin-record">
                 <div class="admin-record-summary">
                     <div>
@@ -79,12 +109,19 @@ $returnTo = '/admin/categories' . ($currentPage > 1 ? '?page=' . $currentPage : 
                             </select>
                         </label>
                     </div>
-                    <label>Description <input name="description" value="<?= h((string) $category['description']) ?>" maxlength="240" autocomplete="off" placeholder="Short category summary…"></label>
+                    <label>Description <input name="description" value="<?= h((string) $category['description']) ?>" maxlength="240" autocomplete="off" placeholder="Short category summary..."></label>
                     <div class="form-row">
-                        <label>SEO Title <input name="seo_title" value="<?= h((string) ($category['seo_title'] ?? '')) ?>" maxlength="120" autocomplete="off" placeholder="SEO title…"></label>
-                        <label>SEO Description <input name="seo_description" value="<?= h((string) ($category['seo_description'] ?? '')) ?>" maxlength="180" autocomplete="off" placeholder="SEO description…"></label>
+                        <label>SEO Title <input name="seo_title" value="<?= h((string) ($category['seo_title'] ?? '')) ?>" maxlength="120" autocomplete="off" placeholder="SEO title..."></label>
+                        <label>SEO Description <input name="seo_description" value="<?= h((string) ($category['seo_description'] ?? '')) ?>" maxlength="180" autocomplete="off" placeholder="SEO description..."></label>
                     </div>
-                    <label>Intro Content <textarea name="intro" rows="4" maxlength="4000" placeholder="Intro content…"><?= h((string) ($category['intro'] ?? '')) ?></textarea></label>
+                    <label>Intro Content <textarea name="intro" rows="4" maxlength="4000" placeholder="Intro content..."><?= h((string) ($category['intro'] ?? '')) ?></textarea></label>
+                    <?php if ($warnings !== []): ?>
+                        <ul class="admin-inline-list">
+                            <?php foreach ($warnings as $warning): ?>
+                                <li><?= h($warning) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
                     <div class="admin-record-actions">
                         <button type="submit">Save Category</button>
                     </div>

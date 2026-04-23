@@ -591,6 +591,59 @@ final class UserModel
         );
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function topTopics(int $userId, int $limit = 8): array
+    {
+        return $this->db->fetchAll(
+            'SELECT topic_type, slug, name, SUM(score) AS score
+             FROM (
+                SELECT "tag" AS topic_type, t.slug, t.name, COUNT(*) AS score
+                FROM tags t
+                JOIN question_tags qt ON qt.tag_id = t.id
+                JOIN questions q ON q.id = qt.question_id
+                WHERE q.user_id = :question_user
+                  AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                GROUP BY t.id, t.slug, t.name
+                UNION ALL
+                SELECT "tag" AS topic_type, t.slug, t.name, COUNT(*) AS score
+                FROM tags t
+                JOIN question_tags qt ON qt.tag_id = t.id
+                JOIN questions q ON q.id = qt.question_id
+                JOIN answers a ON a.question_id = q.id
+                WHERE a.user_id = :answer_user
+                  AND a.deleted_at IS NULL
+                  AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                GROUP BY t.id, t.slug, t.name
+                UNION ALL
+                SELECT "category" AS topic_type, c.slug, c.name, COUNT(*) AS score
+                FROM categories c
+                JOIN questions q ON q.category_id = c.id
+                WHERE q.user_id = :question_category_user
+                  AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                GROUP BY c.id, c.slug, c.name
+                UNION ALL
+                SELECT "category" AS topic_type, c.slug, c.name, COUNT(*) AS score
+                FROM categories c
+                JOIN questions q ON q.category_id = c.id
+                JOIN answers a ON a.question_id = q.id
+                WHERE a.user_id = :answer_category_user
+                  AND a.deleted_at IS NULL
+                  AND q.deleted_at IS NULL' . $this->approvalFilter('q') . '
+                GROUP BY c.id, c.slug, c.name
+             ) topics
+             GROUP BY topic_type, slug, name
+             ORDER BY score DESC, topic_type ASC, name ASC
+             LIMIT :limit',
+            [
+                ':question_user' => $userId,
+                ':answer_user' => $userId,
+                ':question_category_user' => $userId,
+                ':answer_category_user' => $userId,
+                ':limit' => $limit,
+            ]
+        );
+    }
+
     /** @param array<int, int> $questionIds @return array<int, array<int, array<string, mixed>>> */
     public function participantsForQuestions(array $questionIds, int $limitPerQuestion = 6): array
     {

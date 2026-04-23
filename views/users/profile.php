@@ -7,6 +7,7 @@ $websiteUrl = safe_external_url((string) ($profile['website_url'] ?? ''));
 $isBanned = !empty($profile['banned_at']);
 $isDeleted = !empty($profile['deleted_at']);
 $participantsByQuestion = is_array($participantMap ?? null) ? $participantMap : [];
+$topics = is_array($topics ?? null) ? $topics : [];
 $renderParticipants = static function (array $participants): void {
     if ($participants === []) {
         return;
@@ -97,6 +98,26 @@ $renderParticipants = static function (array $participants): void {
         <div class="tags">
             <?php foreach ($badges as $badge): ?>
                 <span title="<?= h((string) ($badge['description'] ?? '')) ?>"><?= h((string) $badge['name']) ?></span>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
+
+<?php if ($topics !== []): ?>
+    <section class="profile-section">
+        <div class="section-head">
+            <h2>Top topics</h2>
+            <p class="meta">Topics this member contributes to most often</p>
+        </div>
+        <div class="tags">
+            <?php foreach ($topics as $topic): ?>
+                <?php
+                $isTag = (string) ($topic['topic_type'] ?? '') === 'tag';
+                $href = $isTag
+                    ? '/tag/' . rawurlencode((string) ($topic['slug'] ?? ''))
+                    : '/category/' . rawurlencode((string) ($topic['slug'] ?? ''));
+                ?>
+                <a href="<?= h($href) ?>"><?= h((string) ($topic['name'] ?? '')) ?></a>
             <?php endforeach; ?>
         </div>
     </section>

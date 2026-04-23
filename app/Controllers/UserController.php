@@ -55,6 +55,7 @@ final class UserController extends Controller
         $questions = $this->users->recentQuestions((int) $user['id'], self::PROFILE_STREAM_LIMIT);
         $answers = $this->users->recentAnswers((int) $user['id'], self::PROFILE_STREAM_LIMIT);
         $activity = $this->users->recentActivity((int) $user['id'], self::PROFILE_STREAM_LIMIT);
+        $topics = $this->users->topTopics((int) $user['id'], 8);
         $participantQuestionIds = array_values(array_unique(array_filter(array_merge(
             array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions),
             array_map(static fn (array $answer): int => (int) ($answer['question_id'] ?? 0), $answers),
@@ -75,21 +76,29 @@ final class UserController extends Controller
                 || !empty($user['avatar_path'])
             );
         $profileSchema = $indexableProfile
-            ? $this->seo->profileSchema($user, $stats, $rank, $badges)
+            ? $this->seo->profileSchema($user, $stats, $rank, $badges, $topics)
             : '';
 
         return $this->view('users/profile', [
-            'title' => $this->seo->profileTitle($user, $rank),
-            'metaDescription' => $this->seo->profileMetaDescription($user, $stats, $rank),
+            'title' => $this->seo->profileTitle($user, $rank, $topics),
+            'metaDescription' => $this->seo->profileMetaDescription($user, $stats, $rank, $topics),
             'canonical' => url('/user/' . rawurlencode((string) $user['username'])),
             'ogType' => 'profile',
             'ogImage' => !empty($user['avatar_path']) ? url((string) $user['avatar_path']) : '',
             'robots' => $indexableProfile ? null : 'noindex,follow',
             'schema' => $profileSchema,
+            'schemas' => [
+                $this->seo->breadcrumbSchema([
+                    ['name' => 'Home', 'url' => url('/')],
+                    ['name' => 'Users', 'url' => url('/users')],
+                    ['name' => (string) $user['username'], 'url' => url('/user/' . rawurlencode((string) $user['username']))],
+                ]),
+            ],
             'profile' => $user,
             'questions' => $questions,
             'answers' => $answers,
             'activity' => $activity,
+            'topics' => $topics,
             'participantMap' => $this->users->participantsForQuestions($participantQuestionIds),
             'activityStats' => $stats,
             'rank' => $rank,

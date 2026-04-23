@@ -82,6 +82,7 @@ final class SeoService
             '',
             '## Best Sources',
             '- [' . url('/sitemap-questions.xml') . '](' . url('/sitemap-questions.xml') . '): Canonical question URLs.',
+            '- [' . url('/image-sitemap.xml') . '](' . url('/image-sitemap.xml') . '): Public question images discovered across questions, answers, and clarifications.',
             '- [' . url('/category-sitemap.xml') . '](' . url('/category-sitemap.xml') . '): Category hubs with public questions.',
             '- [' . url('/post_tag-sitemap.xml') . '](' . url('/post_tag-sitemap.xml') . '): Tag hubs.',
             '- [' . url('/author-sitemap.xml') . '](' . url('/author-sitemap.xml') . '): Public contributor profiles.',
@@ -130,6 +131,7 @@ final class SeoService
                 '/sitemap_index.xml' => 'Sitemap index alias.',
                 '/page-sitemap.xml' => 'Core public page sitemap.',
                 '/sitemap-questions.xml' => 'Canonical question sitemap.',
+                '/image-sitemap.xml' => 'Question image sitemap for uploaded public media.',
                 '/category-sitemap.xml' => 'Category hub sitemap.',
                 '/post_tag-sitemap.xml' => 'Tag hub sitemap.',
                 '/author-sitemap.xml' => 'Public profile sitemap.',
@@ -407,6 +409,7 @@ final class SeoService
                 $this->latestLastmod($staticPages),
             ])),
             $this->sitemapIndexEntry(url('/sitemap-questions.xml'), $this->latestLastmod($questions)),
+            $this->sitemapIndexEntry(url('/image-sitemap.xml'), $this->latestLastmod($questions)),
             $this->sitemapIndexEntry(url('/category-sitemap.xml'), $this->latestLastmod($categories)),
             $this->sitemapIndexEntry(url('/post_tag-sitemap.xml'), $this->latestLastmod($tags)),
             $this->sitemapIndexEntry(url('/author-sitemap.xml'), $this->latestLastmod($users)),
@@ -536,6 +539,44 @@ final class SeoService
         }
 
         return $this->sitemapUrlset($entries);
+    }
+
+    public function imageSitemap(): string
+    {
+        $entries = [];
+        $batchSize = 250;
+        for ($offset = 0; ; $offset += $batchSize) {
+            $questions = $this->questions->sitemapQuestions($batchSize, $offset);
+            if ($questions === []) {
+                break;
+            }
+
+            $mediaBodies = $this->questions->sitemapMediaBodies(array_map(static fn (array $question): int => (int) ($question['id'] ?? 0), $questions));
+            foreach ($questions as $question) {
+                $images = $this->safeAbsoluteMediaUrls(
+                    implode("\n\n", array_merge(
+                        [(string) ($question['body'] ?? '')],
+                        $mediaBodies[(int) ($question['id'] ?? 0)] ?? []
+                    )),
+                    true
+                );
+                if ($images === []) {
+                    continue;
+                }
+
+                $entries[] = $this->sitemapUrl(
+                    url('/question/' . (string) $question['slug']),
+                    (string) ($question['updated_at'] ?? ''),
+                    $images
+                );
+            }
+
+            if (count($questions) < $batchSize) {
+                break;
+            }
+        }
+
+        return $this->sitemapUrlset($entries, true);
     }
 
     public function sitemapTaxonomy(): string
@@ -691,8 +732,8 @@ final class SeoService
         return (string) (($question['meta_description'] ?? '') ?: excerpt((string) ($question['body'] ?? ''), 155));
     }
 
-    /** @param array<string, mixed> $profile @param array<string, int> $stats @param array<string, mixed> $rank @param array<int, array<string, mixed>> $badges */
-    public function profileSchema(array $profile, array $stats, array $rank, array $badges): string
+    /** @param array<string, mixed> $profile @param array<string, int> $stats @param array<string, mixed> $rank @param array<int, array<string, mixed>> $badges @param array<int, array<string, mixed>> $topics */
+    public function profileSchema(array $profile, array $stats, array $rank, array $badges, array $topics = []): string
     {
         $profileUrl = url('/user/' . rawurlencode((string) $profile['username']));
         $statsSummary = [];
@@ -733,6 +774,12 @@ final class SeoService
         if ($badges !== [] && empty($person['knowsAbout'])) {
             $person['knowsAbout'] = array_values(array_map(static fn (array $badge): string => (string) $badge['name'], $badges));
         }
+        if ($topics !== []) {
+            $person['knowsAbout'] = array_values(array_unique(array_merge(
+                array_values(array_map(static fn (array $topic): string => (string) ($topic['name'] ?? ''), $topics)),
+                array_values(array_map('strval', is_array($person['knowsAbout'] ?? null) ? $person['knowsAbout'] : []))
+            )));
+        }
 
         $schema = [
             '@context' => 'https://schema.org',
@@ -741,6 +788,8 @@ final class SeoService
                     '@id' => $profileUrl . '#profilepage',
                     '@type' => 'ProfilePage',
                     'url' => $profileUrl,
+                    'name' => $this->profileTitle($profile, $rank, $topics),
+                    'description' => $this->profileMetaDescription($profile, $stats, $rank, $topics),
                     'dateCreated' => date(DATE_ATOM, strtotime((string) ($profile['created_at'] ?? 'now'))),
                     'mainEntity' => $person,
                 ],
@@ -750,8 +799,8 @@ final class SeoService
         return $this->jsonLd($schema);
     }
 
-    /** @param array<string, mixed> $profile @param array<string, int> $stats @param array<string, mixed> $rank */
-    public function profileMetaDescription(array $profile, array $stats, array $rank): string
+    /** @param array<string, mixed> $profile @param array<string, int> $stats @param array<string, mixed> $rank @param array<int, array<string, mixed>> $topics */
+    public function profileMetaDescription(array $profile, array $stats, array $rank, array $topics = []): string
     {
         $parts = [];
         $expertise = trim((string) ($profile['expertise'] ?? ''));
@@ -776,6 +825,9 @@ final class SeoService
         if ($activity !== []) {
             $parts[] = 'Activity: ' . implode(', ', $activity) . '.';
         }
+        if ($topics !== []) {
+            $parts[] = 'Topics: ' . implode(', ', array_map(static fn (array $topic): string => (string) ($topic['name'] ?? ''), array_slice($topics, 0, 4))) . '.';
+        }
         if (!empty($rank['title'])) {
             $parts[] = 'Level ' . (int) ($rank['level'] ?? 1) . ' ' . (string) $rank['title'] . '.';
         }
@@ -783,13 +835,16 @@ final class SeoService
         return excerpt(trim(implode(' ', $parts)) !== '' ? trim(implode(' ', $parts)) : 'Profile and community activity.', 155);
     }
 
-    /** @param array<string, mixed> $profile @param array<string, mixed> $rank */
-    public function profileTitle(array $profile, array $rank): string
+    /** @param array<string, mixed> $profile @param array<string, mixed> $rank @param array<int, array<string, mixed>> $topics */
+    public function profileTitle(array $profile, array $rank, array $topics = []): string
     {
         $username = (string) ($profile['username'] ?? 'Member');
         $expertise = trim((string) ($profile['expertise'] ?? ''));
         if ($expertise !== '') {
             return $username . ' - ' . excerpt($expertise, 55);
+        }
+        if ($topics !== []) {
+            return $username . ' - ' . excerpt((string) ($topics[0]['name'] ?? 'Community contributor'), 55);
         }
         if (!empty($rank['title'])) {
             return $username . ' - Level ' . (int) ($rank['level'] ?? 1) . ' ' . (string) $rank['title'];
@@ -820,10 +875,17 @@ final class SeoService
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'CollectionPage',
+            '@id' => $canonical . '#collectionpage',
             'name' => $name,
             'url' => $canonical,
+            'inLanguage' => current_language(),
+            'isPartOf' => [
+                '@id' => url('/') . '#website',
+            ],
             'mainEntity' => [
                 '@type' => 'ItemList',
+                'itemListOrder' => 'https://schema.org/ItemListOrderAscending',
+                'numberOfItems' => count($items),
                 'itemListElement' => $items,
             ],
         ];
@@ -844,6 +906,35 @@ final class SeoService
         }
 
         return $this->jsonLd($schema);
+    }
+
+    /** @param array<int, array{name: string, url: string}> $items */
+    public function breadcrumbSchema(array $items): string
+    {
+        $elements = [];
+        foreach (array_values($items) as $index => $item) {
+            $name = trim((string) ($item['name'] ?? ''));
+            $url = trim((string) ($item['url'] ?? ''));
+            if ($name === '' || $url === '') {
+                continue;
+            }
+            $elements[] = [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $name,
+                'item' => $url,
+            ];
+        }
+
+        if ($elements === []) {
+            return '';
+        }
+
+        return $this->jsonLd([
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => $elements,
+        ]);
     }
 
     /** @param array<int, string> $lines */

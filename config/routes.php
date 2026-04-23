@@ -135,10 +135,11 @@ return static function (Router $router): void {
     $router->get('/category-sitemap.xml', [SeoController::class, 'categorySitemap']);
     $router->get('/post_tag-sitemap.xml', [SeoController::class, 'postTagSitemap']);
     $router->get('/author-sitemap.xml', [SeoController::class, 'authorSitemap']);
-    $router->get('/sitemap-pages.xml', [SeoController::class, 'sitemapPages']);
-    $router->get('/sitemap-questions.xml', [SeoController::class, 'sitemapQuestions']);
-    $router->get('/sitemap-taxonomy.xml', [SeoController::class, 'sitemapTaxonomy']);
-    $router->get('/sitemap-users.xml', [SeoController::class, 'sitemapUsers']);
+$router->get('/sitemap-pages.xml', [SeoController::class, 'sitemapPages']);
+$router->get('/sitemap-questions.xml', [SeoController::class, 'sitemapQuestions']);
+$router->get('/image-sitemap.xml', [SeoController::class, 'imageSitemap']);
+$router->get('/sitemap-taxonomy.xml', [SeoController::class, 'sitemapTaxonomy']);
+$router->get('/sitemap-users.xml', [SeoController::class, 'sitemapUsers']);
     $router->get('/robots.txt', [SeoController::class, 'robots']);
     $router->get('/llms.txt', [SeoController::class, 'llms']);
     $router->get('/llms-full.txt', [SeoController::class, 'llmsFull']);

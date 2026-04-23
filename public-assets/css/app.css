@@ -1045,6 +1045,13 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     margin: 0;
     overflow-wrap: anywhere;
 }
+.admin-inline-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--muted);
+}
 .admin-record-form {
     display: grid;
     gap: 10px;

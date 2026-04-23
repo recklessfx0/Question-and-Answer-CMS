@@ -33,9 +33,77 @@ function current_language(): string
     return 'en';
 }
 
+function default_language(): string
+{
+    $translator = $GLOBALS['translator'] ?? null;
+    if ($translator instanceof \App\Services\TranslationService) {
+        return $translator->defaultLanguageCode();
+    }
+
+    return 'en';
+}
+
+/** @return array<int, array<string, mixed>> */
+function active_languages(): array
+{
+    $translator = $GLOBALS['translator'] ?? null;
+    if ($translator instanceof \App\Services\TranslationService) {
+        return $translator->activeLanguages();
+    }
+
+    return [];
+}
+
 function url(string $path = ''): string
 {
     return site_url() . '/' . ltrim($path, '/');
+}
+
+function localized_url(string $url, string $languageCode, ?string $defaultLanguageCode = null): string
+{
+    $defaultLanguageCode ??= default_language();
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+        return $url;
+    }
+
+    $query = [];
+    if (isset($parts['query']) && $parts['query'] !== '') {
+        parse_str((string) $parts['query'], $query);
+    }
+
+    if ($languageCode === '' || strtolower($languageCode) === strtolower($defaultLanguageCode)) {
+        unset($query['lang']);
+    } else {
+        $query['lang'] = strtolower($languageCode);
+    }
+
+    $rebuilt = '';
+    if (isset($parts['scheme'])) {
+        $rebuilt .= (string) $parts['scheme'] . '://';
+    }
+    if (isset($parts['user'])) {
+        $rebuilt .= (string) $parts['user'];
+        if (isset($parts['pass'])) {
+            $rebuilt .= ':' . (string) $parts['pass'];
+        }
+        $rebuilt .= '@';
+    }
+    if (isset($parts['host'])) {
+        $rebuilt .= (string) $parts['host'];
+    }
+    if (isset($parts['port'])) {
+        $rebuilt .= ':' . (int) $parts['port'];
+    }
+    $rebuilt .= (string) ($parts['path'] ?? '');
+    if ($query !== []) {
+        $rebuilt .= '?' . http_build_query($query);
+    }
+    if (isset($parts['fragment']) && $parts['fragment'] !== '') {
+        $rebuilt .= '#' . (string) $parts['fragment'];
+    }
+
+    return $rebuilt !== '' ? $rebuilt : $url;
 }
 
 function site_url(): string

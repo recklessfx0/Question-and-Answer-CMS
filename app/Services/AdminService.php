@@ -83,6 +83,7 @@ final class AdminService
             ],
             'tags' => [
                 'tags' => $this->questions->popularTags($perPage, $offset),
+                'tagSeoWarnings' => $this->taxonomyWarnings($this->questions->popularTags(5000)),
                 'adminPagination' => $this->pagination('/admin/tags', $this->questions->countTags(), $page, $perPage),
             ],
             'reports' => [
@@ -426,6 +427,9 @@ final class AdminService
         if (mb_strlen($name) < 2 || mb_strlen($name) > 80) {
             return false;
         }
+        if ($this->hasNormalizedTaxonomyConflict($this->categories->all(), $name)) {
+            return false;
+        }
 
         $parent = $parentId > 0 ? $parentId : null;
         $slug = $this->categories->uniqueSlug($this->slugger->slug($name));
@@ -438,6 +442,9 @@ final class AdminService
         if ($id < 1 || mb_strlen($name) < 2 || mb_strlen($name) > 80) {
             return false;
         }
+        if ($this->hasNormalizedTaxonomyConflict($this->categories->all(), $name, $id)) {
+            return false;
+        }
 
         $parent = $parentId > 0 ? $parentId : null;
         $slug = $this->categories->uniqueSlug($this->slugger->slug($name), $id);
@@ -448,6 +455,9 @@ final class AdminService
     {
         $name = trim($name);
         if ($id < 1 || mb_strlen($name) < 1 || mb_strlen($name) > 80) {
+            return false;
+        }
+        if ($this->hasNormalizedTaxonomyConflict($this->questions->popularTags(5000), $name, $id)) {
             return false;
         }
 
@@ -643,7 +653,99 @@ final class AdminService
 
         return $this->paginatedArray('categories', '/admin/categories', $categories, $page, $perPage, [
             'allCategories' => $categories,
+            'categorySeoWarnings' => $this->taxonomyWarnings($categories),
         ]);
+    }
+
+    /** @param array<int, array<string, mixed>> $items @return array<int, array<int, string>> */
+    private function taxonomyWarnings(array $items): array
+    {
+        $warnings = [];
+        $count = count($items);
+        for ($i = 0; $i < $count; $i++) {
+            $left = $items[$i];
+            $leftId = (int) ($left['id'] ?? 0);
+            $leftName = trim((string) ($left['name'] ?? ''));
+            if ($leftId < 1 || $leftName === '') {
+                continue;
+            }
+            $leftNormalized = $this->normalizedTaxonomyName($leftName);
+            $leftTokens = $this->taxonomyTokens($leftName);
+
+            for ($j = $i + 1; $j < $count; $j++) {
+                $right = $items[$j];
+                $rightId = (int) ($right['id'] ?? 0);
+                $rightName = trim((string) ($right['name'] ?? ''));
+                if ($rightId < 1 || $rightName === '') {
+                    continue;
+                }
+
+                $reason = '';
+                $rightNormalized = $this->normalizedTaxonomyName($rightName);
+                if ($leftNormalized !== '' && $leftNormalized === $rightNormalized) {
+                    $reason = 'Matches "' . $rightName . '" after punctuation and spacing are stripped.';
+                } else {
+                    $overlap = $this->tokenOverlapRatio($leftTokens, $this->taxonomyTokens($rightName));
+                    $distance = levenshtein($this->slugger->slug($leftName), $this->slugger->slug($rightName));
+                    if ($overlap >= 0.75 || $distance <= 2) {
+                        $reason = 'Looks very close to "' . $rightName . '" and may split the same topic.';
+                    }
+                }
+
+                if ($reason === '') {
+                    continue;
+                }
+
+                $warnings[$leftId][] = $reason;
+                $warnings[$rightId][] = str_replace('"' . $rightName . '"', '"' . $leftName . '"', $reason);
+            }
+        }
+
+        return $warnings;
+    }
+
+    /** @param array<int, array<string, mixed>> $items */
+    private function hasNormalizedTaxonomyConflict(array $items, string $name, int $ignoreId = 0): bool
+    {
+        $normalized = $this->normalizedTaxonomyName($name);
+        if ($normalized === '') {
+            return false;
+        }
+
+        foreach ($items as $item) {
+            if ((int) ($item['id'] ?? 0) === $ignoreId) {
+                continue;
+            }
+            if ($this->normalizedTaxonomyName((string) ($item['name'] ?? '')) === $normalized) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizedTaxonomyName(string $name): string
+    {
+        return preg_replace('/[^a-z0-9]+/', '', mb_strtolower(trim($name))) ?? '';
+    }
+
+    /** @return array<int, string> */
+    private function taxonomyTokens(string $name): array
+    {
+        return array_values(array_filter(array_unique(preg_split('/[^a-z0-9]+/i', mb_strtolower($name)) ?: []), static fn (string $token): bool => $token !== ''));
+    }
+
+    /** @param array<int, string> $leftTokens @param array<int, string> $rightTokens */
+    private function tokenOverlapRatio(array $leftTokens, array $rightTokens): float
+    {
+        if ($leftTokens === [] || $rightTokens === []) {
+            return 0.0;
+        }
+
+        $shared = count(array_intersect($leftTokens, $rightTokens));
+        $largest = max(count($leftTokens), count($rightTokens));
+
+        return $largest > 0 ? $shared / $largest : 0.0;
     }
 
     /** @return array{current: int, total_pages: int, total_items: int, base: string, query_mode: bool, window: array<int, int>, previous: string|null, next: string|null} */

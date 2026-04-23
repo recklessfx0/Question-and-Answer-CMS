@@ -9,7 +9,18 @@ $pageTitle = isset($title) ? (string) $title . ' | ' . $site : $defaultTitle;
 $defaultDescription = trim((string) ($securitySettings['default_meta_description'] ?? '')) ?: (trim((string) ($securitySettings['site_description'] ?? '')) ?: 'A fast, secure community question and answer platform.');
 $description = (string) ($metaDescription ?? $defaultDescription);
 $requestPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
-$canonicalUrl = (string) ($canonical ?? url($requestPath));
+$baseCanonicalUrl = (string) ($canonical ?? url($requestPath));
+$defaultLanguage = default_language();
+$currentLanguage = current_language();
+$canonicalUrl = localized_url($baseCanonicalUrl, $currentLanguage, $defaultLanguage);
+$alternateLanguages = [];
+foreach (active_languages() as $language) {
+    $code = strtolower(trim((string) ($language['code'] ?? '')));
+    if ($code === '') {
+        continue;
+    }
+    $alternateLanguages[$code] = localized_url($baseCanonicalUrl, $code, $defaultLanguage);
+}
 $ogType = (string) ($ogType ?? 'website');
 $defaultOgTitle = trim((string) ($securitySettings['default_og_title'] ?? ''));
 $defaultOgDescription = trim((string) ($securitySettings['default_og_description'] ?? ''));
@@ -72,8 +83,14 @@ if (isset($schemas) && is_array($schemas)) {
     <meta name="description" content="<?= h($description) ?>">
     <meta name="robots" content="<?= h($robotsContent) ?>">
     <link rel="canonical" href="<?= h($canonicalUrl) ?>">
-    <?php if (!empty($pagination['previous'])): ?><link rel="prev" href="<?= h((string) $pagination['previous']) ?>"><?php endif; ?>
-    <?php if (!empty($pagination['next'])): ?><link rel="next" href="<?= h((string) $pagination['next']) ?>"><?php endif; ?>
+    <?php foreach ($alternateLanguages as $languageCode => $languageUrl): ?>
+        <link rel="alternate" hreflang="<?= h($languageCode) ?>" href="<?= h($languageUrl) ?>">
+    <?php endforeach; ?>
+    <?php if ($alternateLanguages !== []): ?>
+        <link rel="alternate" hreflang="x-default" href="<?= h(localized_url($baseCanonicalUrl, $defaultLanguage, $defaultLanguage)) ?>">
+    <?php endif; ?>
+    <?php if (!empty($pagination['previous'])): ?><link rel="prev" href="<?= h(localized_url((string) $pagination['previous'], $currentLanguage, $defaultLanguage)) ?>"><?php endif; ?>
+    <?php if (!empty($pagination['next'])): ?><link rel="next" href="<?= h(localized_url((string) $pagination['next'], $currentLanguage, $defaultLanguage)) ?>"><?php endif; ?>
     <?php if (isset($authorName) && is_string($authorName) && trim($authorName) !== ''): ?><meta name="author" content="<?= h($authorName) ?>"><?php endif; ?>
     <?php if (isset($keywords) && is_string($keywords) && trim($keywords) !== ''): ?><meta name="keywords" content="<?= h($keywords) ?>"><?php endif; ?>
     <meta property="og:title" content="<?= h($ogTitleContent) ?>">
