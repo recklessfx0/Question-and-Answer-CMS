@@ -61,6 +61,8 @@ final class UserController extends Controller
             array_map(static fn (array $item): int => (int) ($item['question_id'] ?? 0), $activity),
         ), static fn (int $id): bool => $id > 0)));
         $indexableProfile =
+            empty($user['banned_at'])
+            &&
             empty($user['deleted_at'])
             && (
                 (int) ($stats['questions'] ?? 0) > 0
@@ -72,7 +74,7 @@ final class UserController extends Controller
                 || trim((string) ($user['website_url'] ?? '')) !== ''
                 || !empty($user['avatar_path'])
             );
-        $profileSchema = empty($user['deleted_at'])
+        $profileSchema = $indexableProfile
             ? $this->seo->profileSchema($user, $stats, $rank, $badges)
             : '';
 
