@@ -895,7 +895,10 @@ final class QuestionModel
         }
 
         $this->db->execute(
-            'UPDATE answers SET verified_at = NOW(), verified_by = :moderator, review_note = :note, updated_at = NOW() WHERE id = :id',
+            'UPDATE answers a
+             JOIN questions q ON q.id = a.question_id
+             SET a.verified_at = NOW(), a.verified_by = :moderator, a.review_note = :note, a.updated_at = NOW(), q.updated_at = NOW()
+             WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL',
             [':moderator' => $moderatorId, ':note' => excerpt($note, 240), ':id' => $answerId]
         );
 
@@ -911,7 +914,7 @@ final class QuestionModel
         $updated = $this->db->query(
             'UPDATE answers a
              JOIN questions q ON q.id = a.question_id
-             SET a.verified_at = NULL, a.verified_by = NULL, a.review_note = "", a.updated_at = NOW()
+             SET a.verified_at = NULL, a.verified_by = NULL, a.review_note = "", a.updated_at = NOW(), q.updated_at = NOW()
              WHERE a.id = :id AND a.deleted_at IS NULL AND q.deleted_at IS NULL',
             [':id' => $answerId]
         )->rowCount();
@@ -1287,10 +1290,14 @@ final class QuestionModel
                     return [];
                 }
 
+                $questionIds = $this->questionIdsForComments($commentIds);
                 $affectedUserIds = $this->deleteReputationFootprint([], [], $commentIds);
                 $commentParams = [];
                 $commentIn = $this->inParams($commentIds, 'comment_delete', $commentParams);
                 $this->db->execute("DELETE FROM comments WHERE id IN ({$commentIn})", $commentParams);
+                foreach ($questionIds as $questionId) {
+                    $this->touchQuestion($questionId);
+                }
 
                 $voteParams = [':post_type' => 'comment'];
                 $voteIn = $this->inParams($commentIds, 'comment_vote_delete', $voteParams);
@@ -1307,6 +1314,7 @@ final class QuestionModel
         if ($type === 'answer') {
             return $this->db->transaction(function () use ($id): array {
                 $answerIds = [$id];
+                $questionIds = $this->questionIdsForAnswers($answerIds);
                 $commentIds = $this->commentIdsForAnswers($answerIds);
                 $affectedUserIds = $this->deleteReputationFootprint([], $answerIds, $commentIds);
 
@@ -1318,6 +1326,9 @@ final class QuestionModel
                     'UPDATE questions SET accepted_answer_id = NULL, updated_at = NOW() WHERE accepted_answer_id = :id',
                     [':id' => $id]
                 );
+                foreach ($questionIds as $questionId) {
+                    $this->touchQuestion($questionId);
+                }
 
                 $commentParams = [];
                 if ($commentIds !== []) {
@@ -1492,11 +1503,13 @@ final class QuestionModel
 
         if ($type === 'answer') {
             $this->db->execute('UPDATE answers SET body = :body, updated_at = NOW() WHERE id = :id', [':body' => $body, ':id' => $id]);
+            $this->touchQuestionForAnswer($id);
             return;
         }
 
         if ($type === 'comment') {
             $this->db->execute('UPDATE comments SET body = :body WHERE id = :id', [':body' => $body, ':id' => $id]);
+            $this->touchQuestionForComment($id);
         }
     }
 
@@ -1606,6 +1619,62 @@ final class QuestionModel
         $rows = $this->db->fetchAll("SELECT id FROM comments WHERE question_id IN ({$in})", $params);
 
         return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
+    /** @param array<int, int> $answerIds @return array<int, int> */
+    private function questionIdsForAnswers(array $answerIds): array
+    {
+        if ($answerIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $in = $this->inParams($answerIds, 'footprint_answer_question', $params);
+        $rows = $this->db->fetchAll("SELECT DISTINCT question_id FROM answers WHERE id IN ({$in})", $params);
+
+        return array_map(static fn (array $row): int => (int) $row['question_id'], $rows);
+    }
+
+    /** @param array<int, int> $commentIds @return array<int, int> */
+    private function questionIdsForComments(array $commentIds): array
+    {
+        if ($commentIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $in = $this->inParams($commentIds, 'footprint_comment_question', $params);
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT COALESCE(c.question_id, a.question_id) AS question_id
+             FROM comments c
+             LEFT JOIN answers a ON a.id = c.answer_id
+             WHERE c.id IN ({$in})",
+            $params
+        );
+
+        return array_values(array_filter(array_map(static fn (array $row): int => (int) ($row['question_id'] ?? 0), $rows), static fn (int $id): bool => $id > 0));
+    }
+
+    private function touchQuestionForComment(int $commentId): void
+    {
+        $this->db->execute(
+            'UPDATE questions q
+             JOIN comments c ON c.question_id = q.id
+             SET q.updated_at = NOW()
+             WHERE c.id = :comment
+               AND q.deleted_at IS NULL',
+            [':comment' => $commentId]
+        );
+        $this->db->execute(
+            'UPDATE questions q
+             JOIN answers a ON a.question_id = q.id
+             JOIN comments c ON c.answer_id = a.id
+             SET q.updated_at = NOW()
+             WHERE c.id = :comment
+               AND a.deleted_at IS NULL
+               AND q.deleted_at IS NULL',
+            [':comment' => $commentId]
+        );
     }
 
     /** @param array<int, int> $answerIds @return array<int, int> */
