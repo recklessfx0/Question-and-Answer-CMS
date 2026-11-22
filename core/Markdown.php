@@ -15,28 +15,56 @@ final class Markdown
 
     public function toHtml(string $markdown): string
     {
+        $parts = preg_split('~(^`{3,}[^\n]*\R[\s\S]*?^\h*`{3,}\h*$|^\$\$\h*\R[\s\S]*?^\$\$\h*$)~m', $markdown, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $html = [];
+        foreach ($parts ?: [$markdown] as $index => $part) {
+            if ($index % 2 === 0) {
+                $html[] = $this->renderText($part);
+            } elseif (str_starts_with($part, '`')) {
+                $lines = preg_split('/\R/', $part) ?: [];
+                $opening = (string) ($lines[0] ?? '');
+                $language = '';
+                if (preg_match('/^`{3,}(\w*)/', $opening, $m)) {
+                    $language = $m[1];
+                }
+                array_shift($lines);
+                array_pop($lines);
+                $code = '<pre><code' . ($language !== '' ? ' class="language-' . h($language) . '"' : '') . '>' . h(implode("\n", $lines)) . '</code></pre>';
+                $html[] = $code;
+            } else {
+                $html[] = '<div class="math-source" data-display-math>' . h(trim(substr(trim($part), 2, -2))) . '</div>';
+            }
+        }
+        return implode("\n", array_filter($html, fn(string $v): bool => $v !== ''));
+    }
+
+    private function renderText(string $markdown): string
+    {
         $escaped = h($markdown);
-        $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped) ?? $escaped;
-        $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped) ?? $escaped;
+        $token = bin2hex(random_bytes(8));
         $codeBlocks = [];
         $htmlBlocks = [];
         $escaped = preg_replace_callback(
-            '/`([^`]+)`/',
-            static function (array $matches) use (&$codeBlocks): string {
-                $placeholder = '%%CODE_BLOCK_' . count($codeBlocks) . '%%';
-                $codeBlocks[$placeholder] = '<code>' . $matches[1] . '</code>';
+            '/`([^`\r\n]+)`|(?<![\\\\$])\$(?![\s$])([^$\r\n]+?)(?<!\s)\$(?![\d$])/',
+            static function (array $matches) use (&$codeBlocks, $token): string {
+                $placeholder = '%%' . $token . '_CODE_BLOCK_' . count($codeBlocks) . '%%';
+                $codeBlocks[$placeholder] = !empty($matches[2])
+                    ? '<span class="math-source">' . $matches[2] . '</span>'
+                    : '<code>' . $matches[1] . '</code>';
 
                 return $placeholder;
             },
             $escaped
         ) ?? $escaped;
+        $escaped = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $escaped) ?? $escaped;
+        $escaped = preg_replace('/\*(.+?)\*/', '<em>$1</em>', $escaped) ?? $escaped;
         $escaped = preg_replace_callback(
             '/!\[([^\]]*)\]\((\/public-assets\/images\/[a-zA-Z0-9\/._-]+)\)/',
-            static function (array $matches) use (&$htmlBlocks): string {
+            static function (array $matches) use (&$htmlBlocks, $token): string {
                 $alt = trim((string) $matches[1]) !== '' ? (string) $matches[1] : \media_alt_text((string) $matches[2]);
                 $path = $matches[2];
                 $image = \uploaded_image($path, '', $alt);
-                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $placeholder = '%%' . $token . '_HTML_BLOCK_' . count($htmlBlocks) . '%%';
                 $htmlBlocks[$placeholder] = '<a class="media-link" href="' . $path . '" data-media-popup="1">' . $image . '</a>';
 
                 return $placeholder;
@@ -45,10 +73,10 @@ final class Markdown
         ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/\[uploaded video\]\((\/public-assets\/(?:images|videos)\/[a-zA-Z0-9\/._-]+\.(?:mp4|webm))\)/',
-            static function (array $matches) use (&$htmlBlocks): string {
+            static function (array $matches) use (&$htmlBlocks, $token): string {
                 $path = $matches[1];
                 $type = str_ends_with(strtolower($path), '.webm') ? 'video/webm' : 'video/mp4';
-                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+                $placeholder = '%%' . $token . '_HTML_BLOCK_' . count($htmlBlocks) . '%%';
                 $htmlBlocks[$placeholder] = '<a class="media-link media-video-link" href="' . $path . '" data-media-popup="1"><video controls preload="metadata" aria-label="Uploaded video"><source src="' . $path . '" type="' . $type . '"></video></a>';
 
                 return $placeholder;
@@ -57,8 +85,8 @@ final class Markdown
         ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/\[embedded video\]\((https?:\/\/[^\s)]+)\)/',
-            function (array $matches) use (&$htmlBlocks): string {
-                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+            function (array $matches) use (&$htmlBlocks, $token): string {
+                $placeholder = '%%' . $token . '_HTML_BLOCK_' . count($htmlBlocks) . '%%';
                 $htmlBlocks[$placeholder] = $this->renderExternalVideo((string) $matches[1]);
 
                 return $placeholder;
@@ -67,8 +95,8 @@ final class Markdown
         ) ?? $escaped;
         $escaped = preg_replace_callback(
             '/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/',
-            function (array $matches) use (&$htmlBlocks): string {
-                $placeholder = '%%HTML_BLOCK_' . count($htmlBlocks) . '%%';
+            function (array $matches) use (&$htmlBlocks, $token): string {
+                $placeholder = '%%' . $token . '_HTML_BLOCK_' . count($htmlBlocks) . '%%';
                 $url = html_entity_decode((string) $matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
                 $safeUrl = safe_external_url($url);
                 if ($safeUrl === '') {
@@ -103,6 +131,19 @@ final class Markdown
 
             $this->flushGallery($html, $gallery);
 
+            $listLines = preg_split('/\R/', $block) ?: [];
+            foreach (['ul' => '/^[-*] +(.+)$/', 'ol' => '/^\d+\. +(.+)$/'] as $tag => $pattern) {
+                $items = [];
+                foreach ($listLines as $line) {
+                    if (!preg_match($pattern, $line, $item)) {
+                        continue 2;
+                    }
+                    $items[] = '<li>' . $item[1] . '</li>';
+                }
+                $html[] = '<' . $tag . '>' . implode('', $items) . '</' . $tag . '>';
+                continue 2;
+            }
+
             if (str_starts_with($block, '&gt; ')) {
                 $quote = preg_replace('/(?:^|<br\s*\/?>)\s*&gt;\s?/i', '<br>', nl2br($block, false)) ?? $block;
                 $quote = preg_replace('/^(?:<br\s*\/?>)+/i', '', $quote) ?? $quote;
@@ -110,13 +151,9 @@ final class Markdown
                 continue;
             }
 
-            if (str_starts_with($block, '### ')) {
-                $html[] = '<h3>' . mb_substr($block, 4) . '</h3>';
-                continue;
-            }
-
-            if (str_starts_with($block, '## ')) {
-                $html[] = '<h2>' . mb_substr($block, 3) . '</h2>';
+            if (preg_match('/^(#{1,6})\s(.+)$/s', $block, $m)) {
+                $level = strlen($m[1]);
+                $html[] = '<h' . $level . '>' . $m[2] . '</h' . $level . '>';
                 continue;
             }
 
