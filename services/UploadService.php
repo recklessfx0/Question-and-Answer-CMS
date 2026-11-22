@@ -30,7 +30,7 @@ class UploadService {
         }
 
         imagejpeg($img, $path, 90);
-        imagedestroy($img);
+        unset($img);
 
         chmod($path, 0644);
 

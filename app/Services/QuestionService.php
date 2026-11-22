@@ -110,7 +110,7 @@ final class QuestionService
         return ['ok' => true, 'errors' => []];
     }
 
-    /** @return array{ok: bool, errors: array<string, string>} */
+    /** @return array{ok: bool, errors: list<string>, id?: int} */
     public function comment(string $type, int $postId, string $body, ?int $parentId = null, ?array $media = null, string $videoUrls = ''): array
     {
         if ((int) $this->session->get('user_id') < 1) {
@@ -204,7 +204,7 @@ final class QuestionService
             $this->notifyMentions($body, $userId, 'Mention', 'You were mentioned in a clarification on ' . (string) ($answer['question_title'] ?? 'a question'), $url, $notifiedUserIds);
         }
         $this->gamification->award($userId, 1, 'clarification_created', 'comment', $id);
-        return ['ok' => true, 'errors' => []];
+        return ['ok' => true, 'errors' => [], 'id' => $id];
     }
 
     /** @return array{votes: int, current_vote: int}|null */

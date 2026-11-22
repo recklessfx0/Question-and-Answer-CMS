@@ -18,23 +18,40 @@ final class Kernel
 
     public function handle(Request $request): Response
     {
+        return $this->container->get(SecurityHeadersMiddleware::class)->handle(
+            $request,
+            fn (Request $request): Response => $this->dispatch($request),
+        );
+    }
+
+    private function dispatch(Request $request): Response
+    {
         try {
-            $this->container->get(Session::class)->start();
-            $this->syncAuthenticatedUser();
+            $session = $this->container->get(Session::class);
+            if (isset($_COOKIE[Session::COOKIE_NAME]) || session_status() === PHP_SESSION_ACTIVE) {
+                $session->start();
+                $this->syncAuthenticatedUser();
+            }
             $this->container->get(TranslationService::class)->boot($request);
             $localeRedirect = $this->normalizedLocaleRedirect($request);
             if ($localeRedirect !== null) {
                 return $localeRedirect;
             }
 
-            $cached = $this->pageCacheLookup($request);
+            $cacheable = $this->canAttemptPageCache($request);
+            $cached = $cacheable
+                ? $this->container->get(PageCache::class)->get($this->pageCacheKey($request), csp_nonce())
+                : null;
             if ($cached !== null) {
                 $response = (new Response($cached, 200, ['Content-Type' => 'text/html; charset=utf-8']))->withHeader('X-Page-Cache', 'HIT');
                 $response->withHeader('Content-Language', current_language());
                 $response->withHeader('Vary', 'Accept-Language');
-                return $this->container->get(SecurityHeadersMiddleware::class)->handle($request, static fn (): Response => $response);
+                return $response;
             }
 
+            if (!$cacheable) {
+                $session->start();
+            }
             $match = $this->router->match($request);
             if ($match === null) {
                 return $this->errorResponse(404, 'Page not found');
@@ -45,7 +62,7 @@ final class Kernel
             $params = $match['params'];
             $handler = fn (Request $r): Response => $route->dispatch($this->container, $r, $params);
 
-            foreach (array_reverse(array_merge([SecurityHeadersMiddleware::class], $route->middleware)) as $middlewareClass) {
+            foreach (array_reverse($route->middleware) as $middlewareClass) {
                 $next = $handler;
                 $handler = function (Request $r) use ($middlewareClass, $next): Response {
                     $middleware = $this->container->get($middlewareClass);
@@ -54,9 +71,13 @@ final class Kernel
             }
 
             $response = $handler($request);
-            if ($this->canPageCache($request, $response)) {
-                $this->container->get(PageCache::class)->put($this->pageCacheKey($request), $response->body(), 120);
+            $contentType = $response->headers()['Content-Type'] ?? '';
+            if ($cacheable && $response->status() === 200 && str_contains($contentType, 'text/html')) {
+                $this->container->get(PageCache::class)->put($this->pageCacheKey($request), $response->body(), csp_nonce(), 120);
                 $response->withHeader('X-Page-Cache', 'MISS');
+            }
+            if (!$cacheable) {
+                $response->withHeader('Cache-Control', 'private, no-store');
             }
             $response->withHeader('Content-Language', current_language());
             $response->withHeader('Vary', 'Accept-Language');
@@ -64,18 +85,16 @@ final class Kernel
             return $response;
         } catch (Throwable $e) {
             $this->container->get(Logger::class)->error($e);
-            return $this->errorResponse(500, 'Something went wrong');
+            return new Response('Something went wrong', 500, [
+                'Content-Type' => 'text/plain; charset=utf-8',
+                'Cache-Control' => 'no-store',
+            ]);
         }
-    }
-
-    private function pageCacheLookup(Request $request): ?string
-    {
-        return $this->canAttemptPageCache($request) ? $this->container->get(PageCache::class)->get($this->pageCacheKey($request)) : null;
     }
 
     private function pageCacheKey(Request $request): string
     {
-        return current_language() . ':' . $request->uri;
+        return current_language() . ':' . $request->path;
     }
 
     private function syncAuthenticatedUser(): void
@@ -114,29 +133,15 @@ final class Kernel
     private function canAttemptPageCache(Request $request): bool
     {
         $session = $this->container->get(Session::class);
-        if (!$request->isGet() || $session->has('user_id')) {
-            return false;
-        }
-
-        foreach (['/login', '/register', '/forgot-password', '/reset-password', '/auth', '/admin', '/moderator', '/logout', '/question/', '/user/'] as $prefix) {
-            if (str_starts_with($request->path, $prefix)) {
-                return false;
-            }
-        }
-
-        // Also exclude the bare /question path to avoid caching redirect-like responses
-        if ($request->path === '/question') {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function canPageCache(Request $request, Response $response): bool
-    {
-        $contentType = $response->headers()['Content-Type'] ?? '';
-
-        return $this->canAttemptPageCache($request) && $response->status() === 200 && str_contains($contentType, 'text/html');
+        return $request->isGet()
+            && !str_contains($request->uri, '?')
+            && !$session->has('user_id')
+            && !$session->has('user')
+            && !$session->has('_flash')
+            && in_array($request->path, [
+                '/', '/activity', '/questions', '/unanswered', '/tags', '/users',
+                '/about', '/privacy', '/terms', '/community-guidelines',
+            ], true);
     }
 
     private function normalizedLocaleRedirect(Request $request): ?Response

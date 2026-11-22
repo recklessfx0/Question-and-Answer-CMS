@@ -2,6 +2,16 @@
 
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+if (PHP_VERSION_ID < 80500) {
+    fwrite(STDERR, "This CMS requires PHP 8.5 or newer.\n");
+    exit(1);
+}
+
 define('BASE_PATH', __DIR__);
 define('STORAGE_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'storage');
 
@@ -16,6 +26,7 @@ $database = new \Core\Database(require BASE_PATH . '/config/database.php');
 $notifications = new \App\Models\NotificationModel($database);
 $users = new \App\Models\UserModel($database);
 $settings = new \App\Models\SettingsModel($database);
+site_url($settings);
 $mail = new \App\Services\MailService($settings, $config);
 $approvalColumnAvailable = null;
 

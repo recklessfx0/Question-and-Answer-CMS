@@ -84,7 +84,7 @@ if (extension_loaded('gd') && function_exists('imagecreatetruecolor') && functio
     if ($largeImage instanceof \GdImage) {
         $largePath = tempnam(sys_get_temp_dir(), 'wide-png-');
         imagepng($largeImage, (string) $largePath);
-        imagedestroy($largeImage);
+        unset($largeImage);
         $wideAccepted = true;
         try {
             $imageGuard->invoke($uploadService, (string) $largePath, 'image/png');

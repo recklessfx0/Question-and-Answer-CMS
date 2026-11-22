@@ -2,7 +2,6 @@
 <section class="auth-page auth-page-forgot-password">
     <div class="auth-panel">
         <header class="auth-head">
-            <p class="eyebrow"><?= h(t('auth.forgot.eyebrow', 'Account recovery')) ?></p>
             <h1><?= h(t('auth.forgot.title', 'Reset Password')) ?></h1>
             <p><?= h(t('auth.forgot.description', 'Enter your account email and a secure reset link will be sent if the account exists.')) ?></p>
         </header>

@@ -175,9 +175,7 @@
             textElement.textContent = String(label);
             button.appendChild(markElement);
             button.appendChild(textElement);
-            if (shortcut) {
-                button.title = label + ' (' + shortcut + ')';
-            }
+            button.title = shortcut ? label + ' (' + shortcut + ')' : label;
             button.addEventListener('click', action);
             tools.appendChild(button);
         });
@@ -637,6 +635,7 @@
             return;
         }
 
+        mediaModal.close();
         mediaModal.hidden = true;
         if (mediaImage) {
             mediaImage.removeAttribute('src');
@@ -656,17 +655,20 @@
             return;
         }
 
-        mediaModal = document.createElement('div');
+        mediaModal = document.createElement('dialog');
         mediaModal.className = 'media-modal';
-        mediaModal.setAttribute('role', 'dialog');
-        mediaModal.setAttribute('aria-modal', 'true');
         mediaModal.setAttribute('aria-label', 'Uploaded media preview');
         mediaModal.hidden = true;
+        mediaModal.addEventListener('cancel', (event) => {
+            event.preventDefault();
+            closeMediaModal();
+        });
 
         const backdrop = document.createElement('button');
         backdrop.type = 'button';
         backdrop.className = 'media-modal-backdrop';
         backdrop.setAttribute('aria-label', 'Close preview');
+        backdrop.tabIndex = -1;
         backdrop.addEventListener('click', closeMediaModal);
 
         const frame = document.createElement('div');
@@ -695,13 +697,13 @@
     document.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const link = target ? target.closest('a.media-link[data-media-popup]') : null;
-        if (!(link instanceof HTMLAnchorElement)) {
+        if (!(link instanceof HTMLAnchorElement) || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
             return;
         }
 
         event.preventDefault();
         ensureMediaModal();
-        lastMediaFocus = document.activeElement;
+        lastMediaFocus = link;
 
         const thumbnail = link.querySelector('img');
         const linkedVideo = link.querySelector('video');
@@ -722,6 +724,7 @@
             mediaImage.alt = thumbnail ? thumbnail.alt : 'Uploaded media preview';
         }
         mediaModal.hidden = false;
+        mediaModal.showModal();
         mediaClose.focus();
     });
 
@@ -736,6 +739,7 @@
             return;
         }
 
+        reportModal.close();
         reportModal.hidden = true;
         if (lastReportFocus && typeof lastReportFocus.focus === 'function') {
             lastReportFocus.focus();
@@ -747,24 +751,31 @@
             return;
         }
 
-        reportModal = document.createElement('div');
+        reportModal = document.createElement('dialog');
         reportModal.className = 'report-modal';
-        reportModal.setAttribute('role', 'dialog');
-        reportModal.setAttribute('aria-modal', 'true');
-        reportModal.setAttribute('aria-label', 'Report content');
+        reportModal.setAttribute('aria-labelledby', 'report-dialog-title');
         reportModal.hidden = true;
+        reportModal.addEventListener('cancel', (event) => {
+            event.preventDefault();
+            closeReportModal();
+        });
 
         const frame = document.createElement('div');
         frame.className = 'report-modal-frame';
         const title = document.createElement('h2');
-        title.textContent = 'Report';
+        title.id = 'report-dialog-title';
+        title.textContent = 'Report content';
         reportForm = document.createElement('form');
         reportForm.method = 'post';
         reportReason = document.createElement('textarea');
+        reportReason.id = 'report-dialog-reason';
         reportReason.name = 'reason';
         reportReason.maxLength = 240;
         reportReason.required = true;
         reportReason.placeholder = 'Briefly describe the problem';
+        const reasonLabel = document.createElement('label');
+        reasonLabel.htmlFor = reportReason.id;
+        reasonLabel.textContent = 'Reason';
         const csrf = document.createElement('div');
         csrf.dataset.reportCsrf = '1';
         const actions = document.createElement('div');
@@ -781,6 +792,7 @@
         actions.appendChild(reportClose);
         actions.appendChild(submit);
         reportForm.appendChild(csrf);
+        reportForm.appendChild(reasonLabel);
         reportForm.appendChild(reportReason);
         reportForm.appendChild(actions);
         frame.appendChild(title);
@@ -798,13 +810,14 @@
 
         event.preventDefault();
         ensureReportModal();
-        lastReportFocus = document.activeElement;
+        lastReportFocus = button;
         // Validate action is an internal path before assigning (defence-in-depth)
         const reportAction = button.dataset.reportAction || '';
         reportForm.action = /^\/[a-zA-Z0-9\-_/]+$/.test(reportAction) ? reportAction : '';
         // Inject CSRF token via DOM API instead of innerHTML
         const csrfContainer = reportForm.querySelector('[data-report-csrf]');
         if (csrfContainer) {
+            csrfContainer.replaceChildren();
             // The server embeds the full <input> HTML in the data attribute; parse it safely
             const match = (button.dataset.reportCsrf || '').match(/value="([^"]*)"/);
             if (match) {
@@ -820,6 +833,7 @@
         }
         reportReason.value = '';
         reportModal.hidden = false;
+        reportModal.showModal();
         reportReason.focus();
     });
 
@@ -865,7 +879,7 @@
         }
         const prefix = textarea.value.trim() === '' ? '' : '\n\n';
         if (parentInput instanceof HTMLInputElement) {
-            parentInput.value = '0';
+            parentInput.value = button.dataset.quoteParent || '0';
         }
         if (quoteInput instanceof HTMLInputElement) {
             quoteInput.value = button.dataset.quoteParent || '0';
@@ -874,13 +888,13 @@
             context.hidden = false;
         }
         if (contextText instanceof HTMLElement) {
-            contextText.textContent = 'Quoting ' + author;
+            contextText.textContent = 'Replying to ' + author;
         }
         form.dataset.activeQuote = quote;
         textarea.value += prefix + quote;
         textarea.focus();
         textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-        form.scrollIntoView({block: 'center', behavior: 'smooth'});
+        form.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
     });
 
     document.addEventListener('click', (event) => {
@@ -1048,6 +1062,7 @@
         }
     };
 
+    const pendingEngagement = new WeakSet();
     document.addEventListener('submit', async (event) => {
         const form = event.target instanceof HTMLFormElement ? event.target : null;
         if (!(form instanceof HTMLFormElement) || (!form.hasAttribute('data-async-vote-form') && !form.hasAttribute('data-async-reaction-form'))) {
@@ -1055,6 +1070,10 @@
         }
 
         event.preventDefault();
+        const group = form.closest('[data-vote-box], [data-reaction-bar]') ?? form;
+        if (pendingEngagement.has(group)) return;
+        pendingEngagement.add(group);
+        group.setAttribute('aria-busy', 'true');
         const submitButtons = Array.from(form.querySelectorAll('button[type="submit"], button:not([type])')).filter((button) => button instanceof HTMLButtonElement);
         submitButtons.forEach((button) => {
             if (button instanceof HTMLButtonElement) {
@@ -1096,18 +1115,13 @@
         } catch (error) {
             window.location.reload();
         } finally {
+            pendingEngagement.delete(group);
+            group.removeAttribute('aria-busy');
             submitButtons.forEach((button) => {
                 if (button instanceof HTMLButtonElement) {
                     button.disabled = false;
                 }
             });
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            closeMediaModal();
-            closeReportModal();
         }
     });
 

@@ -9,7 +9,7 @@ final class RateLimiter
     public function __construct(private string $path)
     {
         if (!is_dir($path)) {
-            mkdir($path, 0750, true);
+            @mkdir($path, 0750, true);
         }
     }
 
@@ -24,30 +24,37 @@ final class RateLimiter
         
         // Ensure directory exists before attempting to write
         $dir = dirname($file);
-        if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
-            // If we can't create the directory, fail open
-            return false;
+        if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
+            return true;
         }
         
-        $fh = fopen($file, 'c+');
+        $fh = @fopen($file, 'c+');
         if ($fh === false) {
-            // If we can't open the file, fail open (don't block the request)
-            return false;
+            return true;
         }
 
-        flock($fh, LOCK_EX);
+        if (!flock($fh, LOCK_EX)) {
+            fclose($fh);
+            return true;
+        }
 
         try {
-            $size = filesize($file);
-            $raw = $size > 0 ? fread($fh, (int) $size) : '';
+            $raw = stream_get_contents($fh);
             $hits = is_string($raw) && $raw !== '' ? json_decode($raw, true) : [];
-            $threshold = time() - $seconds;
+            $now = time();
+            $threshold = $now - $seconds;
             $hits = array_values(array_filter(is_array($hits) ? $hits : [], static fn (mixed $hit): bool => is_int($hit) && $hit >= $threshold));
-            $hits[] = time();
+            $hits[] = $now;
+            $hits = array_slice($hits, -($limit + 1));
 
-            ftruncate($fh, 0);
+            if (!ftruncate($fh, 0)) {
+                return true;
+            }
             rewind($fh);
-            fwrite($fh, json_encode($hits, JSON_THROW_ON_ERROR));
+            $encoded = json_encode($hits, JSON_THROW_ON_ERROR);
+            if (fwrite($fh, $encoded) !== strlen($encoded)) {
+                return true;
+            }
         } finally {
             flock($fh, LOCK_UN);
             fclose($fh);

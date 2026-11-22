@@ -1,5 +1,6 @@
 <?php declare(strict_types=1); ?>
 <?php
+require_once BASE_PATH . '/views/partials/icon.php';
 $pageWidgets = is_array($pageWidgets ?? null) ? $pageWidgets : [];
 $hasDynamicWidgets = !empty($pageWidgets['has_widgets']);
 $widgetDevices = is_array($pageWidgets['devices'] ?? null) ? array_map('strval', $pageWidgets['devices']) : ['desktop', 'phone'];
@@ -11,11 +12,32 @@ if (!in_array('phone', $widgetDevices, true)) {
     $widgetLayoutClass .= ' widgets-hide-phone';
 }
 $widgetZone = '';
+$feedTopics = [];
+if (!$hasDynamicWidgets && empty($query) && empty($category) && empty($tagInfo)) {
+    foreach ($questions as $item) {
+        if (!empty($item['category_slug'])) {
+            $feedTopics[(string) $item['category_slug']] = (string) $item['category_name'];
+        }
+    }
+}
 ?>
 <section class="page-head">
     <?php require BASE_PATH . '/views/partials/guest-welcome.php'; ?>
-    <h1><?= h($heading ?? $title ?? 'Latest Questions') ?></h1>
-    <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
+    <div class="feed-intro<?= empty($query) && empty($category) && empty($tagInfo) ? ' feed-intro-illustrated' : '' ?>">
+        <div>
+            <h1><?= h($heading ?? $title ?? 'Latest Questions') ?></h1>
+            <p><?= h($metaDescription ?? 'Browse community questions.') ?></p>
+        </div>
+        <?php if (empty($query) && empty($category) && empty($tagInfo)): ?>
+            <svg class="feed-illustration" viewBox="0 0 216 132" width="216" height="132" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path class="illustration-soft" d="m14 95 91-48 97 48-94 34z"/>
+                <path class="illustration-panel" d="m41 40 60-32 41 22v54l-42 21-59-30z"/>
+                <path d="m41 40 59 31 42-41m-42 41v34M63 28l58 31M55 55l30 16m-30-7 21 11"/>
+                <path class="illustration-panel" d="m121 68 37-20 32 17v32l-34 18-35-18z"/>
+                <path d="m121 68 35 19 34-22m-34 22v28m9-21 16-9"/>
+            </svg>
+        <?php endif; ?>
+    </div>
     <?php if (!empty($category) && is_array($category)): ?>
         <div class="hub-panel" aria-label="Category hub">
             <p class="meta"><?= h((string) (($category['intro'] ?? '') ?: 'Topic hub for ' . (string) $category['name'] . '. Browse subcategories, related tags, current questions, and recent answers.')) ?></p>
@@ -47,12 +69,11 @@ $widgetZone = '';
         </div>
     <?php endif; ?>
     <nav class="landing-tabs" aria-label="Question navigation">
-        <a href="<?= h(localized_path('/activity')) ?>">All activity</a>
-        <a href="<?= h(localized_path('/questions')) ?>">Questions</a>
-        <a href="<?= h(localized_path('/unanswered')) ?>">Unanswered</a>
-        <a href="<?= h(localized_path('/tags')) ?>">Tags</a>
-        <a href="<?= h(localized_path('/users')) ?>">Users</a>
-        <a href="<?= h(localized_path('/ask')) ?>">Ask a Question</a>
+        <?php $feedPath = rtrim((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH), '/'); ?>
+        <?php foreach (['/questions' => 'Questions', '/activity' => 'All activity', '/unanswered' => 'Unanswered', '/tags' => 'Tags', '/users' => 'Members'] as $path => $label): ?>
+            <?php $href = localized_path($path); ?>
+            <a href="<?= h($href) ?>" <?= in_array($path, ['/tags', '/users'], true) ? 'class="feed-tab-directory"' : '' ?> <?= $feedPath === rtrim($href, '/') || ($path === '/questions' && $feedPath === rtrim(localized_path('/'), '/')) ? 'aria-current="page"' : '' ?>><?= h($label) ?></a>
+        <?php endforeach; ?>
     </nav>
 </section>
 
@@ -60,11 +81,22 @@ $widgetZone = '';
     <div class="content-with-widgets landing-with-widgets<?= h($widgetLayoutClass) ?>">
         <?php $widgetZone = 'left'; require BASE_PATH . '/views/partials/dynamic-widgets.php'; ?>
         <div class="dynamic-widget-main">
+<?php elseif ($feedTopics !== []): ?>
+    <div class="feed-layout">
 <?php endif; ?>
 
 <section class="question-list" aria-label="Questions">
     <?php if ($questions === []): ?>
-        <p>No questions found.</p>
+        <div class="empty-state">
+            <span class="topic-mark"><?= ui_icon('topics') ?></span>
+            <h2>No questions found</h2>
+            <?php if (!empty($query)): ?>
+                <p>Try a shorter search or browse all questions.</p>
+                <a class="button button-secondary" href="<?= h(localized_path('/questions')) ?>">Browse questions</a>
+            <?php else: ?>
+                <a class="button button-secondary" href="<?= h(localized_path('/ask')) ?>">Ask a question</a>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
     <?php foreach ($questions as $question): ?>
         <?php $activityUsers = is_array($question['activity_users'] ?? null) ? array_slice($question['activity_users'], 0, 9) : []; ?>
@@ -136,12 +168,15 @@ $widgetZone = '';
                     </div>
                     <div class="activity-spark-wrap" aria-label="Activity in the past 31 days">
                         <div class="activity-spark">
-                            <?php for ($day = 30; $day >= 0; $day--): ?>
-                                <?php $date = date('Y-m-d', strtotime('-' . $day . ' days')); ?>
-                                <?php $count = (int) ($activityDays[$date] ?? 0); ?>
-                                <?php $activityLevel = $count > 0 ? max(1, min(10, (int) ceil(($count / $maxActivity) * 10))) : 0; ?>
-                                <span class="<?= $count > 0 ? 'is-active' : 'is-empty' ?> activity-level-<?= $activityLevel ?>" title="<?= h($date . ': ' . $count) ?>"></span>
-                            <?php endfor; ?>
+                            <?php
+                            for ($day = 30; $day >= 0; $day--) {
+                                $date = date('Y-m-d', strtotime('-' . $day . ' days'));
+                                $count = (int) ($activityDays[$date] ?? 0);
+                                $level = $count > 0 ? max(1, min(10, (int) ceil(($count / $maxActivity) * 10))) : 0;
+                                $state = $count > 0 ? 'is-active' : 'is-empty';
+                                echo '<span class="' . $state . ' activity-level-' . $level . '" title="' . h($date . ': ' . $count) . '"></span>';
+                            }
+                            ?>
                         </div>
                         <span class="activity-spark-title"><?= $activityTotal > 0 ? (int) $activityTotal . ' events in 31 days' : 'No recent activity' ?></span>
                     </div>
@@ -150,6 +185,18 @@ $widgetZone = '';
         </article>
     <?php endforeach; ?>
 </section>
+<?php if ($feedTopics !== []): ?>
+        <aside class="feed-topics" aria-labelledby="feed-topics-heading">
+            <h2 id="feed-topics-heading">Topics in this feed</h2>
+            <ul>
+                <?php foreach ($feedTopics as $slug => $name): ?>
+                    <li><a href="<?= h(localized_path('/category/' . $slug)) ?>"><?= ui_icon('topics') ?><?= h($name) ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+            <a class="feed-topics-directory" href="<?= h(localized_path('/tags')) ?>">Browse all tags</a>
+        </aside>
+    </div>
+<?php endif; ?>
 
 <?php if (!empty($pagination) && is_array($pagination) && (int) ($pagination['total_pages'] ?? 1) > 1): ?>
     <nav class="pagination" aria-label="Question pages">

@@ -17,6 +17,6 @@ $adminItems = [
 ?>
 <nav class="admin-nav" aria-label="Admin sections">
     <?php foreach ($adminItems as $href => $label): ?>
-        <a href="<?= h($href) ?>" class="<?= $adminPath === $href ? 'active' : '' ?>"><?= h(t('admin.nav.' . strtolower(str_replace(' ', '_', $label)), $label)) ?></a>
+        <a href="<?= h(localized_path($href)) ?>" <?= $adminPath === localized_path($href) ? 'class="active" aria-current="page"' : '' ?>><?= h(t('admin.nav.' . strtolower(str_replace(' ', '_', $label)), $label)) ?></a>
     <?php endforeach; ?>
 </nav>

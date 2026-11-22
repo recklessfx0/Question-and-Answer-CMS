@@ -146,7 +146,7 @@ final class GoogleAuthService
             $username = $this->users->uniqueUsername($base);
 
             try {
-                return $this->users->createWithBootstrapRole($username, $email, $hash);
+                return $this->users->create($username, $email, $hash);
             } catch (\Throwable $e) {
                 if (!is_duplicate_key_exception($e)) {
                     throw $e;

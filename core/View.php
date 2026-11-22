@@ -77,8 +77,11 @@ final class View
         extract($data, EXTR_SKIP);
 
         ob_start();
-        include $file;
-
-        return (string) ob_get_clean();
+        try {
+            include $file;
+            return (string) ob_get_contents();
+        } finally {
+            ob_end_clean();
+        }
     }
 }

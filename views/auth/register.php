@@ -2,7 +2,6 @@
 <section class="auth-page auth-page-register">
     <div class="auth-panel">
         <header class="auth-head">
-            <p class="eyebrow"><?= h(t('auth.register.eyebrow', 'Join the community')) ?></p>
             <h1><?= h(t('auth.register.title', 'Create Account')) ?></h1>
             <p><?= h(t('auth.register.description', 'Ask questions, answer others, react to useful posts, and build reputation.')) ?></p>
         </header>

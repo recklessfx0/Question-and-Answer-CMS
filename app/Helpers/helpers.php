@@ -140,8 +140,7 @@ function localized_route_path(string $path, string $languageCode, ?string $defau
 
     $languageCode = strtolower(trim($languageCode));
     $defaultLanguageCode = strtolower(trim($defaultLanguageCode));
-    $strippedPath = preg_replace('#^/([a-z]{2,3}(?:-[a-z0-9]{2,8})?)(?=/|$)#i', '', $path) ?? $path;
-    $strippedPath = $strippedPath === '' ? '/' : $strippedPath;
+    [, $strippedPath] = \Core\Request::splitLocalePath($path);
 
     if ($languageCode === '' || $languageCode === $defaultLanguageCode) {
         return $strippedPath;
@@ -168,7 +167,7 @@ function is_localizable_path(string $path): bool
     return true;
 }
 
-function site_url(): string
+function site_url(?\App\Models\SettingsModel $settings = null): string
 {
     static $base = null;
     if ($base !== null) {
@@ -179,23 +178,14 @@ function site_url(): string
     $base = normalize_site_url((string) ($config['url'] ?? '')) ?: 'https://example.com';
 
     try {
-        $databaseConfig = require BASE_PATH . '/config/database.php';
-        $dsn = sprintf(
-            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
-            $databaseConfig['host'],
-            $databaseConfig['port'],
-            $databaseConfig['database'],
-            $databaseConfig['charset']
-        );
-        $pdo = new \PDO($dsn, (string) $databaseConfig['username'], (string) $databaseConfig['password'], [
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-            \PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-        $statement = $pdo->prepare('SELECT value FROM settings WHERE `key` = :key LIMIT 1');
-        $statement->execute([':key' => 'site_url']);
-        $configured = $statement->fetchColumn();
-        $settingUrl = is_string($configured) ? normalize_site_url($configured) : '';
+        if ($settings === null) {
+            $databaseConfig = require BASE_PATH . '/config/database.php';
+            $settings = new \App\Models\SettingsModel(new \Core\Database($databaseConfig));
+            $configured = $settings->get('site_url');
+        } else {
+            $configured = $settings->all()['site_url'] ?? '';
+        }
+        $settingUrl = normalize_site_url($configured);
         if ($settingUrl !== '') {
             $base = $settingUrl;
         }

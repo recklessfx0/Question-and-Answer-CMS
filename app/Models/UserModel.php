@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Core\Database;
-use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -107,59 +106,6 @@ final class UserModel
         );
 
         return $this->db->lastInsertId();
-    }
-
-    public function createWithBootstrapRole(string $username, string $email, string $passwordHash): int
-    {
-        $lockName = 'users:first-admin-bootstrap';
-        $attempts = 0;
-
-        beginning:
-        $pdo = $this->db->pdo();
-        $lockAcquired = false;
-
-        try {
-            $lock = $this->db->fetch('SELECT GET_LOCK(:lock_name, 5) AS acquired', [':lock_name' => $lockName]);
-            if ((int) ($lock['acquired'] ?? 0) !== 1) {
-                throw new RuntimeException('Unable to acquire bootstrap role lock.');
-            }
-
-            $lockAcquired = true;
-            $pdo->beginTransaction();
-
-            $count = $this->db->fetch('SELECT COUNT(*) AS total FROM users');
-            $role = (int) ($count['total'] ?? 0) === 0 ? 'administrator' : 'user';
-
-            $this->db->execute(
-                'INSERT INTO users (username, email, password_hash, role, reputation, created_at, updated_at) VALUES (:username, :email, :hash, :role, 1, NOW(), NOW())',
-                [':username' => $username, ':email' => $email, ':hash' => $passwordHash, ':role' => $role]
-            );
-
-            $userId = $this->db->lastInsertId();
-            $pdo->commit();
-
-            return $userId;
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-
-            $retryable = $e instanceof PDOException
-                && (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'Lock wait timeout'));
-            if ($retryable && ++$attempts < 3) {
-                usleep(100000 * $attempts);
-                goto beginning;
-            }
-
-            throw $e;
-        } finally {
-            if ($lockAcquired) {
-                try {
-                    $this->db->fetch('SELECT RELEASE_LOCK(:lock_name) AS released', [':lock_name' => $lockName]);
-                } catch (Throwable) {
-                }
-            }
-        }
     }
 
     public function uniqueUsername(string $username): string

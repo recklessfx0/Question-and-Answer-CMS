@@ -2,7 +2,7 @@
 
 I built this platform for my own private projects, mainly because every alternative I found was outdated, insecure, and far behind current coding and security standards. So I decided to start fresh.
 
-It's a universal PHP 8.2+ question and answer platform with zero external dependencies: no Composer, no framework, just a clean root `index.php` entry point, MVC flow, PDO prepared statements, file cache, file queue, RBAC, CSRF protection, and rate limiting. Everything you actually need, nothing you don't.
+The CMS runs on PHP 8.5+ with no Composer dependencies. The root `index.php` entry point uses an MVC flow, PDO prepared statements, a file cache, a file queue, role-based access control, CSRF protection, and rate limiting.
 
 One thing I paid special attention to is how AI is reshaping SEO. LLMs are now crawling and interpreting content differently than traditional search engines, so I optimized this platform to be highly machine-readable, with proper QAPage JSON-LD schemas and a range of other SEO tweaks baked in from the start.
 
@@ -10,10 +10,9 @@ The platform is fully brandable through environment variables and database setti
 
 ## Install
 
-1. Point Apache document root at this directory.
-2. Enable `mod_rewrite` and allow `.htaccess`.
-3. Create a MySQL/MariaDB database and import `database/schema.sql`.
-4. Set environment variables:
+1. Install PHP 8.5+ with Argon2id and the PDO MySQL, Mbstring, Fileinfo, OpenSSL, SimpleXML, and Iconv extensions. Enable OPcache in the web PHP runtime.
+2. Create an empty MySQL or MariaDB database and grant the installer account permission to create and alter tables in it.
+3. Set these environment variables for the installer and the web runtime. Supply the database password through your deployment environment.
 
 ```bash
 APP_NAME="Question And Answer Platform"
@@ -27,8 +26,14 @@ DB_USERNAME=qa_user
 DB_PASSWORD="replace-this"
 ```
 
-5. Ensure PHP can write to `storage/logs`, `storage/cache`, `storage/sessions`, and `storage/queue`.
-6. Run queued jobs from cron:
+4. Set `CMS_INSTALL_PASSWORD` for the installer process using your secret manager or service environment. Run the command from the project root. The installer creates the schema and the first administrator. Use a lowercase administrator username with hyphens between words and a password of 12 to 128 characters.
+
+```bash
+php install.php site-admin admin@your-domain.example
+```
+
+5. Remove `CMS_INSTALL_PASSWORD` from the environment after setup. Point Apache's document root at the project directory, enable `mod_rewrite`, and allow the supplied `.htaccess`. Verify that the PHP service account can write to `storage/logs`, `storage/cache`, `storage/sessions`, and `storage/queue`. If the installer ran as a different user, set the storage ownership or ACLs accordingly. If you use a different web server, configure the same access restrictions and front-controller routing before exposing the site.
+6. Run queued jobs from cron with the application database environment:
 
 ```bash
 php queue-worker.php
@@ -36,7 +41,7 @@ php queue-worker.php
 
 For local development over plain HTTP, set `APP_SECURE_COOKIES=false`.
 
-The first account registered on a fresh database is automatically assigned the `administrator` role.
+Public registration creates regular users. Existing administrators keep their roles. On an existing site, back up the database and apply any outstanding migrations before upgrading. If a fresh schema import fails partway through, inspect the error and restore a clean database before retrying. The installer does not overwrite existing tables.
 
 ## Architecture
 
@@ -86,5 +91,7 @@ Dynamic endpoints:
 - `/sitemap.xml`
 - `/robots.txt`
 - `/llms.txt`
+- `/llms-full.txt`
+- `/question/{slug}/text` serves the public discussion as Markdown. The HTML page advertises it as an alternate, and the Markdown response links back to the canonical HTML page.
 
 Static fallback files `robots.txt` and `llms.txt` are included for hosts that serve existing files before PHP routing. Replace `https://example.com` with your production URL if you keep them static.

@@ -2,13 +2,12 @@
 <section class="auth-page auth-page-login">
     <div class="auth-panel">
         <header class="auth-head">
-            <p class="eyebrow"><?= h(t('auth.login.eyebrow', 'Welcome back')) ?></p>
             <h1><?= h(t('auth.login.title', 'Sign In')) ?></h1>
             <p><?= h(t('auth.login.description', 'Continue your questions, answers, notifications, and saved settings.')) ?></p>
         </header>
 <form method="post" action="<?= h(localized_path('/login')) ?>" class="auth-form">
             <?= $csrf->field('/login') ?>
-            <label><?= h(t('auth.email', 'Email')) ?><input name="email" type="email" autocomplete="email" spellcheck="false" required></label>
+            <label><?= h(t('auth.email', 'Email')) ?><input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>
             <label><?= h(t('auth.password', 'Password')) ?><input name="password" type="password" autocomplete="current-password" required></label>
             <?= recaptcha_widget($securitySettings ?? []) ?>
             <button type="submit"><?= h(t('auth.login.submit', 'Sign In')) ?></button>

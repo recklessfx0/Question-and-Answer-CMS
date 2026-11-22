@@ -203,7 +203,7 @@ final class UploadService
             $webpOk = $this->withoutWarnings(static fn (): bool => imagewebp($image, $webpTarget, 82));
             $avifOk = $this->withoutWarnings(static fn (): bool => imageavif($image, $avifTarget, 50));
         } catch (RuntimeException) {
-            imagedestroy($image);
+            unset($image);
             foreach ([$webpTarget, $avifTarget] as $partial) {
                 if (is_file($partial)) {
                     unlink($partial);
@@ -211,7 +211,7 @@ final class UploadService
             }
             return null;
         }
-        imagedestroy($image);
+        unset($image);
 
         if ($webpOk && is_file($webpTarget)) {
             chmod($webpTarget, 0644);

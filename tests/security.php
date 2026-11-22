@@ -34,6 +34,19 @@ $assert(!$limiter->hitAndCheck('login', 'user@example.com', 2, 60), 'First login
 $assert(!$limiter->hitAndCheck('login', 'user@example.com', 2, 60), 'Second login attempt should pass rate limiter.');
 $assert($limiter->hitAndCheck('login', 'user@example.com', 2, 60), 'Third login attempt should be blocked.');
 $assert($limiter->attemptCount('login', 'user@example.com', 60) === 3, 'Rate limiter should report current attempt count.');
+$assert($limiter->hitAndCheck('login', 'user@example.com', 2, 60), 'Repeated login attempts should remain blocked.');
+$assert($limiter->attemptCount('login', 'user@example.com', 60) === 3, 'The rate-limit window should retain only the hits needed for enforcement.');
+
+$pageDir = $rateDir . DIRECTORY_SEPARATOR . 'pages';
+$pageCache = new \Core\PageCache($pageDir);
+$oldNonce = str_repeat('a', 32);
+$newNonce = str_repeat('b', 32);
+$html = '<script nonce="' . $oldNonce . '" src="/public-assets/js/app.js"></script>';
+$pageCache->put('en:/', $html, $oldNonce, 60);
+$assert($pageCache->get('en:/', $newNonce) === str_replace($oldNonce, $newNonce, $html), 'Cached HTML should use the current response nonce.');
+$assert($pageCache->get('de:/', $newNonce) === null, 'Cached HTML should stay scoped to its locale key.');
+$pageCache->put('en:/', $html, $oldNonce, 0);
+$assert($pageCache->get('en:/', $newNonce) === null, 'Expired HTML should not be served.');
 
 $cleanup = static function (string $path) use (&$cleanup): void {
     if (!is_dir($path)) {

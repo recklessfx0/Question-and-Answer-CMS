@@ -6,6 +6,8 @@ namespace Core;
 
 final class Session
 {
+    public const string COOKIE_NAME = 'qa_session';
+
     public function __construct(
         private readonly string $path,
         private readonly bool $secureCookies,
@@ -25,7 +27,7 @@ final class Session
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_only_cookies', '1');
         ini_set('session.cookie_httponly', '1');
-        session_name('qa_session');
+        session_name(self::COOKIE_NAME);
         session_set_cookie_params([
             'lifetime' => 0,
             'path' => '/',

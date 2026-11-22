@@ -56,6 +56,10 @@ $assert($request->path === '/questions', 'Request capture should strip the local
 $assert(localized_path('/questions', 'de', 'en') === '/de/questions', 'Localized paths should add a locale prefix for non-default languages.');
 $assert(localized_path('/questions', 'en', 'en') === '/questions', 'Localized paths should keep default-language URLs clean.');
 $assert(localized_path('/sitemap.xml', 'de', 'en') === '/sitemap.xml', 'Technical sitemap URLs should not be locale-prefixed.');
+$assert(localized_path('/ask', 'en', 'en') === '/ask', 'The ask route must survive default-language URL generation.');
+$assert(localized_path('/tag/benchmarking', 'de', 'en') === '/de/tag/benchmarking', 'Tag hubs must keep their route prefix when localized.');
+$assert(\Core\Request::splitLocalePath('/ask/suggest') === ['', '/ask/suggest'], 'Ask suggestions must route as an application endpoint.');
+$assert(\Core\Request::splitLocalePath('/de') === ['de', '/'], 'A locale-only path must route to the homepage.');
 
 $redirect = \Core\Response::redirect('/questions');
 $assert(($redirect->headers()['Location'] ?? '') === '/de/questions', 'Internal redirects should preserve the active locale path.');
@@ -75,6 +79,7 @@ $siteSchema = '';
 $schemas = [];
 $authUser = null;
 $query = '';
+$discussionTextUrl = url('/de/question/sample/text');
 $csrf = new class {
     public function field(string $action = 'default'): string
     {
@@ -91,6 +96,20 @@ $assert(str_contains($layoutHtml, '<link rel="canonical" href="' . h(url('/de/qu
 $assert(str_contains($layoutHtml, 'hreflang="de" href="' . h(url('/de/questions')) . '"'), 'Rendered layout should emit hreflang for the active locale path.');
 $assert(str_contains($layoutHtml, 'hreflang="fr" href="' . h(url('/fr/questions')) . '"'), 'Rendered layout should emit hreflang for additional active locales.');
 $assert(str_contains($layoutHtml, 'hreflang="x-default" href="' . h(url('/questions')) . '"'), 'Rendered layout should emit an x-default alternate for the default language URL.');
+$assert(str_contains($layoutHtml, 'rel="alternate" type="text/markdown" href="' . h($discussionTextUrl) . '"'), 'Rendered layout should advertise the Markdown alternate.');
+
+$db = new \Core\Database([]);
+$seo = new \App\Services\SeoService(new \App\Models\QuestionModel($db), new \App\Models\CategoryModel($db), new \App\Models\UserModel($db), new \Core\Markdown(), new \App\Models\SettingsModel($db));
+$postedAt = '2026-11-20 12:00:00';
+$discussion = $seo->discussionMarkdown(
+    ['title' => 'Sample question', 'body' => 'A complete question body.', 'username' => 'author', 'created_at' => $postedAt],
+    [['id' => 4, 'body' => 'A complete answer.', 'username' => 'responder', 'is_accepted' => 1, 'votes' => 2, 'created_at' => $postedAt]],
+    [],
+    [['id' => 9, 'answer_id' => 4, 'username' => 'author', 'created_at' => $postedAt, 'body' => 'A clarification on the answer.']],
+    url('/de/question/sample'),
+);
+$assert(str_contains($discussion, '### Accepted answer by responder') && str_contains($discussion, '#answer-4)'), 'Markdown should label the accepted answer and link to its HTML anchor.');
+$assert(str_contains($discussion, 'A complete question body.') && str_contains($discussion, '#comment-9)') && str_contains($discussion, 'A clarification on the answer.'), 'Markdown should include the question and its answer clarification.');
 
 unset($GLOBALS['translator']);
 

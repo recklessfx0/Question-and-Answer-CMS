@@ -262,9 +262,14 @@ final class QuestionModel
              FROM questions q
              JOIN users u ON u.id = q.user_id
              LEFT JOIN categories c ON c.id = q.category_id
-             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.title LIKE :query_title OR q.body LIKE :query_body)
+             WHERE q.deleted_at IS NULL' . $this->approvalFilter('q') . $this->canonicalQuestionFilter('q') . ' AND (q.title LIKE :filter_title OR q.body LIKE :filter_body)
              ORDER BY relevance_score DESC, has_accepted DESC, has_verified DESC, answer_count DESC, q.votes DESC, q.views DESC, q.updated_at DESC, q.created_at DESC LIMIT :limit OFFSET :offset',
-            [':query_exact' => $exact, ':query_prefix' => $prefixPattern, ':query_title' => $pattern, ':query_body' => $pattern, ':limit' => $limit, ':offset' => $offset]
+            [
+                ':query_exact' => $exact, ':query_prefix' => $prefixPattern,
+                ':query_title' => $pattern, ':query_body' => $pattern,
+                ':filter_title' => $pattern, ':filter_body' => $pattern,
+                ':limit' => $limit, ':offset' => $offset,
+            ]
         );
     }
 
@@ -772,6 +777,34 @@ final class QuestionModel
     public function vote(string $type, int $postId, int $userId, int $value): void
     {
         $this->applyVote($type, $postId, $userId, $value);
+    }
+
+    /** @param array<string, list<int>> $idsByType @return array<string, int> */
+    public function viewerVotes(int $userId, array $idsByType): array
+    {
+        if ($userId < 1) {
+            return [];
+        }
+
+        $conditions = [];
+        $params = [$userId];
+        foreach ($idsByType as $type => $ids) {
+            if ($ids === []) {
+                continue;
+            }
+            $conditions[] = '(post_type = ? AND post_id IN (' . implode(',', array_fill(0, count($ids), '?')) . '))';
+            array_push($params, $type, ...$ids);
+        }
+        if ($conditions === []) {
+            return [];
+        }
+
+        $votes = [];
+        foreach ($this->db->fetchAll('SELECT post_type, post_id, value FROM votes WHERE user_id = ? AND (' . implode(' OR ', $conditions) . ')', $params) as $row) {
+            $votes[$row['post_type'] . ':' . $row['post_id']] = (int) $row['value'];
+        }
+
+        return $votes;
     }
 
     /** @return array{user_id: int, reputation_delta: int, votes: int, current_vote: int}|null */

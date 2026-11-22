@@ -9,6 +9,19 @@ $pageTitle = isset($title) ? (string) $title . ' | ' . $site : $defaultTitle;
 $defaultDescription = trim((string) ($securitySettings['default_meta_description'] ?? '')) ?: (trim((string) ($securitySettings['site_description'] ?? '')) ?: 'A fast, secure community question and answer platform.');
 $description = (string) ($metaDescription ?? $defaultDescription);
 $requestPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+[, $surfacePath] = \Core\Request::splitLocalePath($requestPath);
+require_once BASE_PATH . '/views/partials/icon.php';
+$needsAppScript = !in_array($surfacePath, ['/about', '/contact', '/privacy', '/terms', '/community-guidelines', '/login', '/register', '/forgot-password', '/two-factor'], true)
+    && !str_starts_with($surfacePath, '/reset-password/');
+if (isset($questions) && preg_match('~^/(?:$|(?:activity|questions|unanswered|search|tag|category)(?:/|$))~', $surfacePath)) {
+    $needsAppScript = !empty($pageWidgets['has_widgets']);
+    foreach ($questions as $card) {
+        if (!empty($card['latest_media'])) {
+            $needsAppScript = true;
+            break;
+        }
+    }
+}
 $baseCanonicalUrl = (string) ($canonical ?? url($requestPath));
 $defaultLanguage = default_language();
 $currentLanguage = current_language();
@@ -56,6 +69,13 @@ if ($faviconPath !== '' && !str_starts_with($faviconPath, '/public-assets/images
 $assetUrl = static function (string $path): string {
     $file = BASE_PATH . $path;
     $version = is_file($file) ? (string) filemtime($file) : '1';
+    if (in_array($path, ['/public-assets/css/app.css', '/public-assets/js/app.js'], true)) {
+        $minified = preg_replace('/\.(css|js)$/', '.min.$1', $path);
+        $compiled = BASE_PATH . $minified;
+        if (is_file($compiled) && filemtime($compiled) >= (int) $version) {
+            return $minified . '?v=' . (string) filemtime($compiled);
+        }
+    }
 
     return $path . '?v=' . rawurlencode($version);
 };
@@ -78,7 +98,13 @@ if (isset($schemas) && is_array($schemas)) {
 <html lang="<?= h(current_language()) ?>">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#F7F9F6">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <?php if ($faviconPath === ''): ?><link rel="icon" href="/public-assets/images/app-icon.svg" type="image/svg+xml"><?php endif; ?>
+    <?php if (!empty($discussionTextUrl)): ?>
+        <link rel="alternate" type="text/markdown" href="<?= h($discussionTextUrl) ?>" title="Discussion in Markdown">
+    <?php endif; ?>
     <title><?= h($pageTitle) ?></title>
     <meta name="description" content="<?= h($description) ?>">
     <meta name="robots" content="<?= h($robotsContent) ?>">
@@ -123,7 +149,6 @@ if (isset($schemas) && is_array($schemas)) {
     <?php endif; ?>
     <meta name="twitter:card" content="<?= $ogImage !== '' ? 'summary_large_image' : 'summary' ?>">
     <?php if ($faviconPath !== ''): ?><link rel="icon" href="<?= h($faviconPath) ?>"><?php endif; ?>
-    <link rel="preload" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>" as="style">
     <link rel="stylesheet" href="<?= h($assetUrl('/public-assets/css/app.css')) ?>">
     <?php foreach ($schemaBlocks as $schemaBlock): ?>
         <script type="application/ld+json" nonce="<?= h(csp_nonce()) ?>"><?= str_replace(['</', '<', '>'], ['\u003C/', '\u003C', '\u003E'], (string) $schemaBlock) ?></script>
@@ -135,19 +160,30 @@ if (isset($schemas) && is_array($schemas)) {
     <?php endif; ?>
 </head>
 <body>
+<a class="skip-link" href="#main-content"><?= h(t('layout.skip_content', 'Skip to content')) ?></a>
 <header class="site-header">
     <a class="brand" href="<?= h(localized_path('/')) ?>">
         <?php if ($siteLogoPath !== ''): ?>
             <?= uploaded_image($siteLogoPath, 'site-logo', (string) $site) ?>
+        <?php else: ?>
+            <span class="brand-mark"><?= ui_icon('topics') ?></span>
         <?php endif; ?>
         <span><?= h($site) ?></span>
     </a>
     <form class="search" action="<?= h(localized_path('/search')) ?>" role="search">
         <label class="sr-only" for="q"><?= h(t('layout.search.label', 'Search')) ?></label>
-        <input id="q" name="q" value="<?= h($query ?? '') ?>" placeholder="<?= h(t('layout.search.placeholder', 'Search questions')) ?>">
+        <input id="q" type="search" enterkeyhint="search" name="q" value="<?= h($query ?? '') ?>" placeholder="<?= h(t('layout.search.placeholder', 'Search questions')) ?>">
+        <button class="search-submit" type="submit" aria-label="<?= h(t('layout.search.label', 'Search')) ?>"><?= ui_icon('search') ?></button>
     </form>
-    <nav aria-label="Primary">
-        <a href="<?= h(localized_path('/ask')) ?>"><?= h(t('layout.nav.ask', 'Ask')) ?></a>
+    <div class="header-actions">
+        <a class="button header-ask" href="<?= h(localized_path('/ask')) ?>"><?= ui_icon('ask') ?><?= h(t('layout.nav.ask', 'Ask')) ?></a>
+        <details class="header-menu">
+            <summary><?= h(t('layout.nav.menu', 'Menu')) ?></summary>
+            <nav aria-label="<?= h(t('layout.nav.primary', 'Primary navigation')) ?>">
+                <a href="<?= h(localized_path('/questions')) ?>"><?= h(t('layout.nav.questions', 'Questions')) ?></a>
+                <a href="<?= h(localized_path('/unanswered')) ?>"><?= h(t('layout.nav.unanswered', 'Unanswered')) ?></a>
+                <a href="<?= h(localized_path('/tags')) ?>"><?= h(t('layout.nav.tags', 'Tags')) ?></a>
+                <a href="<?= h(localized_path('/users')) ?>"><?= h(t('layout.nav.users', 'Members')) ?></a>
         <?php if (is_array($authUser)): ?>
             <a href="<?= h(localized_path('/user/' . (string) $authUser['username'])) ?>"><?= h((string) $authUser['username']) ?></a>
             <a href="<?= h(localized_path('/notifications')) ?>"><?= h(t('layout.nav.notifications', 'Notifications')) ?></a>
@@ -166,12 +202,14 @@ if (isset($schemas) && is_array($schemas)) {
             <a href="<?= h(localized_path('/login')) ?>"><?= h(t('layout.nav.sign_in', 'Sign in')) ?></a>
             <a href="<?= h(localized_path('/register')) ?>"><?= h(t('layout.nav.register', 'Register')) ?></a>
         <?php endif; ?>
-    </nav>
+            </nav>
+        </details>
+    </div>
 </header>
-<main class="site-main">
+<main class="site-main" id="main-content" tabindex="-1">
     <?php foreach ($flash as $type => $messages): ?>
         <?php foreach ($messages as $message): ?>
-            <p class="flash <?= h($type) ?>" role="status"><?= h($message) ?></p>
+            <p class="flash <?= h($type) ?>" role="<?= $type === 'error' ? 'alert' : 'status' ?>"><?= h($message) ?></p>
         <?php endforeach; ?>
     <?php endforeach; ?>
     <?= $content ?>
@@ -192,6 +230,26 @@ if (isset($schemas) && is_array($schemas)) {
     </nav>
     <p class="footer-copy">&copy; <?= h(date('Y')) ?> <?= h((string) $site) ?>. <?= h(t('layout.footer.copyright', 'All rights reserved.')) ?></p>
 </footer>
-<script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" nonce="<?= h(csp_nonce()) ?>" defer></script>
+<nav class="mobile-nav" aria-label="Quick navigation">
+    <?php
+    $quickLinks = [
+        ['questions', '/questions', t('layout.nav.questions', 'Questions')],
+        ['topics', '/tags', t('layout.nav.tags', 'Topics')],
+        ['ask', '/ask', t('layout.nav.ask', 'Ask')],
+        is_array($authUser)
+            ? ['notifications', '/notifications', t('layout.nav.notifications', 'Notifications')]
+            : ['members', '/users', t('layout.nav.users', 'Members')],
+    ];
+    ?>
+    <?php foreach ($quickLinks as [$icon, $path, $label]): ?>
+        <a href="<?= h(localized_path($path)) ?>" <?= $surfacePath === $path || ($surfacePath === '/' && $path === '/questions') ? 'aria-current="page"' : '' ?>>
+            <?= ui_icon($icon) ?><span><?= h($label) ?></span>
+        </a>
+    <?php endforeach; ?>
+</nav>
+<script src="<?= h($assetUrl('/public-assets/js/shell.js')) ?>" nonce="<?= h(csp_nonce()) ?>" defer></script>
+<?php if ($needsAppScript): ?>
+    <script src="<?= h($assetUrl('/public-assets/js/app.js')) ?>" nonce="<?= h(csp_nonce()) ?>" defer></script>
+<?php endif; ?>
 </body>
 </html>

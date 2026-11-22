@@ -23,22 +23,32 @@ final class Request
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $path = parse_url($uri, PHP_URL_PATH);
         $path = is_string($path) && $path !== '' ? '/' . trim($path, '/') : '/';
-        $locale = '';
-        if ($path !== '/' && preg_match('#^/([a-z]{2,3}(?:-[a-z0-9]{2,8})?)(?:/|$)#i', $path, $matches) === 1) {
-            $locale = strtolower((string) ($matches[1] ?? ''));
-            $trimmed = substr($path, strlen((string) $matches[0]) - 1);
-            $path = $trimmed !== '' ? $trimmed : '/';
-        }
+        [$locale, $path] = self::splitLocalePath($path);
         $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
-        if ($method === 'POST' && isset($_POST['_method'])) {
-            $override = strtoupper((string) $_POST['_method']);
+        if ($method === 'POST' && is_string($_POST['_method'] ?? null)) {
+            $override = strtoupper($_POST['_method']);
             if (in_array($override, ['PUT', 'PATCH', 'DELETE'], true)) {
                 $method = $override;
             }
         }
 
         return new self($method, $uri, $path === '//' ? '/' : $path, $locale, $_GET, $_POST, $_FILES, $_SERVER);
+    }
+
+    /** @return array{string, string} */
+    public static function splitLocalePath(string $path): array
+    {
+        if (preg_match('#^/([a-z]{2,3}(?:-[a-z0-9]{2,8})?)(?=/|$)#i', $path, $matches) !== 1) {
+            return ['', $path];
+        }
+
+        $prefix = strtolower($matches[1]);
+        if (in_array($prefix, ['ask', 'tag'], true)) {
+            return ['', $path];
+        }
+
+        return [$prefix, substr($path, strlen($matches[0])) ?: '/'];
     }
 
     public function isGet(): bool

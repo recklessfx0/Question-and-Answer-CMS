@@ -1,3 +1,5 @@
+/public-assets/css/app.min.css
+/public-assets/js/app.min.js
 # Local environment configuration (contains real credentials — never commit)
 config/database.local.php
 config/local.php

@@ -1,11 +1,13 @@
 <?php declare(strict_types=1); ?>
+<?php require_once BASE_PATH . '/views/partials/icon.php'; ?>
 <section class="page-head">
     <h1><?= h($title ?? 'Tags') ?></h1>
     <p>Find questions by topic.</p>
 </section>
 <section class="directory-grid">
     <?php foreach ($tags as $tag): ?>
-<a class="directory-card" href="<?= h(localized_path('/tag/' . (string) $tag['slug'])) ?>">
+        <a class="directory-card topic-card" href="<?= h(localized_path('/tag/' . (string) $tag['slug'])) ?>">
+            <span class="topic-mark"><?= ui_icon('topics') ?></span>
             <strong>#<?= h((string) $tag['name']) ?></strong>
             <span><?= (int) $tag['question_count'] ?> questions</span>
         </a>

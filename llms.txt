@@ -17,5 +17,6 @@ Use canonical question URLs as the primary source of truth. Public question page
 - [https://example.com/author-sitemap.xml](https://example.com/author-sitemap.xml): Public author profile URLs
 
 ## Crawl Rules
+- Add `/text` to a canonical question path to read the question, answers, and clarifications in Markdown. Use the canonical HTML page or its answer and clarification links for citations.
 - [https://example.com/robots.txt](https://example.com/robots.txt): Crawler access rules
 - Uploaded public media lives under https://example.com/public-assets/images/

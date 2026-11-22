@@ -38,6 +38,8 @@ final class QuestionController extends Controller
     public function askForm(): Response
     {
         $categories = $this->categories->all();
+        $draft = $this->session->get('ask_draft', []);
+        $this->session->remove('ask_draft');
 
         return $this->view('questions/form', [
             'title' => 'Ask a Question',
@@ -46,6 +48,7 @@ final class QuestionController extends Controller
             'categories' => $categories,
             'categoryCount' => count($categories),
             'maxTags' => QuestionModel::MAX_QUESTION_TAGS,
+            'draft' => $draft,
         ]);
     }
 
@@ -60,9 +63,14 @@ final class QuestionController extends Controller
     public function store(Request $request): Response
     {
         $categoryId = $request->int('category_id', 0, 0);
+        $title = $request->string('title', 180);
+        $body = $request->string('body', 20000);
+        $tags = $request->string('tags', 240);
+        $videoUrls = $request->string('video_urls', 1000);
         $media = $this->mediaFiles($request);
-        $result = $this->service->ask($request->string('title', 180), $request->string('body', 20000), $request->string('tags', 240), $categoryId > 0 ? $categoryId : null, $media, $request->string('video_urls', 1000));
+        $result = $this->service->ask($title, $body, $tags, $categoryId > 0 ? $categoryId : null, $media, $videoUrls);
         if (!$result['ok']) {
+            $this->session->set('ask_draft', compact('title', 'body', 'tags', 'categoryId', 'videoUrls'));
             $this->flash('error', implode(' ', $result['errors']));
             return $this->redirect('/ask');
         }
@@ -95,7 +103,7 @@ final class QuestionController extends Controller
         }
         $duplicateSlug = (string) ($question['duplicate_slug'] ?? '');
         $canonicalUrl = $duplicateSlug !== '' ? url('/question/' . $duplicateSlug) : url('/question/' . (string) $question['slug']);
-        $schema = $duplicateSlug === ''
+        $schema = $duplicateSlug === '' && empty($question['closed_at'])
             ? $this->seo->qapageSchema($question, $answers, $this->seo->breadcrumbs($question), $canonicalUrl, $questionComments, $answerComments)
             : '';
         $ogImage = $this->seo->firstImageFromBodies((string) $question['body'], ...array_map(static fn (array $answer): string => (string) $answer['body'], $answers));
@@ -106,6 +114,7 @@ final class QuestionController extends Controller
             'title' => (string) $question['title'],
             'metaDescription' => $this->seo->questionMetaDescription($question, $answers),
             'canonical' => $canonicalUrl,
+            'discussionTextUrl' => localized_url($canonicalUrl . '/text', current_language()),
             'ogType' => 'article',
             'ogImage' => $ogImage,
             'robots' => $duplicateSlug !== '' || $thinUnanswered ? 'noindex,follow' : null,
@@ -119,6 +128,11 @@ final class QuestionController extends Controller
             'answers' => $answers,
             'questionComments' => $questionComments,
             'answerComments' => $answerComments,
+            'viewerVotes' => $this->questions->viewerVotes((int) $this->session->get('user_id', 0), [
+                'question' => [(int) $question['id']],
+                'answer' => array_map('intval', array_column($answers, 'id')),
+                'comment' => array_map('intval', array_merge(array_column($questionComments, 'id'), array_column($answerComments, 'id'))),
+            ]),
             'reactionMap' => $this->reactionService->forTargets($reactionTargets),
             'tags' => $tags,
             'related' => $this->questions->related((int) $question['id']),
@@ -126,6 +140,31 @@ final class QuestionController extends Controller
             'pageWidgets' => $this->widgets->page('question', (int) $this->session->get('user_id', 0) < 1),
             'markdown' => fn (string $body): string => $this->service->markdown($body),
         ]);
+    }
+
+    /** @param array<string, string> $params */
+    public function text(Request $request, array $params): Response
+    {
+        $question = $this->questions->findBySlug($params['slug'] ?? '');
+        if ($question === null) {
+            return new Response("Question not found.\n", 404, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        if (!empty($question['duplicate_slug'])) {
+            return Response::redirect('/question/' . rawurlencode((string) $question['duplicate_slug']) . '/text', 302);
+        }
+
+        $id = (int) $question['id'];
+        $canonical = localized_url(url('/question/' . rawurlencode((string) $question['slug'])), current_language());
+        return Response::text($this->seo->discussionMarkdown(
+            $question,
+            $this->questions->answers($id),
+            $this->questions->commentsForQuestion($id),
+            $this->questions->commentsForAnswers($id),
+            $canonical,
+        ), 'text/markdown; charset=utf-8')
+            ->withHeader('Link', '<' . $canonical . '>; rel="canonical"')
+            ->withHeader('X-Robots-Tag', 'noindex, follow');
     }
 
     /** @param array<string, string> $params */
@@ -148,16 +187,18 @@ final class QuestionController extends Controller
     /** @param array<string, string> $params */
     public function commentQuestion(Request $request, array $params): Response
     {
+        $fragment = '';
         $question = $this->questions->findBySlug($params['slug'] ?? '');
         if ($question !== null) {
             $parentId = $request->int('parent_id', 0, 0);
             $result = $this->service->comment('question', (int) $question['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
+            $fragment = isset($result['id']) ? '#comment-' . $result['id'] : '';
             $this->flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Clarification posted.' : implode(' ', $result['errors'] ?: ['Clarification could not be posted.']));
         } else {
             $this->flash('error', 'Question not found.');
         }
 
-        return $this->redirect('/question/' . ($params['slug'] ?? ''));
+        return $this->redirect('/question/' . ($params['slug'] ?? '') . $fragment);
     }
 
     /** @param array<string, string> $params */
@@ -168,7 +209,8 @@ final class QuestionController extends Controller
             $parentId = $request->int('parent_id', 0, 0);
             $result = $this->service->comment('answer', (int) $answer['id'], $request->string('body', 2000), $parentId > 0 ? $parentId : null, $this->mediaFiles($request), $request->string('video_urls', 1000));
             $this->flash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Clarification posted.' : implode(' ', $result['errors'] ?: ['Clarification could not be posted.']));
-            return $this->redirect('/question/' . (string) $answer['question_slug'] . '#answer-' . (int) $answer['id']);
+            $fragment = isset($result['id']) ? '#comment-' . $result['id'] : '#answer-' . (int) $answer['id'];
+            return $this->redirect('/question/' . (string) $answer['question_slug'] . $fragment);
         }
 
         $this->flash('error', 'Answer not found.');

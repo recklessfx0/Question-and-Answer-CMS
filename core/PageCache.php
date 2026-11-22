@@ -9,36 +9,42 @@ final class PageCache
     public function __construct(private string $path)
     {
         if (!is_dir($path)) {
-            mkdir($path, 0750, true);
+            @mkdir($path, 0750, true);
         }
     }
 
-    public function get(string $uri): ?string
+    public function get(string $uri, string $nonce): ?string
     {
         $file = $this->file($uri);
         if (!is_file($file)) {
             return null;
         }
 
-        $contents = (string) file_get_contents($file);
-        $newline = strpos($contents, "\n");
-        if ($newline === false || (int) substr($contents, 0, $newline) < time()) {
-            if (is_file($file)) {
-                unlink($file);
-            }
+        $contents = @file_get_contents($file);
+        if ($contents === false) {
             return null;
         }
 
-        return substr($contents, $newline + 1);
+        $parts = explode("\n", $contents, 3);
+        if (count($parts) !== 3 || (int) $parts[0] <= time() || !preg_match('/^[a-f0-9]{32}$/D', $parts[1])) {
+            return null;
+        }
+
+        return str_replace('nonce="' . $parts[1] . '"', 'nonce="' . $nonce . '"', $parts[2]);
     }
 
-    public function put(string $uri, string $html, int $seconds): void
+    public function put(string $uri, string $html, string $nonce, int $seconds): void
     {
-        file_put_contents($this->file($uri), (string) (time() + $seconds) . "\n" . $html, LOCK_EX);
+        $file = $this->file($uri);
+        $temporary = $file . '.' . bin2hex(random_bytes(8)) . '.tmp';
+        $contents = (time() + $seconds) . "\n" . $nonce . "\n" . $html;
+        if (@file_put_contents($temporary, $contents) !== strlen($contents) || !@rename($temporary, $file)) {
+            @unlink($temporary);
+        }
     }
 
     private function file(string $uri): string
     {
-        return rtrim($this->path, '/\\') . DIRECTORY_SEPARATOR . hash('sha256', $uri) . '.html';
+        return rtrim($this->path, '/\\') . DIRECTORY_SEPARATOR . hash('sha256', 'v8:' . $uri) . '.html';
     }
 }

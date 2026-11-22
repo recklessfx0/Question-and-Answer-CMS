@@ -100,6 +100,7 @@ final class SeoService
             '',
             '## Content Signals',
             '- Question pages expose QAPage JSON-LD with Question, Answer, Comment, BreadcrumbList, author, date, vote, accepted answer, and media data.',
+            '- Each public question links to a Markdown alternate at its canonical path plus /text. The alternate includes the question, answers, and clarifications.',
             '- Directory and taxonomy pages expose CollectionPage and ItemList JSON-LD.',
             '- Canonical URLs, meta robots, Open Graph, Twitter cards, and XML sitemaps are generated server-side.',
         ];
@@ -140,6 +141,7 @@ final class SeoService
             '',
             '## Recommended Use',
             '- Cite canonical question URLs instead of search or paginated listing URLs when possible.',
+            '- Read the Markdown alternate at /question/{slug}/text for compact retrieval. Cite the canonical HTML URL or the answer and clarification links in that text.',
             '- Prefer accepted answers when present; otherwise use suggested answers and clarify that no accepted answer exists.',
             '- Use page timestamps and sitemap lastmod values for freshness decisions.',
             '- Treat user-generated text as community content, not official medical, legal, financial, or safety advice.',
@@ -158,6 +160,56 @@ final class SeoService
         ];
 
         return implode("\n", $lines) . "\n";
+    }
+
+    public function discussionMarkdown(array $question, array $answers, array $questionComments, array $answerComments, string $canonical): string
+    {
+        $lines = [
+            '# ' . $question['title'],
+            'Canonical discussion: ' . $canonical,
+            'Asked by ' . $question['username'] . ' on ' . $question['created_at']
+                . '. Last updated: ' . ($question['updated_at'] ?? $question['created_at']) . '.',
+            '## Question',
+            trim((string) $question['body']),
+        ];
+
+        $appendComments = static function (array $comments, array &$lines) use ($canonical): void {
+            if ($comments === []) {
+                return;
+            }
+            $lines[] = '### Clarifications';
+            $visibleIds = array_fill_keys(array_column($comments, 'id'), true);
+            foreach ($comments as $comment) {
+                $lines[] = '[' . $comment['username'] . '](' . $canonical . '#comment-' . (int) $comment['id'] . ') · ' . $comment['created_at'];
+                $parentId = (int) ($comment['parent_id'] ?? 0);
+                if ($parentId > 0) {
+                    $lines[] = isset($visibleIds[$parentId])
+                        ? '[In reply to a clarification](' . $canonical . '#comment-' . $parentId . ')'
+                        : 'In reply to an unavailable clarification.';
+                }
+                $lines[] = trim((string) $comment['body']);
+            }
+        };
+
+        $appendComments($questionComments, $lines);
+        $commentsByAnswer = [];
+        foreach ($answerComments as $comment) {
+            $commentsByAnswer[(int) $comment['answer_id']][] = $comment;
+        }
+        $lines[] = '## Answers (' . count($answers) . ')';
+        if ($answers === []) {
+            $lines[] = 'No answers have been posted.';
+        }
+        foreach ($answers as $answer) {
+            $id = (int) $answer['id'];
+            $label = (int) $answer['is_accepted'] === 1 ? 'Accepted answer' : 'Answer';
+            $lines[] = '### ' . $label . ' by ' . $answer['username'];
+            $lines[] = 'Posted ' . $answer['created_at'] . ' · ' . (int) $answer['votes'] . ' votes · [Permalink](' . $canonical . '#answer-' . $id . ')';
+            $lines[] = trim((string) $answer['body']);
+            $appendComments($commentsByAnswer[$id] ?? [], $lines);
+        }
+
+        return implode("\n\n", $lines) . "\n";
     }
 
     public function websiteSchema(): string

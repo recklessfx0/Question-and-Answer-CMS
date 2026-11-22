@@ -61,6 +61,7 @@ return static function (Router $router): void {
     $router->get('/ask/suggest', [QuestionController::class, 'suggest'], [AuthMiddleware::class]);
     $router->post('/ask', [QuestionController::class, 'store'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
     $router->get('/question/{slug}', [QuestionController::class, 'show']);
+    $router->get('/question/{slug}/text', [QuestionController::class, 'text']);
     $router->post('/question/{slug}/answer', [QuestionController::class, 'answer'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/question/{slug}/comment', [QuestionController::class, 'commentQuestion'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
     $router->post('/answer/{id}/comment', [QuestionController::class, 'commentAnswer'], [CsrfMiddleware::class, AuthMiddleware::class, RateLimitMiddleware::class]);
