@@ -2299,14 +2299,6 @@ label { display: grid; gap: 5px; margin: 12px 0; font-weight: 650; }
     min-height: 26px;
     padding: 2px 7px;
 }
-.comment-compose-tools {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.comment-compose-tools input[type="text"],
-.comment-compose-tools input:not([type]) { flex: 1 1 220px; }
 .quote-comment { min-height: 30px; padding: 4px 8px; }
 .attachment-control {
     display: inline-flex;
@@ -3123,9 +3115,6 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .comment::before { left: -10px; width: 10px; }
     .comment-children { margin-left: 10px; padding-left: 14px; }
     .post-media-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .comment-compose-tools { align-items: stretch; }
-    .comment-compose-tools input[type="text"],
-    .comment-compose-tools input:not([type]) { flex-basis: 100%; }
     .score {
         display: inline-flex;
         align-items: center;
@@ -3275,8 +3264,6 @@ th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; 
     .comment::before { left: -7px; width: 7px; }
     .comment .vote-box-compact { width: 24px; min-width: 24px; }
     .post-media-gallery { grid-template-columns: 1fr; }
-    .comment-compose-tools button,
-    .comment-compose-tools .attachment-control { width: 100%; }
     .inline { width: 100%; }
     .inline button { width: 100%; }
     .editor-toolbar {
@@ -4819,17 +4806,21 @@ body { background: var(--panel); }
 .discussion-flow .comment-thread-composer > summary::-webkit-details-marker { display: none; }
 .discussion-flow .answer-form { margin-block: 1.25rem; }
 .discussion-flow .answer-form h2 { margin: 0 0 1rem; }
-.discussion-flow .answer-compose { display: grid; gap: .8rem; max-width: none; }
+.discussion-flow :is(.answer-compose,.comment-composer) { display: grid; gap: .65rem; max-width: none; }
+.discussion-flow .comment-composer { padding: 0; border: 0; background: none; }
 .answer-compose .answer-body-field,
 .answer-compose .answer-attachment-fields label { margin: 0; }
-.answer-compose textarea {
+:is(.answer-compose,.comment-composer) textarea {
     min-height: 9rem;
     resize: vertical;
     font: inherit;
     font-weight: 400;
 }
-.answer-compose .editor-toolbar { gap: .25rem; padding: .25rem; }
-.answer-compose .editor-toolbar .editor-tool {
+.discussion-flow .comment-composer textarea { min-height: 5.5rem; }
+.discussion-flow .quote-context { padding-inline: 0; border: 0; background: none; }
+.math-source[data-display-math], .editor-preview pre { overflow-x: auto; }
+:is(.answer-compose,.comment-composer) .editor-toolbar { gap: .25rem; padding: .25rem; }
+:is(.answer-compose,.comment-composer) .editor-toolbar .editor-tool {
     min-height: 44px;
     min-width: 44px;
     padding: .25rem;
@@ -4837,10 +4828,10 @@ body { background: var(--panel); }
     background: transparent;
     color: var(--ink);
 }
-.answer-compose .editor-tool .editor-tool-mark { background: none; }
-.answer-compose .editor-tool:not(.editor-preview-toggle) .editor-tool-text,
-.answer-compose .editor-preview-toggle .editor-tool-mark { display: none; }
-.answer-compose .editor-preview-toggle { margin-inline-start: auto; }
+:is(.answer-compose,.comment-composer) .editor-tool .editor-tool-mark { background: none; }
+:is(.answer-compose,.comment-composer) .editor-tool:not(.editor-preview-toggle) .editor-tool-text,
+:is(.answer-compose,.comment-composer) .editor-preview-toggle .editor-tool-mark { display: none; }
+:is(.answer-compose,.comment-composer) .editor-preview-toggle { margin-inline-start: auto; }
 .answer-attachments {
     min-width: 0;
     padding: .1rem .65rem;

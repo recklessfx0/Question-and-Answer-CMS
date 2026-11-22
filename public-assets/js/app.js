@@ -28,13 +28,49 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
-    const inlineMarkdown = (value) => escapeHtml(value)
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="nofollow ugc noopener noreferrer">$1</a>');
+    const inlineMarkdown = (value) => value.split(/(`[^`\r\n]+`|(?<![\\$])\$(?![\s$])[^$\r\n]+?(?<!\s)\$(?![\d$]))/g)
+        .map((part, index) => {
+            if (index % 2) {
+                const body = escapeHtml(part.slice(1, -1));
+                return part.startsWith('`') ? '<code>' + body + '</code>' : '<span class="math-source">' + body + '</span>';
+            }
+            return escapeHtml(part)
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="nofollow ugc noopener noreferrer">$1</a>');
+        }).join('');
+
+    let mathLibrary;
+    const renderMath = (root) => {
+        const expressions = root.querySelectorAll('.math-source');
+        if (!expressions.length) return;
+        mathLibrary ??= new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = '/public-assets/js/math.min.js';
+            script.onload = () => resolve(window.katex);
+            script.onerror = () => resolve(null);
+            document.head.append(script);
+        });
+        mathLibrary.then((katex) => expressions.forEach((item) => {
+            if (!katex || item.querySelector('math') || item.textContent.length > 2000) return;
+            try {
+                katex.render(item.textContent, item, {
+                    output: 'mathml', displayMode: item.hasAttribute('data-display-math'),
+                    trust: false, maxExpand: 200, maxSize: 10,
+                });
+            } catch {
+                // Leave the escaped TeX source readable if rendering is unavailable.
+            }
+        }));
+    };
 
     const renderMarkdownPreview = (markdown) => {
+        const parts = markdown.split(/(^`{3,}[^\n]*\n[\s\S]*?^[ \t]*`{3,}[ \t]*$|^\$\$[ \t]*\n[\s\S]*?^\$\$[ \t]*$)/m);
+        if (parts.length > 1) return parts.map((part, index) => {
+            if (index % 2 === 0) return part.trim() ? renderMarkdownPreview(part) : '';
+            if (part.startsWith('`')) return '<pre><code>' + escapeHtml(part.split('\n').slice(1, -1).join('\n')) + '</code></pre>';
+            return '<div class="math-source" data-display-math>' + escapeHtml(part.trim().slice(2,-2).trim()) + '</div>';
+        }).join('');
         const blocks = String(markdown || '').replace(/\r\n?/g, '\n').split(/\n{2,}/);
         const html = [];
         let listItems = [];
@@ -78,6 +114,7 @@
 
         return html.length > 0 ? html.join('') : '<p class="meta">Nothing to preview yet.</p>';
     };
+    renderMath(document);
 
     const setShareStatus = (trigger, message) => {
         const action = trigger.closest('.share-action');
@@ -157,7 +194,8 @@
         [
             ['bold', 'B', 'Bold', 'Ctrl+B', () => wrapSelection(textarea, '**', '**', 'bold text')],
             ['italic', 'I', 'Italic', 'Ctrl+I', () => wrapSelection(textarea, '*', '*', 'italic text')],
-            ['code', '</>', 'Code', 'Ctrl+`', () => wrapSelection(textarea, '`', '`', 'code')],
+            ['code', '</>', 'Code block', '', () => wrapSelection(textarea, '\n\n```\n', '\n```\n\n', 'code')],
+            ['math', '∑', 'Equation', '', () => wrapSelection(textarea, '\n\n$$\n', '\n$$\n\n', 'x^2 + y^2 = z^2')],
             ['heading', 'H2', 'Heading', '', () => prefixLines(textarea, '## ', 'Heading')],
             ['quote', '>', 'Quote', '', () => prefixLines(textarea, '> ', 'Quoted text')],
             ['list', 'List', 'List', '', () => prefixLines(textarea, '- ', 'First point\nSecond point')],
@@ -199,6 +237,7 @@
             previewButton.setAttribute('aria-pressed', showing ? 'false' : 'true');
             if (!showing) {
                 preview.innerHTML = renderMarkdownPreview(textarea.value);
+                renderMath(preview);
             } else {
                 textarea.focus();
             }
@@ -212,6 +251,7 @@
             count.textContent = words + ' words - ' + chars + ' characters' + needed;
             if (!preview.hidden) {
                 preview.innerHTML = renderMarkdownPreview(textarea.value);
+                renderMath(preview);
             }
         };
 
@@ -859,30 +899,11 @@
 
         event.preventDefault();
         const author = button.dataset.quoteAuthor || 'user';
-        const body = button.dataset.quoteBody || '';
-        const mention = '@' + author.replace(/[^a-zA-Z0-9_-]/g, '');
-        const quotedLines = body
-            .replace(/\r\n?/g, '\n')
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
-            .map((line) => '> ' + line)
-            .join('\n');
-        const quote = ['> ' + mention + ' wrote:', quotedLines, ''].filter((line) => line !== '').join('\n') + '\n\n';
         const parentInput = form.querySelector('[data-quote-parent-input]');
-        const quoteInput = form.querySelector('[data-quote-id-input]');
         const context = form.querySelector('[data-quote-context]');
         const contextText = form.querySelector('[data-quote-context-text]');
-        const previousQuote = form.dataset.activeQuote || '';
-        if (previousQuote && textarea.value.includes(previousQuote)) {
-            textarea.value = textarea.value.replace(previousQuote, '').trim();
-        }
-        const prefix = textarea.value.trim() === '' ? '' : '\n\n';
         if (parentInput instanceof HTMLInputElement) {
             parentInput.value = button.dataset.quoteParent || '0';
-        }
-        if (quoteInput instanceof HTMLInputElement) {
-            quoteInput.value = button.dataset.quoteParent || '0';
         }
         if (context instanceof HTMLElement) {
             context.hidden = false;
@@ -890,8 +911,6 @@
         if (contextText instanceof HTMLElement) {
             contextText.textContent = 'Replying to ' + author;
         }
-        form.dataset.activeQuote = quote;
-        textarea.value += prefix + quote;
         textarea.focus();
         textarea.setSelectionRange(textarea.value.length, textarea.value.length);
         form.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
@@ -906,24 +925,12 @@
 
         const form = button.closest('form');
         const parentInput = form ? form.querySelector('[data-quote-parent-input]') : null;
-        const quoteInput = form ? form.querySelector('[data-quote-id-input]') : null;
         const context = form ? form.querySelector('[data-quote-context]') : null;
         if (parentInput instanceof HTMLInputElement) {
             parentInput.value = '0';
         }
-        if (quoteInput instanceof HTMLInputElement) {
-            quoteInput.value = '0';
-        }
         if (context instanceof HTMLElement) {
             context.hidden = true;
-        }
-        if (form instanceof HTMLFormElement) {
-            const textarea = form.querySelector('textarea[name="body"]');
-            const previousQuote = form.dataset.activeQuote || '';
-            if (textarea instanceof HTMLTextAreaElement && previousQuote && textarea.value.includes(previousQuote)) {
-                textarea.value = textarea.value.replace(previousQuote, '').trim();
-            }
-            delete form.dataset.activeQuote;
         }
     });
 

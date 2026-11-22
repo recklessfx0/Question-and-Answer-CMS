@@ -30,7 +30,9 @@ node scripts/build-frontend.mjs
 node tests/frontend_budget.mjs
 ```
 
-The build uses esbuild only at build time. Deploy the generated CSS and JavaScript alongside the source assets. PHP selects the minified files when they are current. The budget check limits initial CSS to 20 KB and initial JavaScript to 50 KB after gzip. Apache can compress static CSS, JavaScript, and SVG when `mod_deflate` is enabled.
+The build uses esbuild only at build time. Deploy the generated CSS and JavaScript alongside the source assets, including `math.min.js` and its license. PHP selects the minified files when they are current. The budget check limits initial CSS to 20 KB and initial JavaScript to 50 KB after gzip. Apache can compress static CSS, JavaScript, and SVG when `mod_deflate` is enabled.
+
+Answers and replies support fenced code, lists, links, quote blocks, and equations. Use dollar delimiters for inline math and double dollar delimiters on separate lines for a display equation. Equations load a local KaTeX build on demand for native MathML. The published Markdown endpoint preserves the original code and TeX source.
 
 The service worker registers on HTTPS or loopback. It caches only versioned shell assets from a fixed list. HTML and API responses stay on the network, including account, moderation, and administrator pages. A local fallback explains how to return online when navigation fails.
 

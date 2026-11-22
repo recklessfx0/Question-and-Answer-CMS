@@ -136,22 +136,9 @@ foreach ($answerComments as $commentLookup) {
     $answerCommentTrees[$answerId][$parentId][] = $commentLookup;
 }
 
-$quotePreview = static function (string $body, int $wordLimit = 5): string {
-    $words = preg_split('/\s+/', trim(strip_tags($body))) ?: [];
-    $words = array_values(array_filter($words, static fn (string $word): bool => $word !== ''));
-    if ($words === []) {
-        return '';
-    }
 
-    $limited = array_slice($words, 0, $wordLimit);
-    $suffix = count($words) > $wordLimit ? '...' : '';
-
-    return implode(' ', $limited) . $suffix;
-};
-
-$renderComment = static function (array $comment, string $composerId, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question, $quotePreview): void {
+$renderComment = static function (array $comment, string $composerId, int $depth = 0) use ($authUser, $csrf, $renderVote, $renderReportButton, $renderShareLink, $markdown, $allCommentsById, $canModerate, $commentsOpen, $question): void {
     $parent = isset($comment['parent_id']) ? ($allCommentsById[(int) $comment['parent_id']] ?? null) : null;
-    $quoteBody = $quotePreview((string) $comment['body']);
     $depthClass = 'comment-depth-' . min(6, max(0, $depth));
     $commentUrl = url('/question/' . rawurlencode((string) $question['slug']) . '#comment-' . (int) $comment['id']);
     $commentTitle = strtr(t('questions.share.clarification_title', 'Clarification by :username', ['username' => (string) ($comment['username'] ?? '')]), [':username' => (string) ($comment['username'] ?? '')]);
@@ -182,7 +169,7 @@ $renderComment = static function (array $comment, string $composerId, int $depth
                 <?php $renderShareLink($commentUrl, $commentTitle, t('questions.share.action', 'Share')); ?>
                 <?php if (is_array($authUser)): ?>
                     <?php if ($commentsOpen): ?>
-                        <button type="button" class="button-secondary quote-comment" data-quote-comment data-quote-inline-target="<?= h($composerId) ?>" data-quote-parent="<?= (int) $comment['id'] ?>" data-quote-author="<?= h((string) $comment['username']) ?>" data-quote-body="<?= h($quoteBody) ?>">Reply</button>
+                        <button type="button" class="button-secondary quote-comment" data-quote-comment data-quote-inline-target="<?= h($composerId) ?>" data-quote-parent="<?= (int) $comment['id'] ?>" data-quote-author="<?= h((string) $comment['username']) ?>">Reply</button>
                     <?php endif; ?>
                     <?php $renderReportButton('comment', (int) $comment['id'], 'Report'); ?>
                     <?php if ($canModerate): ?>
@@ -320,10 +307,9 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                 <form method="post" action="/question/<?= h((string) $question['slug']) ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data">
                     <?= $csrf->field('/question/' . (string) $question['slug'] . '/comment') ?>
                     <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
-                    <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
                     <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                    <textarea name="body" aria-label="Clarification text" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
-                    <div class="comment-compose-tools">
+                    <textarea name="body" aria-label="Clarification text" rows="3" maxlength="2000" placeholder="Write a clarification…" data-markdown-editor data-editor-context="reply" data-mentionable></textarea>
+                    <details class="answer-attachments"><summary>Add media or video links</summary><div class="answer-attachment-fields">
                         <label class="attachment-control">Attach media
                             <input
                                 name="media[]"
@@ -338,13 +324,10 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                                 data-upload-empty-message="Attach images or short videos to support your clarification."
                             >
                         </label>
-                        <input name="video_urls" aria-label="Video links" inputmode="url" maxlength="1000" placeholder="YouTube or Vimeo URL">
-                        <button type="submit">Reply</button>
-                    </div>
-                    <div class="upload-feedback upload-feedback-inline" data-upload-feedback>
+                        <input name="video_urls" aria-label="Video links" inputmode="url" maxlength="1000" placeholder="YouTube or Vimeo URL"></div><div class="upload-feedback upload-feedback-inline" data-upload-feedback>
                         <p class="field-help upload-feedback-summary" data-upload-summary>Attach images or short videos to support your clarification.</p>
                         <ul class="upload-feedback-list" data-upload-list hidden></ul>
-                    </div>
+                    </div></details><div class="answer-submit"><button type="submit">Post reply</button></div>
                 </form>
             </details>
         <?php elseif (is_array($authUser)): ?>
@@ -452,10 +435,9 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                                 <form method="post" action="/answer/<?= (int) $answer['id'] ?>/comment" class="comment-form comment-composer" enctype="multipart/form-data">
                                     <?= $csrf->field('/answer/' . (int) $answer['id'] . '/comment') ?>
                                     <input type="hidden" name="parent_id" value="0" data-quote-parent-input>
-                                    <input type="hidden" name="quoted_comment_id" value="0" data-quote-id-input>
                                     <div class="quote-context" data-quote-context hidden><span data-quote-context-text></span><button type="button" class="button-secondary" data-clear-quote>Clear</button></div>
-                                    <textarea name="body" aria-label="Clarification text" rows="2" maxlength="2000" placeholder="Reply in this thread. Use @username to mention someone." data-mentionable></textarea>
-                                    <div class="comment-compose-tools">
+                                    <textarea name="body" aria-label="Clarification text" rows="3" maxlength="2000" placeholder="Write a clarification…" data-markdown-editor data-editor-context="reply" data-mentionable></textarea>
+                                    <details class="answer-attachments"><summary>Add media or video links</summary><div class="answer-attachment-fields">
                                         <label class="attachment-control">Attach media
                                             <input
                                                 name="media[]"
@@ -470,13 +452,10 @@ $questionShareTitle = (string) ($question['title'] ?? t('questions.share.questio
                                                 data-upload-empty-message="Attach images or short videos to support your clarification."
                                             >
                                         </label>
-                                        <input name="video_urls" aria-label="Video links" inputmode="url" maxlength="1000" placeholder="YouTube or Vimeo URL">
-                                        <button type="submit">Reply</button>
-                                    </div>
-                                    <div class="upload-feedback upload-feedback-inline" data-upload-feedback>
+                                        <input name="video_urls" aria-label="Video links" inputmode="url" maxlength="1000" placeholder="YouTube or Vimeo URL"></div><div class="upload-feedback upload-feedback-inline" data-upload-feedback>
                                         <p class="field-help upload-feedback-summary" data-upload-summary>Attach images or short videos to support your clarification.</p>
                                         <ul class="upload-feedback-list" data-upload-list hidden></ul>
-                                    </div>
+                                    </div></details><div class="answer-submit"><button type="submit">Post reply</button></div>
                                 </form>
                             </details>
                         <?php elseif (is_array($authUser)): ?>
